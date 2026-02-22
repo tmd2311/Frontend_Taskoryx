@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(npm install)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)",
+      "Bash(cat:*)",
+      "Bash(cd /e/DOAN/FE/task-management-app && npx tsc --noEmit 2>&1)",
+      "Bash(cd:*)",
+      "Bash(head:*)"
+    ]
+  }
+}

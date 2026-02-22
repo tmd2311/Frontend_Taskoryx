@@ -1,0 +1,90 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "email": "admin@example.com",
+      "password": "admin123",
+      "fullName": "Administrator",
+      "avatar": "",
+      "role": "admin"
+    },
+    {
+      "id": 2,
+      "username": "user",
+      "email": "user@example.com",
+      "password": "user123",
+      "fullName": "Test User",
+      "avatar": "",
+      "role": "user"
+    }
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Setup project structure",
+      "description": "Create initial project structure and configure build tools",
+      "status": "DONE",
+      "priority": "HIGH",
+      "assigneeId": 1,
+      "dueDate": "2026-01-20T00:00:00.000Z",
+      "createdAt": "2026-01-15T10:00:00.000Z",
+      "updatedAt": "2026-01-20T15:30:00.000Z"
+    },
+    {
+      "id": 2,
+      "title": "Implement authentication",
+      "description": "Add login and registration functionality with JWT",
+      "status": "IN_PROGRESS",
+      "priority": "URGENT",
+      "assigneeId": 1,
+      "dueDate": "2026-01-28T00:00:00.000Z",
+      "createdAt": "2026-01-18T09:00:00.000Z",
+      "updatedAt": "2026-01-25T14:20:00.000Z"
+    },
+    {
+      "id": 3,
+      "title": "Design database schema",
+      "description": "Create ERD and design database tables",
+      "status": "REVIEW",
+      "priority": "MEDIUM",
+      "assigneeId": 2,
+      "dueDate": "2026-01-26T00:00:00.000Z",
+      "createdAt": "2026-01-20T11:00:00.000Z",
+      "updatedAt": "2026-01-24T16:45:00.000Z"
+    },
+    {
+      "id": 4,
+      "title": "Write API documentation",
+      "description": "Document all API endpoints with examples",
+      "status": "TODO",
+      "priority": "LOW",
+      "assigneeId": 2,
+      "dueDate": "2026-02-05T00:00:00.000Z",
+      "createdAt": "2026-01-22T13:00:00.000Z",
+      "updatedAt": "2026-01-22T13:00:00.000Z"
+    },
+    {
+      "id": 5,
+      "title": "Create dashboard UI",
+      "description": "Build responsive dashboard with charts and statistics",
+      "status": "IN_PROGRESS",
+      "priority": "HIGH",
+      "assigneeId": 1,
+      "dueDate": "2026-01-30T00:00:00.000Z",
+      "createdAt": "2026-01-23T10:30:00.000Z",
+      "updatedAt": "2026-01-25T11:15:00.000Z"
+    },
+    {
+      "id": 6,
+      "title": "Setup CI/CD pipeline",
+      "description": "Configure automated testing and deployment",
+      "status": "TODO",
+      "priority": "MEDIUM",
+      "assigneeId": 1,
+      "dueDate": "2026-02-10T00:00:00.000Z",
+      "createdAt": "2026-01-24T14:00:00.000Z",
+      "updatedAt": "2026-01-24T14:00:00.000Z"
+    }
+  ]
+}
