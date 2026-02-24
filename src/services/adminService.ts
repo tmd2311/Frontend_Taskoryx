@@ -3,6 +3,7 @@ import type {
   AdminUser,
   Role,
   Permission,
+  Project,
   CreateRoleRequest,
   UpdateRoleRequest,
   AssignPermissionsRequest,
@@ -69,6 +70,14 @@ export const adminService = {
   /** DELETE /admin/users/:id/roles/:roleId */
   removeRole: async (userId: string, roleId: string): Promise<AdminUser> => {
     const response: any = await api.delete(`/admin/users/${userId}/roles/${roleId}`);
+    return response.data ?? response;
+  },
+
+  // ── Projects (Admin) ───────────────────────────────────────
+
+  /** GET /admin/projects – Tất cả project trong hệ thống */
+  getAllProjects: async (): Promise<Project[]> => {
+    const response: any = await api.get('/admin/projects');
     return response.data ?? response;
   },
 

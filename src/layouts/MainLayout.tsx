@@ -5,6 +5,7 @@ import {
   MenuUnfoldOutlined,
   DashboardOutlined,
   CheckSquareOutlined,
+  FolderOutlined,
   UserOutlined,
   LogoutOutlined,
 } from '@ant-design/icons';
@@ -35,6 +36,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       icon: <DashboardOutlined />,
       label: 'Dashboard',
       onClick: () => navigate('/dashboard'),
+    },
+    {
+      key: '/projects',
+      icon: <FolderOutlined />,
+      label: 'Projects',
+      onClick: () => navigate('/projects'),
     },
     {
       key: '/tasks',

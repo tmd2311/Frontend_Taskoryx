@@ -9,7 +9,8 @@
       "Bash(cat:*)",
       "Bash(cd /e/DOAN/FE/task-management-app && npx tsc --noEmit 2>&1)",
       "Bash(cd:*)",
-      "Bash(head:*)"
+      "Bash(head:*)",
+      "Bash(cd E:/DOAN/FE && npx tsc --noEmit 2>&1)"
     ]
   }
 }

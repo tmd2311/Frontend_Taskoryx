@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User, LoginRequest, RegisterRequest } from '../types';
+import type { User, LoginRequest, RegisterRequest, UpdateProfileRequest } from '../types';
 import { authService } from '../services/authService';
 import { userService } from '../services/userService';
 import { STORAGE_KEYS } from '../utils/config';
@@ -17,6 +17,7 @@ interface AuthState {
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   getCurrentUser: () => Promise<void>;
+  updateProfile: (data: UpdateProfileRequest) => Promise<void>;
   setUser: (user: User | null) => void;
   clearError: () => void;
 }
@@ -115,6 +116,18 @@ export const useAuthStore = create<AuthState>()(
           set({ user, isAuthenticated: true, isLoading: false });
         } catch (error: any) {
           set({ error: error.message || 'Không thể tải thông tin người dùng', isLoading: false });
+          throw error;
+        }
+      },
+
+      updateProfile: async (data: UpdateProfileRequest) => {
+        set({ isLoading: true, error: null });
+        try {
+          const updated = await userService.updateProfile(data);
+          localStorage.setItem(STORAGE_KEYS.USER_INFO, JSON.stringify(updated));
+          set({ user: updated, isLoading: false });
+        } catch (error: any) {
+          set({ error: error.message || 'Không thể cập nhật hồ sơ', isLoading: false });
           throw error;
         }
       },
