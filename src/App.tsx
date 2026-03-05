@@ -6,6 +6,8 @@ import DashboardPage from './pages/DashboardPage';
 import TasksPage from './pages/TasksPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProfilePage from './pages/ProfilePage';
+import BoardsPage from './pages/BoardsPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
 import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -56,6 +58,26 @@ function App() {
             }
           />
 
+          <Route
+            path="/projects/:projectId"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ProjectDetailPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/boards"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <BoardsPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/profile"
             element={

@@ -3,11 +3,12 @@ import { Layout, Menu, Avatar, Dropdown, Space, Typography } from 'antd';
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  DashboardOutlined,
   CheckSquareOutlined,
   FolderOutlined,
   UserOutlined,
   LogoutOutlined,
+  BarChartOutlined,
+  TableOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
@@ -33,21 +34,27 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const menuItems = [
     {
       key: '/dashboard',
-      icon: <DashboardOutlined />,
-      label: 'Dashboard',
+      icon: <BarChartOutlined />,
+      label: 'Biểu đồ',
       onClick: () => navigate('/dashboard'),
     },
     {
       key: '/projects',
       icon: <FolderOutlined />,
-      label: 'Projects',
+      label: 'Dự án',
       onClick: () => navigate('/projects'),
     },
     {
       key: '/tasks',
       icon: <CheckSquareOutlined />,
-      label: 'Tasks',
+      label: 'Đầu việc',
       onClick: () => navigate('/tasks'),
+    },
+    {
+      key: '/boards',
+      icon: <TableOutlined />,
+      label: 'Boards',
+      onClick: () => navigate('/boards'),
     },
   ];
 
@@ -55,7 +62,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     {
       key: 'profile',
       icon: <UserOutlined />,
-      label: 'Profile',
+      label: 'Hồ sơ',
       onClick: () => navigate('/profile'),
     },
     {
@@ -64,7 +71,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: 'Logout',
+      label: 'Đăng xuất',
       onClick: handleLogout,
     },
   ];
@@ -83,7 +90,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             fontWeight: 'bold',
           }}
         >
-          {collapsed ? 'TM' : 'Task Mgmt'}
+          {collapsed ? 'TM' : 'Taskoryx'}
         </div>
         <Menu
           theme="dark"

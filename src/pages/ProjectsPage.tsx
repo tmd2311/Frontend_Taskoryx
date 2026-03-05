@@ -34,6 +34,7 @@ import {
 import { useProjectStore } from '../stores/projectStore';
 import { adminService } from '../services/adminService';
 import { useAuthStore } from '../stores/authStore';
+import { useNavigate } from 'react-router-dom';
 import type { Project, CreateProjectRequest } from '../types';
 
 const { Title, Text, Paragraph } = Typography;
@@ -70,6 +71,7 @@ const ProjectCard: React.FC<{
   currentUserId?: string;
   onDelete: (id: string) => void;
 }> = ({ project, isAdmin, currentUserId, onDelete }) => {
+  const navigate = useNavigate();
   const color = project.color || '#1890ff';
   const initial = project.name.charAt(0).toUpperCase();
   const canDelete = isAdmin || project.ownerId === currentUserId || project.currentUserRole === 'OWNER';
@@ -78,7 +80,8 @@ const ProjectCard: React.FC<{
     <Card
       hoverable
       styles={{ body: { padding: 0 } }}
-      style={{ borderRadius: 8, overflow: 'hidden', height: '100%' }}
+      style={{ borderRadius: 8, overflow: 'hidden', height: '100%', cursor: 'pointer' }}
+      onClick={() => navigate(`/projects/${project.id}`)}
     >
       {/* Color bar + icon */}
       <div
@@ -219,7 +222,7 @@ const ProjectsPage: React.FC = () => {
       } catch (err: any) {
         // 403 / 401 → không phải admin, dùng endpoint thường
         setIsAdmin(false);
-        await fetchProjects().catch(() => {});
+        await fetchProjects().catch(() => { });
       } finally {
         setAdminLoading(false);
       }
@@ -292,16 +295,16 @@ const ProjectsPage: React.FC = () => {
           <FolderOutlined style={{ fontSize: 28, color: '#1890ff' }} />
           <div>
             <Title level={3} style={{ margin: 0 }}>
-              Projects
+              Dự án
             </Title>
             <Text type="secondary" style={{ fontSize: 13 }}>
               {isAdmin ? (
                 <Space size={4}>
                   <CrownOutlined style={{ color: '#faad14' }} />
-                  Chế độ Admin – hiển thị tất cả projects
+                  Chế độ Admin – hiển thị tất cả dự án
                 </Space>
               ) : (
-                'Projects bạn đang tham gia'
+                'Dự án bạn đang tham gia'
               )}
             </Text>
           </div>
@@ -323,7 +326,7 @@ const ProjectsPage: React.FC = () => {
             icon={<PlusOutlined />}
             onClick={() => setCreateModalOpen(true)}
           >
-            Tạo Project
+            Tạo dự án
           </Button>
         </Space>
       </div>
@@ -334,7 +337,7 @@ const ProjectsPage: React.FC = () => {
           type="info"
           icon={<CrownOutlined />}
           showIcon
-          message={`Tổng cộng ${adminProjects.length} project trong hệ thống`}
+          message={`Tổng cộng ${adminProjects.length} dự án trong hệ thống`}
           style={{ marginBottom: 20 }}
           closable
         />
@@ -357,15 +360,15 @@ const ProjectsPage: React.FC = () => {
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={
               search
-                ? `Không tìm thấy project nào với từ khóa "${search}"`
+                ? `Không tìm thấy dự án nào với từ khóa "${search}"`
                 : isAdmin
-                ? 'Chưa có project nào trong hệ thống'
-                : 'Bạn chưa tham gia project nào'
+                  ? 'Chưa có dự án nào trong hệ thống'
+                  : 'Bạn chưa tham gia dự án nào'
             }
           >
             {!search && (
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>
-                Tạo Project đầu tiên
+                Tạo Dự án đầu tiên
               </Button>
             )}
           </Empty>
@@ -390,7 +393,7 @@ const ProjectsPage: React.FC = () => {
         title={
           <Space>
             <FolderOutlined style={{ color: '#1890ff' }} />
-            Tạo Project mới
+            Tạo dự án mới
           </Space>
         }
         open={createModalOpen}
@@ -409,10 +412,10 @@ const ProjectsPage: React.FC = () => {
         >
           <Form.Item
             name="key"
-            label="Project Key"
+            label="Mã dự án"
             rules={[
-              { required: true, message: 'Nhập project key' },
-              { pattern: /^[A-Z0-9]{2,10}$/, message: 'Key gồm 2-10 ký tự IN HOA hoặc số, ví dụ: PSBS' },
+              { required: true, message: 'Nhập mã dự án' },
+              { pattern: /^[A-Z0-9]{2,10}$/, message: 'Mã gồm 2-10 ký tự IN HOA hoặc số, ví dụ: PSBS' },
             ]}
             extra="Mã viết hoa, ví dụ: PSBS, DEV, WEB"
           >
@@ -427,14 +430,14 @@ const ProjectsPage: React.FC = () => {
 
           <Form.Item
             name="name"
-            label="Tên Project"
-            rules={[{ required: true, message: 'Nhập tên project' }]}
+            label="Tên Dự án"
+            rules={[{ required: true, message: 'Nhập tên dự án' }]}
           >
-            <Input placeholder="Tên project của bạn" />
+            <Input placeholder="Tên dự án của bạn" />
           </Form.Item>
 
           <Form.Item name="description" label="Mô tả">
-            <Input.TextArea rows={3} placeholder="Mô tả ngắn về project..." />
+            <Input.TextArea rows={3} placeholder="Mô tả ngắn về dự án..." />
           </Form.Item>
 
           <Form.Item name="color" label="Màu sắc">
@@ -485,7 +488,7 @@ const ProjectsPage: React.FC = () => {
               Hủy
             </Button>
             <Button type="primary" htmlType="submit" loading={submitting}>
-              Tạo Project
+              Tạo dự án
             </Button>
           </div>
         </Form>

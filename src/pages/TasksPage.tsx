@@ -23,6 +23,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useTaskStore } from '../stores/taskStore';
 import { useProjectStore } from '../stores/projectStore';
+import TaskDetailDrawer from '../components/TaskDetailDrawer';
 import type { TaskSummary, Task, CreateTaskRequest, UpdateTaskRequest } from '../types';
 import { TaskPriority } from '../types';
 import dayjs from 'dayjs';
@@ -63,6 +64,7 @@ const TasksPage: React.FC = () => {
   const [editingTask, setEditingTask] = useState<TaskSummary | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [form] = Form.useForm();
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMyTasks();
@@ -263,6 +265,15 @@ const TasksPage: React.FC = () => {
         loading={isLoading}
         pagination={{ pageSize: 10 }}
         locale={{ emptyText: 'Không có task nào được giao cho bạn' }}
+        onRow={(record) => ({
+          onClick: (e) => {
+            // Không mở drawer khi click vào nút Edit/Delete
+            const target = e.target as HTMLElement;
+            if (target.closest('button') || target.closest('.ant-btn') || target.closest('.ant-popconfirm')) return;
+            setDetailTaskId(record.id);
+          },
+          style: { cursor: 'pointer' },
+        })}
       />
 
       <Modal
@@ -336,6 +347,13 @@ const TasksPage: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      <TaskDetailDrawer
+        taskId={detailTaskId}
+        onClose={() => setDetailTaskId(null)}
+        onUpdated={fetchMyTasks}
+        onDeleted={fetchMyTasks}
+      />
     </div>
   );
 };
