@@ -4,6 +4,7 @@ import type {
   TaskSummary,
   CreateTaskRequest,
   UpdateTaskRequest,
+  UpdateStatusRequest,
   MoveTaskRequest,
   TaskFilterParams,
   SpringPage,
@@ -66,11 +67,26 @@ export const taskService = {
   },
 
   /**
-   * PATCH /tasks/:id/move – Di chuyển task (Kanban drag & drop)
-   * Body: { targetColumnId, newPosition }
+   * PATCH /tasks/:id/status – Cập nhật trạng thái task
+   * Body: { status }
+   */
+  updateStatus: async (id: string, data: UpdateStatusRequest): Promise<Task> => {
+    const response: any = await api.patch(`/tasks/${id}/status`, data);
+    return response.data ?? response;
+  },
+
+  /**
+   * PATCH /tasks/:id/move – Di chuyển task (Kanban / Backlog)
+   * targetColumnId = null → đưa về Backlog
    */
   moveTask: async (id: string, data: MoveTaskRequest): Promise<Task> => {
     const response: any = await api.patch(`/tasks/${id}/move`, data);
+    return response.data ?? response;
+  },
+
+  /** GET /projects/:projectId/backlog – Task chưa vào board */
+  getBacklog: async (projectId: string): Promise<TaskSummary[]> => {
+    const response: any = await api.get(`/projects/${projectId}/backlog`);
     return response.data ?? response;
   },
 

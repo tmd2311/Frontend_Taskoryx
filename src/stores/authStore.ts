@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { User, LoginRequest, RegisterRequest, UpdateProfileRequest } from '../types';
 import { authService } from '../services/authService';
 import { userService } from '../services/userService';
+import { adminService } from '../services/adminService';
 import { STORAGE_KEYS } from '../utils/config';
 
 interface AuthState {
@@ -10,6 +11,8 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  mustChangePassword: boolean;
+  isAdmin: boolean | null; // null = chưa kiểm tra
   isLoading: boolean;
   error: string | null;
 
@@ -18,7 +21,9 @@ interface AuthState {
   logout: () => Promise<void>;
   getCurrentUser: () => Promise<void>;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;
+  checkAdminAccess: () => Promise<void>;
   setUser: (user: User | null) => void;
+  clearMustChangePassword: () => void;
   clearError: () => void;
 }
 
@@ -29,6 +34,8 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      mustChangePassword: false,
+      isAdmin: null,
       isLoading: false,
       error: null,
 
@@ -56,6 +63,7 @@ export const useAuthStore = create<AuthState>()(
             accessToken: res.accessToken,
             refreshToken: res.refreshToken,
             isAuthenticated: true,
+            mustChangePassword: res.mustChangePassword === true,
             isLoading: false,
             error: null,
           });
@@ -105,7 +113,7 @@ export const useAuthStore = create<AuthState>()(
           localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
           localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
           localStorage.removeItem(STORAGE_KEYS.USER_INFO);
-          set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+          set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false, mustChangePassword: false, isAdmin: null });
         }
       },
 
@@ -132,7 +140,17 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      checkAdminAccess: async () => {
+        try {
+          await adminService.getUsers({ page: 0, size: 1 });
+          set({ isAdmin: true });
+        } catch {
+          set({ isAdmin: false });
+        }
+      },
+
       setUser: (user: User | null) => set({ user, isAuthenticated: !!user }),
+      clearMustChangePassword: () => set({ mustChangePassword: false }),
       clearError: () => set({ error: null }),
     }),
     {

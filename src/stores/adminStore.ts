@@ -21,6 +21,7 @@ interface AdminState {
   currentRole: Role | null;
   permissions: Permission[];
   totalPages: number;
+  totalElements: number;
   isLoading: boolean;
   error: string | null;
 
@@ -51,6 +52,7 @@ export const useAdminStore = create<AdminState>((set) => ({
   currentRole: null,
   permissions: [],
   totalPages: 0,
+  totalElements: 0,
   isLoading: false,
   error: null,
 
@@ -60,7 +62,7 @@ export const useAdminStore = create<AdminState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const page = await adminService.getUsers(params);
-      set({ users: page.content, totalPages: page.totalPages, isLoading: false });
+      set({ users: page.content, totalPages: page.totalPages, totalElements: page.totalElements, isLoading: false });
     } catch (error: any) {
       set({ error: error.message || 'Không thể tải danh sách người dùng', isLoading: false });
     }

@@ -15,10 +15,15 @@ const LoginPage: React.FC = () => {
   const onFinish = async (values: LoginRequest) => {
     try {
       await login(values);
-      message.success('Login successful!');
-      navigate('/dashboard');
+      const { mustChangePassword } = useAuthStore.getState();
+      if (mustChangePassword) {
+        navigate('/change-password', { replace: true });
+      } else {
+        message.success('Đăng nhập thành công!');
+        navigate('/dashboard');
+      }
     } catch (error: any) {
-      message.error(error.message || 'Login failed');
+      message.error(error.message || 'Đăng nhập thất bại');
     }
   };
 
@@ -32,8 +37,8 @@ const LoginPage: React.FC = () => {
     }}>
       <Card style={{ width: 400, boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <Title level={2}>Task Management</Title>
-          <Text type="secondary">Sign in to your account</Text>
+          <Title level={2}>Quản lý công việc</Title>
+          <Text type="secondary">Đăng nhập vào tài khoản của bạn</Text>
         </div>
 
         <Form
@@ -59,11 +64,11 @@ const LoginPage: React.FC = () => {
 
           <Form.Item
             name="password"
-            rules={[{ required: true, message: 'Please input your password!' }]}
+            rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}
           >
             <Input.Password
               prefix={<LockOutlined />}
-              placeholder="Password"
+              placeholder="Mật khẩu"
               size="large"
             />
           </Form.Item>
@@ -76,14 +81,14 @@ const LoginPage: React.FC = () => {
               block
               size="large"
             >
-              Sign In
+              Đăng nhập
             </Button>
           </Form.Item>
 
           <div style={{ textAlign: 'center' }}>
             <Text type="secondary">
-              Don't have an account?{' '}
-              <a onClick={() => navigate('/register')}>Sign up</a>
+              Chưa có tài khoản?{' '}
+              <a onClick={() => navigate('/register')}>Đăng ký ngay</a>
             </Text>
           </div>
         </Form>

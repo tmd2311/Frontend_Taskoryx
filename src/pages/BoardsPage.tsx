@@ -35,6 +35,7 @@ import { useProjectStore } from '../stores/projectStore';
 import { useBoardStore } from '../stores/boardStore';
 import { useTaskStore } from '../stores/taskStore';
 import TaskDetailDrawer from '../components/TaskDetailDrawer';
+import { StatusTag } from '../components/StatusSelect';
 import type { Board, KanbanColumn, TaskSummary } from '../types';
 import { TaskPriority } from '../types';
 import dayjs from 'dayjs';
@@ -78,14 +79,12 @@ const TaskCard: React.FC<{ task: TaskSummary; onOpen: (id: string) => void }> = 
       (e.currentTarget as HTMLDivElement).style.borderColor = '#f0f0f0';
     }}
   >
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
       <Tag style={{ margin: 0, fontSize: 11 }}>{task.taskKey}</Tag>
-      <Tag
-        color={PRIORITY_COLOR[task.priority]}
-        style={{ margin: 0, fontSize: 11 }}
-      >
+      <Tag color={PRIORITY_COLOR[task.priority]} style={{ margin: 0, fontSize: 11 }}>
         {PRIORITY_LABEL[task.priority]}
       </Tag>
+      <StatusTag status={task.status} small />
     </div>
 
     <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, lineHeight: 1.4 }}>
@@ -202,7 +201,7 @@ const ColumnCard: React.FC<ColumnCardProps> = ({
         ) : null}
 
         {col.isCompleted && (
-          <Tag color="success" style={{ fontSize: 10, margin: 0 }}>Done</Tag>
+          <Tag color="success" style={{ fontSize: 10, margin: 0 }}>Hoàn thành</Tag>
         )}
 
         {/* Actions */}
@@ -512,7 +511,7 @@ const BoardsPage: React.FC = () => {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <Title level={2} style={{ margin: 0 }}>
-          Kanban Boards
+          Bảng công việc
         </Title>
         <Select
           style={{ width: 240 }}
@@ -527,7 +526,7 @@ const BoardsPage: React.FC = () => {
       </div>
 
       {!selectedProjectId ? (
-        <Empty description="Vui lòng chọn project" />
+        <Empty description="Vui lòng chọn dự án" />
       ) : (
         <>
           {/* Board tabs + actions */}
@@ -637,7 +636,7 @@ const BoardsPage: React.FC = () => {
 
       {/* Modal tạo/sửa Board */}
       <Modal
-        title={editingBoard ? 'Chỉnh sửa Board' : 'Tạo Board mới'}
+        title={editingBoard ? 'Chỉnh sửa bảng' : 'Tạo bảng mới'}
         open={boardModalOpen}
         onCancel={() => setBoardModalOpen(false)}
         footer={null}
@@ -679,7 +678,7 @@ const BoardsPage: React.FC = () => {
             label="Tên cột"
             rules={[{ required: true, message: 'Vui lòng nhập tên cột' }]}
           >
-            <Input placeholder="VD: Todo, In Progress, Done..." maxLength={80} />
+            <Input placeholder="VD: Việc cần làm, Đang làm, Hoàn thành..." maxLength={80} />
           </Form.Item>
 
           <Form.Item name="color" label="Màu cột">

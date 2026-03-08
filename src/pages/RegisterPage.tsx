@@ -14,17 +14,17 @@ const RegisterPage: React.FC = () => {
 
   const onFinish = async (values: RegisterRequest & { confirmPassword: string }) => {
     if (values.password !== values.confirmPassword) {
-      message.error('Passwords do not match!');
+      message.error('Mật khẩu xác nhận không khớp!');
       return;
     }
 
     try {
       const { confirmPassword, ...registerData } = values;
       await register(registerData);
-      message.success('Registration successful!');
+      message.success('Đăng ký thành công!');
       navigate('/dashboard');
     } catch (error: any) {
-      message.error(error.message || 'Registration failed');
+      message.error(error.message || 'Đăng ký thất bại');
     }
   };
 
@@ -38,8 +38,8 @@ const RegisterPage: React.FC = () => {
     }}>
       <Card style={{ width: 400, boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <Title level={2}>Create Account</Title>
-          <Text type="secondary">Sign up to get started</Text>
+          <Title level={2}>Tạo tài khoản</Title>
+          <Text type="secondary">Đăng ký để bắt đầu sử dụng</Text>
         </div>
 
         <Form
@@ -51,11 +51,11 @@ const RegisterPage: React.FC = () => {
         >
           <Form.Item
             name="username"
-            rules={[{ required: true, message: 'Please input your username!' }]}
+            rules={[{ required: true, message: 'Vui lòng nhập tên đăng nhập!' }]}
           >
             <Input
               prefix={<UserOutlined />}
-              placeholder="Username"
+              placeholder="Tên đăng nhập"
               size="large"
             />
           </Form.Item>
@@ -63,8 +63,8 @@ const RegisterPage: React.FC = () => {
           <Form.Item
             name="email"
             rules={[
-              { required: true, message: 'Please input your email!' },
-              { type: 'email', message: 'Please enter a valid email!' }
+              { required: true, message: 'Vui lòng nhập email!' },
+              { type: 'email', message: 'Email không hợp lệ!' }
             ]}
           >
             <Input
@@ -79,7 +79,7 @@ const RegisterPage: React.FC = () => {
           >
             <Input
               prefix={<UserOutlined />}
-              placeholder="Full Name (Optional)"
+              placeholder="Họ và tên (tùy chọn)"
               size="large"
             />
           </Form.Item>
@@ -87,24 +87,24 @@ const RegisterPage: React.FC = () => {
           <Form.Item
             name="password"
             rules={[
-              { required: true, message: 'Please input your password!' },
-              { min: 6, message: 'Password must be at least 6 characters!' }
+              { required: true, message: 'Vui lòng nhập mật khẩu!' },
+              { min: 6, message: 'Mật khẩu phải có ít nhất 6 ký tự!' }
             ]}
           >
             <Input.Password
               prefix={<LockOutlined />}
-              placeholder="Password"
+              placeholder="Mật khẩu"
               size="large"
             />
           </Form.Item>
 
           <Form.Item
             name="confirmPassword"
-            rules={[{ required: true, message: 'Please confirm your password!' }]}
+            rules={[{ required: true, message: 'Vui lòng xác nhận mật khẩu!' }]}
           >
             <Input.Password
               prefix={<LockOutlined />}
-              placeholder="Confirm Password"
+              placeholder="Xác nhận mật khẩu"
               size="large"
             />
           </Form.Item>
@@ -117,14 +117,14 @@ const RegisterPage: React.FC = () => {
               block
               size="large"
             >
-              Sign Up
+              Đăng ký
             </Button>
           </Form.Item>
 
           <div style={{ textAlign: 'center' }}>
             <Text type="secondary">
-              Already have an account?{' '}
-              <a onClick={() => navigate('/login')}>Sign in</a>
+              Đã có tài khoản?{' '}
+              <a onClick={() => navigate('/login')}>Đăng nhập ngay</a>
             </Text>
           </div>
         </Form>

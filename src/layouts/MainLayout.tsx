@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Avatar, Dropdown, Space, Typography } from 'antd';
 import {
   MenuFoldOutlined,
@@ -9,9 +9,11 @@ import {
   LogoutOutlined,
   BarChartOutlined,
   TableOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import NotificationDropdown from '../components/NotificationDropdown';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -24,7 +26,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuthStore();
+  const { user, logout, isAdmin, checkAdminAccess } = useAuthStore();
+
+  useEffect(() => {
+    if (isAdmin === null) checkAdminAccess();
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -53,9 +59,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     {
       key: '/boards',
       icon: <TableOutlined />,
-      label: 'Boards',
+      label: 'Bảng làm việc',
       onClick: () => navigate('/boards'),
     },
+    ...(isAdmin ? [
+      { type: 'divider' as const },
+      {
+        key: '/admin/users',
+        icon: <TeamOutlined />,
+        label: 'Quản lý người dùng',
+        onClick: () => navigate('/admin/users'),
+      },
+    ] : []),
   ];
 
   const userMenuItems = [
@@ -108,7 +123,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               style: { fontSize: 18, padding: '0 24px', cursor: 'pointer' },
             })}
           </div>
-          <div style={{ paddingRight: 24 }}>
+          <div style={{ paddingRight: 24, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <NotificationDropdown />
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <Space style={{ cursor: 'pointer' }}>
                 <Avatar icon={<UserOutlined />} src={user?.avatarUrl} />

@@ -2,12 +2,13 @@
 // ENUMS & CONSTANTS
 // ============================================================
 
-/** Dùng cho UI mapping – column trong Kanban đại diện cho status */
 export const TaskStatus = {
-  TODO: 'TODO',
+  TODO:        'TODO',
   IN_PROGRESS: 'IN_PROGRESS',
-  REVIEW: 'REVIEW',
-  DONE: 'DONE',
+  IN_REVIEW:   'IN_REVIEW',
+  RESOLVED:    'RESOLVED',
+  DONE:        'DONE',
+  CANCELLED:   'CANCELLED',
 } as const;
 export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
 
@@ -220,13 +221,16 @@ export interface TaskSummary {
   id: string;
   taskKey: string;
   title: string;
+  status: TaskStatus;
   priority: TaskPriority;
   position: number;
   columnId?: string;
+  boardId?: string;
   assigneeId?: string;
   assigneeName?: string;
   assigneeAvatar?: string;
   dueDate?: string;
+  completedAt?: string;
   overdue: boolean;
   commentCount: number;
   attachmentCount: number;
@@ -277,8 +281,12 @@ export interface UpdateTaskRequest {
 }
 
 export interface MoveTaskRequest {
-  targetColumnId: string; // API dùng targetColumnId
-  newPosition: number;    // API dùng newPosition
+  targetColumnId: string | null; // null = đưa về Backlog
+  newPosition: number;
+}
+
+export interface UpdateStatusRequest {
+  status: TaskStatus;
 }
 
 export interface TaskFilterParams extends PageParams {

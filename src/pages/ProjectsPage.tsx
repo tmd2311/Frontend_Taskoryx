@@ -18,6 +18,7 @@ import {
   Popconfirm,
   Select,
   Avatar,
+  message,
 } from 'antd';
 import {
   PlusOutlined,
@@ -35,6 +36,7 @@ import { useProjectStore } from '../stores/projectStore';
 import { adminService } from '../services/adminService';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
+import { ExclamationCircleOutlined } from '@ant-design/icons';
 import type { Project, CreateProjectRequest } from '../types';
 
 const { Title, Text, Paragraph } = Typography;
@@ -57,10 +59,10 @@ const getRoleColor = (role?: string) => {
 
 const getRoleLabel = (role?: string) => {
   switch (role) {
-    case 'OWNER': return 'Owner';
-    case 'ADMIN': return 'Admin';
-    case 'MEMBER': return 'Member';
-    case 'VIEWER': return 'Viewer';
+    case 'OWNER': return 'Quản trị viên';
+    case 'ADMIN': return 'Quản trị';
+    case 'MEMBER': return 'Thành viên';
+    case 'VIEWER': return 'Người xem';
     default: return role ?? '';
   }
 };
@@ -110,16 +112,16 @@ const ProjectCard: React.FC<{
 
         <Space>
           {project.isPublic ? (
-            <Tooltip title="Public">
+            <Tooltip title="Công khai">
               <GlobalOutlined style={{ color: 'rgba(255,255,255,0.8)', fontSize: 16 }} />
             </Tooltip>
           ) : (
-            <Tooltip title="Private">
+            <Tooltip title="Riêng tư">
               <LockOutlined style={{ color: 'rgba(255,255,255,0.8)', fontSize: 16 }} />
             </Tooltip>
           )}
           {project.isArchived && (
-            <Tag color="orange" style={{ margin: 0 }}>Archived</Tag>
+            <Tag color="orange" style={{ margin: 0 }}>Đã lưu trữ</Tag>
           )}
         </Space>
       </div>
@@ -249,9 +251,37 @@ const ProjectsPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    await deleteProject(id);
-    if (isAdmin) {
-      setAdminProjects((prev) => prev.filter((p) => p.id !== id));
+    try {
+      await deleteProject(id);
+      if (isAdmin) {
+        setAdminProjects((prev) => prev.filter((p) => p.id !== id));
+      }
+      message.success('Đã xóa dự án thành công');
+    } catch (e: any) {
+      const status = (e as any)?.status ?? (e as any)?.response?.status;
+      if (status === 400) {
+        Modal.warning({
+          title: 'Không thể xóa dự án',
+          icon: <ExclamationCircleOutlined />,
+          content: (
+            <div>
+              <p>{e.message || 'Dự án vẫn còn task, vui lòng xóa hết task trước.'}</p>
+              <Button
+                type="link"
+                style={{ padding: 0 }}
+                onClick={() => { Modal.destroyAll(); navigate(`/projects/${id}`); }}
+              >
+                Xem danh sách task →
+              </Button>
+            </div>
+          ),
+          okText: 'Đóng',
+        });
+      } else if (status === 403) {
+        message.error('Bạn không có quyền xóa dự án này');
+      } else {
+        message.error(e.message || 'Xóa dự án thất bại');
+      }
     }
   };
 
@@ -262,10 +292,11 @@ const ProjectsPage: React.FC = () => {
       if (isAdmin) {
         setAdminProjects((prev) => [newProject, ...prev]);
       }
+      message.success('Đã tạo dự án');
       form.resetFields();
       setCreateModalOpen(false);
-    } catch {
-      // error hiển thị qua store
+    } catch (e: any) {
+      message.error(e.message || 'Tạo dự án thất bại');
     } finally {
       setSubmitting(false);
     }

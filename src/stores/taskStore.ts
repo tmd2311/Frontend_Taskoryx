@@ -4,6 +4,7 @@ import type {
   TaskSummary,
   CreateTaskRequest,
   UpdateTaskRequest,
+  UpdateStatusRequest,
   MoveTaskRequest,
   TaskFilterParams,
   SpringPage,
@@ -18,6 +19,8 @@ interface TaskState {
   // Danh sách task
   myTasks: TaskSummary[];
   projectTasks: SpringPage<TaskSummary> | null;
+  backlog: TaskSummary[];
+  backlogLoading: boolean;
   currentTask: Task | null;
   isLoading: boolean;
   error: string | null;
@@ -33,9 +36,11 @@ interface TaskState {
   // Actions – Task
   fetchMyTasks: () => Promise<void>;
   fetchProjectTasks: (projectId: string, params?: TaskFilterParams) => Promise<void>;
+  fetchBacklog: (projectId: string) => Promise<void>;
   fetchTaskById: (id: string) => Promise<void>;
   createTask: (projectId: string, data: CreateTaskRequest) => Promise<Task>;
   updateTask: (id: string, data: UpdateTaskRequest) => Promise<Task>;
+  updateTaskStatus: (id: string, data: UpdateStatusRequest) => Promise<Task>;
   deleteTask: (id: string) => Promise<void>;
   moveTask: (id: string, data: MoveTaskRequest) => Promise<Task>;
   setCurrentTask: (task: Task | null) => void;
@@ -57,6 +62,8 @@ interface TaskState {
 export const useTaskStore = create<TaskState>((set, get) => ({
   myTasks: [],
   projectTasks: null,
+  backlog: [],
+  backlogLoading: false,
   currentTask: null,
   isLoading: false,
   error: null,
@@ -84,6 +91,16 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       set({ projectTasks: page, isLoading: false });
     } catch (error: any) {
       set({ error: error.message || 'Không thể tải task của project', isLoading: false });
+    }
+  },
+
+  fetchBacklog: async (projectId) => {
+    set({ backlogLoading: true });
+    try {
+      const tasks = await taskService.getBacklog(projectId);
+      set({ backlog: tasks, backlogLoading: false });
+    } catch {
+      set({ backlogLoading: false });
     }
   },
 
@@ -132,12 +149,40 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
 
+  updateTaskStatus: async (id, data) => {
+    // Optimistic update
+    const prev = useTaskStore.getState().currentTask;
+    set((state) => ({
+      currentTask: state.currentTask?.id === id
+        ? { ...state.currentTask, status: data.status }
+        : state.currentTask,
+      myTasks: state.myTasks.map((t) => t.id === id ? { ...t, status: data.status } : t),
+      backlog: state.backlog.map((t) => t.id === id ? { ...t, status: data.status } : t),
+    }));
+    try {
+      const updated = await taskService.updateStatus(id, data);
+      set((state) => ({
+        currentTask: state.currentTask?.id === id ? updated : state.currentTask,
+        myTasks: state.myTasks.map((t) => t.id === id ? { ...t, ...updated } : t),
+        backlog: state.backlog.map((t) => t.id === id ? { ...t, ...updated } : t),
+      }));
+      return updated;
+    } catch (error: any) {
+      // Rollback
+      set((state) => ({
+        currentTask: state.currentTask?.id === id && prev ? prev : state.currentTask,
+      }));
+      throw error;
+    }
+  },
+
   deleteTask: async (id) => {
     set({ isLoading: true, error: null });
     try {
       await taskService.deleteTask(id);
       set((state) => ({
         myTasks: state.myTasks.filter((t) => t.id !== id),
+        backlog: state.backlog.filter((t) => t.id !== id),
         projectTasks: state.projectTasks
           ? { ...state.projectTasks, content: state.projectTasks.content.filter((t) => t.id !== id) }
           : null,

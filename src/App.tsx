@@ -8,6 +8,8 @@ import ProjectsPage from './pages/ProjectsPage';
 import ProfilePage from './pages/ProfilePage';
 import BoardsPage from './pages/BoardsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
+import AdminUsersPage from './pages/AdminUsersPage';
 import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -25,6 +27,16 @@ function App() {
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+
+          {/* Đổi mật khẩu bắt buộc (cần đăng nhập nhưng không cần MainLayout) */}
+          <Route
+            path="/change-password"
+            element={
+              <ProtectedRoute>
+                <ChangePasswordPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Protected routes */}
           <Route
@@ -84,6 +96,17 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <ProfilePage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <AdminUsersPage />
                 </MainLayout>
               </ProtectedRoute>
             }
