@@ -33,7 +33,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useTaskStore } from '../stores/taskStore';
 import { useProjectStore } from '../stores/projectStore';
 import TaskDetailDrawer from '../components/TaskDetailDrawer';
-import type { TaskSummary, Task, CreateTaskRequest, UpdateTaskRequest } from '../types';
+import type { TaskSummary, CreateTaskRequest, UpdateTaskRequest } from '../types';
 import { TaskPriority } from '../types';
 import dayjs from 'dayjs';
 
@@ -517,7 +517,7 @@ const TasksPage: React.FC = () => {
         onCancel={handleCancel}
         footer={null}
         width={560}
-        destroyOnHide
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ marginTop: 12 }}>
           {!editingTask && (

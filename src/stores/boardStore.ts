@@ -184,7 +184,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       const cols = state.currentBoard.columns.map((col) => {
         const idx = col.tasks.findIndex((t) => t.id === taskId);
         if (idx !== -1) {
-          movedTask = { ...col.tasks[idx], columnId: targetColumnId, position: newPosition };
+          movedTask = { ...col.tasks[idx], columnId: targetColumnId ?? undefined, position: newPosition };
           return { ...col, tasks: col.tasks.filter((t) => t.id !== taskId) };
         }
         return col;

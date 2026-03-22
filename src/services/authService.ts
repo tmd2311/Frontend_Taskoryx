@@ -1,5 +1,8 @@
 import api from './api';
-import type { LoginRequest, AuthTokenResponse, RegisterRequest, User } from '../types';
+import type {
+  LoginRequest, AuthTokenResponse, RegisterRequest, User,
+  TwoFactorSetupResponse, TwoFactorStatusResponse, TwoFactorVerifyRequest,
+} from '../types';
 
 export const authService = {
   /** Đăng nhập – body: {email, password} → response: {accessToken, refreshToken, ...} */
@@ -28,6 +31,29 @@ export const authService = {
   /** Làm mới access token */
   refreshToken: async (refreshToken: string): Promise<AuthTokenResponse> => {
     const response: any = await api.post('/auth/refresh', { refreshToken });
+    return response.data ?? response;
+  },
+
+  // ─── 2FA ────────────────────────────────────────────────────
+  /** POST /auth/2fa/setup → { qrCodeUrl, secret } */
+  twoFactorSetup: async (): Promise<TwoFactorSetupResponse> => {
+    const response: any = await api.post('/auth/2fa/setup');
+    return response.data ?? response;
+  },
+
+  /** POST /auth/2fa/enable { code } */
+  twoFactorEnable: async (data: TwoFactorVerifyRequest): Promise<void> => {
+    await api.post('/auth/2fa/enable', data);
+  },
+
+  /** POST /auth/2fa/disable { code } */
+  twoFactorDisable: async (data: TwoFactorVerifyRequest): Promise<void> => {
+    await api.post('/auth/2fa/disable', data);
+  },
+
+  /** GET /auth/2fa/status → { enabled } */
+  twoFactorStatus: async (): Promise<TwoFactorStatusResponse> => {
+    const response: any = await api.get('/auth/2fa/status');
     return response.data ?? response;
   },
 };

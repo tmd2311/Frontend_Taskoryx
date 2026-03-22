@@ -10,7 +10,6 @@ import type {
   CreateAdminUserRequest,
   AssignRoleRequest,
   ResetPasswordRequest,
-  SpringPage,
 } from '../types';
 import { adminService } from '../services/adminService';
 

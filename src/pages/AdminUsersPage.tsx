@@ -12,7 +12,6 @@ import {
   Popconfirm,
   Modal,
   Form,
-  Switch,
   message,
   Badge,
   Dropdown,
@@ -379,7 +378,7 @@ const AdminUsersPage: React.FC = () => {
         open={createModalOpen}
         onCancel={() => setCreateModalOpen(false)}
         footer={null}
-        destroyOnHide
+        destroyOnHidden
         width={480}
       >
         <Form
@@ -446,7 +445,7 @@ const AdminUsersPage: React.FC = () => {
         open={resetModalOpen}
         onCancel={() => setResetModalOpen(false)}
         footer={null}
-        destroyOnHide
+        destroyOnHidden
       >
         <Form
           form={resetForm}
@@ -506,7 +505,7 @@ const AdminUsersPage: React.FC = () => {
         cancelText="Hủy"
         confirmLoading={roleSaving}
         okButtonProps={{ disabled: !selectedRoleId }}
-        destroyOnHide
+        destroyOnHidden
       >
         <div style={{ marginTop: 12 }}>
           {roleTargetUser && roleTargetUser.roles?.length > 0 && (

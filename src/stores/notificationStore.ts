@@ -15,7 +15,7 @@ interface NotificationState {
   markAllAsRead: () => Promise<void>;
 }
 
-export const useNotificationStore = create<NotificationState>((set, get) => ({
+export const useNotificationStore = create<NotificationState>((set) => ({
   notifications: [],
   unreadCount: 0,
   totalPages: 0,
@@ -39,8 +39,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   fetchUnreadCount: async () => {
     try {
-      const { count } = await notificationService.getUnreadCount();
-      set({ unreadCount: count });
+      const { unreadCount } = await notificationService.getUnreadCount();
+      set({ unreadCount });
     } catch {
       // im lặng – badge không ảnh hưởng UX chính
     }

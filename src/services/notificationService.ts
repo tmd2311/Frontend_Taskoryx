@@ -17,13 +17,7 @@ export const notificationService = {
    */
   getUnreadCount: async (): Promise<UnreadCountResponse> => {
     const response: any = await api.get('/notifications/unread-count');
-    // API trả { key_0: number } – chuẩn hoá thành { count }
-    const data = response.data ?? response;
-    if (typeof data === 'object' && !('count' in data)) {
-      const firstVal = Object.values(data)[0];
-      return { count: typeof firstVal === 'number' ? firstVal : 0 };
-    }
-    return data;
+    return response.data ?? response;
   },
 
   /** PATCH /notifications/:id/read */

@@ -22,8 +22,8 @@ export type TaskPriority = (typeof TaskPriority)[keyof typeof TaskPriority];
 
 export const ProjectRole = {
   OWNER: 'OWNER',
-  ADMIN: 'ADMIN',
-  MEMBER: 'MEMBER',
+  MANAGER: 'MANAGER',
+  DEVELOPER: 'DEVELOPER',
   VIEWER: 'VIEWER',
 } as const;
 export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole];
@@ -88,6 +88,7 @@ export interface User {
   language?: string;
   emailVerified?: boolean;
   isActive?: boolean;
+  twoFactorEnabled?: boolean;
   lastLoginAt?: string;
   createdAt?: string;
 }
@@ -126,6 +127,31 @@ export interface AuthTokenResponse {
   email: string;
   fullName?: string;
   avatarUrl?: string;
+  twoFactorEnabled?: boolean;
+  mustChangePassword?: boolean;
+}
+
+// ============================================================
+// 2FA
+// ============================================================
+
+export interface TwoFactorSetupResponse {
+  qrCodeUrl: string;
+  secret: string;
+}
+
+export interface TwoFactorStatusResponse {
+  enabled: boolean;
+}
+
+export interface TwoFactorVerifyRequest {
+  code: string;
+}
+
+export interface TwoFactorLoginRequest {
+  email: string;
+  password: string;
+  totpCode: string;
 }
 
 export interface RegisterRequest {
@@ -216,6 +242,17 @@ export interface CreateLabelRequest {
 // TASK
 // ============================================================
 
+/** Subtask tóm tắt – dùng trong task detail */
+export interface SubTaskSummary {
+  id: string;
+  taskKey: string;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assigneeId?: string;
+  assigneeName?: string;
+}
+
 /** Task summary – dùng trong list, kanban, my-tasks */
 export interface TaskSummary {
   id: string;
@@ -251,6 +288,12 @@ export interface Task extends TaskSummary {
   startDate?: string;
   estimatedHours?: number;
   actualHours?: number;
+  // Subtask / Parent task
+  parentTaskId?: string;
+  parentTaskKey?: string;
+  parentTaskTitle?: string;
+  subTasks?: SubTaskSummary[];
+  watcherCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -266,6 +309,9 @@ export interface CreateTaskRequest {
   startDate?: string;
   dueDate?: string;
   estimatedHours?: number;
+  parentTaskId?: string;
+  versionId?: string;
+  categoryId?: string;
 }
 
 export interface UpdateTaskRequest {
@@ -278,6 +324,8 @@ export interface UpdateTaskRequest {
   dueDate?: string;
   estimatedHours?: number;
   actualHours?: number;
+  parentTaskId?: string;
+  clearParent?: boolean;
 }
 
 export interface MoveTaskRequest {
@@ -353,6 +401,7 @@ export interface KanbanColumn {
 export interface CreateBoardRequest {
   name: string;
   description?: string;
+  boardType?: 'KANBAN' | 'SCRUM';
 }
 
 export interface UpdateBoardRequest {
@@ -441,7 +490,7 @@ export interface Notification {
 }
 
 export interface UnreadCountResponse {
-  count: number;
+  unreadCount: number;
 }
 
 // ============================================================
@@ -529,4 +578,306 @@ export interface UpdateRoleRequest {
 
 export interface AssignPermissionsRequest {
   permissionIds: string[];
+}
+
+// ============================================================
+// CHECKLIST
+// ============================================================
+
+export interface ChecklistItem {
+  id: string;
+  taskId: string;
+  content: string;
+  isChecked: boolean;
+  checkedById?: string;
+  checkedByName?: string;
+  checkedAt?: string;
+  position: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ChecklistSummary {
+  totalItems: number;
+  checkedItems: number;
+  completionPercentage: number;
+  items: ChecklistItem[];
+}
+
+export interface CreateChecklistItemRequest {
+  content: string;
+  position?: number;
+}
+
+export interface CreateChecklistBulkRequest {
+  items: { content: string }[];
+}
+
+export interface UpdateChecklistItemRequest {
+  content?: string;
+  isChecked?: boolean;
+}
+
+// ============================================================
+// TIME TRACKING
+// ============================================================
+
+export interface TimeEntry {
+  id: string;
+  taskId: string;
+  userId: string;
+  username?: string;
+  userFullName?: string;
+  hours: number;
+  description?: string;
+  workDate: string;
+  createdAt?: string;
+}
+
+export interface CreateTimeEntryRequest {
+  taskId: string;
+  hours: number;
+  description?: string;
+  workDate: string;
+}
+
+export interface UpdateTimeEntryRequest {
+  hours?: number;
+  description?: string;
+  workDate?: string;
+}
+
+export interface TimeTotal {
+  totalHours: number;
+}
+
+// ============================================================
+// SPRINT
+// ============================================================
+
+export const SprintStatus = {
+  PLANNED: 'PLANNED',
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+export type SprintStatus = (typeof SprintStatus)[keyof typeof SprintStatus];
+
+export interface Sprint {
+  id: string;
+  projectId: string;
+  boardId?: string;
+  boardName?: string;
+  name: string;
+  goal?: string;
+  status: SprintStatus;
+  startDate?: string;
+  endDate?: string;
+  completedAt?: string;
+  taskCount?: number;
+  completedTaskCount?: number;
+  inProgressTaskCount?: number;
+  tasks?: TaskSummary[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSprintRequest {
+  name: string;
+  goal?: string;
+  startDate?: string;
+  endDate?: string;
+  boardId?: string;
+}
+
+export interface UpdateSprintRequest {
+  name?: string;
+  goal?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface AddTaskToSprintRequest {
+  taskId: string;
+}
+
+// ============================================================
+// VERSION (Milestone)
+// ============================================================
+
+export const VersionStatus = {
+  OPEN: 'OPEN',
+  LOCKED: 'LOCKED',
+  CLOSED: 'CLOSED',
+} as const;
+export type VersionStatus = (typeof VersionStatus)[keyof typeof VersionStatus];
+
+export interface Version {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  status: VersionStatus;
+  dueDate?: string;
+  releaseDate?: string;
+  totalTasks?: number;
+  completedTasks?: number;
+  completionPercent?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateVersionRequest {
+  name: string;
+  description?: string;
+  status?: VersionStatus;
+  dueDate?: string;
+  releaseDate?: string;
+}
+
+export interface UpdateVersionRequest {
+  name?: string;
+  description?: string;
+  status?: VersionStatus;
+  dueDate?: string;
+  releaseDate?: string;
+}
+
+// ============================================================
+// ISSUE CATEGORY
+// ============================================================
+
+export interface IssueCategory {
+  id: string;
+  projectId: string;
+  name: string;
+  defaultAssigneeId?: string;
+  defaultAssigneeName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateIssueCategoryRequest {
+  name: string;
+  defaultAssigneeId?: string;
+}
+
+export interface UpdateIssueCategoryRequest {
+  name?: string;
+  defaultAssigneeId?: string;
+}
+
+// ============================================================
+// TASK DEPENDENCY
+// ============================================================
+
+export const DependencyType = {
+  BLOCKS: 'BLOCKS',
+  RELATES_TO: 'RELATES_TO',
+} as const;
+export type DependencyType = (typeof DependencyType)[keyof typeof DependencyType];
+
+export interface TaskDependency {
+  id: string;
+  taskId: string;
+  dependsOnTaskId: string;
+  dependsOnTaskKey?: string;
+  dependsOnTaskTitle?: string;
+  type: DependencyType;
+  createdAt: string;
+}
+
+export interface CreateDependencyRequest {
+  dependsOnTaskId: string;
+  type: DependencyType;
+}
+
+// ============================================================
+// TASK WATCHER
+// ============================================================
+
+export interface TaskWatcher {
+  id: string;
+  taskId: string;
+  userId: string;
+  username: string;
+  fullName?: string;
+  avatarUrl?: string;
+  createdAt: string;
+}
+
+export interface WatcherStatus {
+  watching: boolean;
+}
+
+// ============================================================
+// ACTIVITY LOG
+// ============================================================
+
+export interface ActivityLog {
+  id: string;
+  projectId?: string;
+  taskId?: string;
+  userId: string;
+  username?: string;
+  userFullName?: string;
+  userAvatar?: string;
+  action: string;
+  entityType?: string;
+  entityId?: string;
+  description: string;
+  createdAt: string;
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+
+export interface DashboardStats {
+  totalTasks: number;
+  myTasks: number;
+  overdueTasks: number;
+  completedTasks: number;
+  inProgressTasks: number;
+  upcomingDueTasks?: TaskSummary[];
+  recentActivity?: ActivityLog[];
+}
+
+// ============================================================
+// GANTT
+// ============================================================
+
+export interface GanttTask {
+  id: string;
+  taskKey: string;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assigneeName?: string;
+  startDate?: string;
+  dueDate?: string;
+  completedAt?: string;
+}
+
+// ============================================================
+// TEMPLATE
+// ============================================================
+
+export interface ProjectTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  icon?: string;
+  color?: string;
+  isPublic: boolean;
+  createdAt?: string;
+}
+
+export interface UseTemplateRequest {
+  name: string;
+  key: string;
+  description?: string;
+  color?: string;
+  isPublic?: boolean;
 }

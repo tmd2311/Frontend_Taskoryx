@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Drawer, Button, Tag, Space, Typography, Spin, Form, Input, Select,
   DatePicker, Popconfirm, Divider, Descriptions, message, Avatar, Badge,
-  Tabs, List, Upload, Tooltip, Image,
+  Tabs, List, Upload, Tooltip, Image, Checkbox, Progress, InputNumber,
+  Modal,
 } from 'antd';
 import {
   EditOutlined, DeleteOutlined, CloseOutlined, SaveOutlined, UserOutlined,
@@ -10,14 +11,22 @@ import {
   PaperClipOutlined, FolderOutlined, AppstoreOutlined, SendOutlined,
   FileOutlined, FileImageOutlined, FilePdfOutlined, FileExcelOutlined,
   FileWordOutlined, FileZipOutlined, ReloadOutlined, DownloadOutlined,
-  MessageOutlined,
+  MessageOutlined, CheckSquareOutlined, ClockCircleOutlined, LinkOutlined,
+  PlusOutlined, BellOutlined, BellFilled,
 } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import { useTaskStore } from '../stores/taskStore';
 import { useAuthStore } from '../stores/authStore';
 import { projectService } from '../services/projectService';
-import type { ProjectMember, Comment, Attachment } from '../types';
-import { TaskPriority, TaskStatus } from '../types';
+import { checklistService } from '../services/checklistService';
+import { timeTrackingService } from '../services/timeTrackingService';
+import { dependencyService } from '../services/dependencyService';
+import { watcherService } from '../services/watcherService';
+import type {
+  ProjectMember, Comment, Attachment, ChecklistItem, ChecklistSummary,
+  TimeEntry, TaskDependency,
+} from '../types';
+import { TaskPriority, TaskStatus, DependencyType } from '../types';
 import StatusSelect, { StatusTag } from './StatusSelect';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -37,6 +46,11 @@ const PRIORITY_COLOR: Record<string, string> = {
 const PRIORITY_LABEL: Record<string, string> = {
   [TaskPriority.LOW]: 'Thấp',   [TaskPriority.MEDIUM]: 'Trung bình',
   [TaskPriority.HIGH]: 'Cao',   [TaskPriority.URGENT]: 'Khẩn cấp',
+};
+
+const DEP_TYPE_LABEL: Record<string, string> = {
+  BLOCKS: 'Chặn',
+  RELATES_TO: 'Liên quan đến',
 };
 
 // ─── Icon file theo extension ────────────────────────────────
@@ -84,16 +98,13 @@ const CommentItem: React.FC<CommentItemProps> = ({
   return (
     <div style={{ marginBottom: depth === 0 ? 16 : 8 }}>
       <div style={{ display: 'flex', gap: 10 }}>
-        {/* Avatar */}
         <Avatar
           src={comment.userAvatar}
           icon={<UserOutlined />}
           size={depth === 0 ? 36 : 28}
           style={{ flexShrink: 0, marginTop: 2 }}
         />
-
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Header */}
           <Space size={6} style={{ marginBottom: 4 }}>
             <Text strong style={{ fontSize: depth === 0 ? 13 : 12 }}>
               {comment.userFullName || comment.username}
@@ -106,7 +117,6 @@ const CommentItem: React.FC<CommentItemProps> = ({
             )}
           </Space>
 
-          {/* Nội dung / form edit */}
           {editing ? (
             <div>
               <TextArea
@@ -116,55 +126,35 @@ const CommentItem: React.FC<CommentItemProps> = ({
                 style={{ marginBottom: 6 }}
               />
               <Space size={6}>
-                <Button
-                  size="small"
-                  type="primary"
-                  loading={editSaving}
-                  onClick={handleSaveEdit}
-                  disabled={!editContent.trim()}
-                >
-                  Lưu
-                </Button>
+                <Button size="small" type="primary" loading={editSaving} onClick={handleSaveEdit}
+                  disabled={!editContent.trim()}>Lưu</Button>
                 <Button size="small" onClick={() => { setEditing(false); setEditContent(comment.content); }}>
                   Hủy
                 </Button>
               </Space>
             </div>
           ) : (
-            <div
-              style={{
-                background: depth === 0 ? '#f5f5f5' : '#fafafa',
-                borderRadius: 8,
-                padding: '8px 12px',
-                fontSize: 13,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-              }}
-            >
+            <div style={{
+              background: depth === 0 ? '#f5f5f5' : '#fafafa',
+              borderRadius: 8, padding: '8px 12px', fontSize: 13,
+              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            }}>
               {comment.content}
             </div>
           )}
 
-          {/* Actions */}
           {!editing && (
             <Space size={12} style={{ marginTop: 4 }}>
               {depth === 0 && (
                 <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto' }}
-                  onClick={() => onReply(comment)}>
-                  Trả lời
-                </Button>
+                  onClick={() => onReply(comment)}>Trả lời</Button>
               )}
               {isOwn && (
                 <>
                   <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto' }}
-                    onClick={() => setEditing(true)}>
-                    Sửa
-                  </Button>
-                  <Popconfirm
-                    title="Xóa bình luận này?"
-                    onConfirm={() => onDelete(comment.id)}
-                    okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}
-                  >
+                    onClick={() => setEditing(true)}>Sửa</Button>
+                  <Popconfirm title="Xóa bình luận này?" onConfirm={() => onDelete(comment.id)}
+                    okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
                     <Button type="link" size="small" danger style={{ padding: 0, fontSize: 12, height: 'auto' }}>
                       Xóa
                     </Button>
@@ -174,19 +164,11 @@ const CommentItem: React.FC<CommentItemProps> = ({
             </Space>
           )}
 
-          {/* Replies */}
           {comment.replies && comment.replies.length > 0 && (
             <div style={{ marginTop: 8, paddingLeft: 8, borderLeft: '2px solid #f0f0f0' }}>
               {comment.replies.map((reply) => (
-                <CommentItem
-                  key={reply.id}
-                  comment={reply}
-                  currentUserId={currentUserId}
-                  depth={1}
-                  onReply={onReply}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                />
+                <CommentItem key={reply.id} comment={reply} currentUserId={currentUserId}
+                  depth={1} onReply={onReply} onEdit={onEdit} onDelete={onDelete} />
               ))}
             </div>
           )}
@@ -220,11 +202,10 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
 
-  // Members for assignee select
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
 
-  // Comment input
+  // Comments
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [commentSending, setCommentSending] = useState(false);
@@ -232,6 +213,31 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
 
   // Upload
   const [uploading, setUploading] = useState(false);
+
+  // Checklist
+  const [checklist, setChecklist] = useState<ChecklistSummary | null>(null);
+  const [checklistLoading, setChecklistLoading] = useState(false);
+  const [newCheckItem, setNewCheckItem] = useState('');
+  const [addingCheckItem, setAddingCheckItem] = useState(false);
+
+  // Time Tracking
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+  const [timeLoading, setTimeLoading] = useState(false);
+  const [timeTotal, setTimeTotal] = useState<number>(0);
+  const [addTimeModal, setAddTimeModal] = useState(false);
+  const [timeForm] = Form.useForm();
+  const [timeSaving, setTimeSaving] = useState(false);
+
+  // Dependencies
+  const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
+  const [depsLoading, setDepsLoading] = useState(false);
+  const [addDepModal, setAddDepModal] = useState(false);
+  const [depForm] = Form.useForm();
+  const [depSaving, setDepSaving] = useState(false);
+
+  // Watchers
+  const [watching, setWatching] = useState(false);
+  const [watchLoading, setWatchLoading] = useState(false);
 
   const open = !!taskId;
   const task = currentTask?.id === taskId ? currentTask : null;
@@ -244,7 +250,11 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
       setMembers([]);
       setNewComment('');
       setReplyTo(null);
+      setChecklist(null);
+      setTimeEntries([]);
+      setDependencies([]);
       fetchTaskById(taskId);
+      fetchWatchStatus(taskId);
     }
   }, [taskId]);
 
@@ -253,6 +263,9 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     if (!taskId) return;
     if (activeTab === 'comments') fetchComments(taskId);
     if (activeTab === 'attachments') fetchAttachments(taskId);
+    if (activeTab === 'checklist') fetchChecklist(taskId);
+    if (activeTab === 'time') fetchTimeEntries(taskId);
+    if (activeTab === 'dependencies') fetchDependencies(taskId);
   }, [activeTab, taskId]);
 
   // ── Fetch members khi vào edit mode ───────────────────────
@@ -265,6 +278,47 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     }
   }, [editMode, task?.projectId]);
 
+  const fetchWatchStatus = async (id: string) => {
+    try {
+      const { watching: w } = await watcherService.getStatus(id);
+      setWatching(w);
+    } catch { /* ignore */ }
+  };
+
+  const fetchChecklist = useCallback(async (id: string) => {
+    setChecklistLoading(true);
+    try {
+      const data = await checklistService.getChecklist(id);
+      setChecklist(data);
+    } catch { /* ignore */ } finally {
+      setChecklistLoading(false);
+    }
+  }, []);
+
+  const fetchTimeEntries = useCallback(async (id: string) => {
+    setTimeLoading(true);
+    try {
+      const [entries, total] = await Promise.all([
+        timeTrackingService.getByTask(id),
+        timeTrackingService.getTotalByTask(id),
+      ]);
+      setTimeEntries(entries);
+      setTimeTotal(total.totalHours ?? 0);
+    } catch { /* ignore */ } finally {
+      setTimeLoading(false);
+    }
+  }, []);
+
+  const fetchDependencies = useCallback(async (id: string) => {
+    setDepsLoading(true);
+    try {
+      const data = await dependencyService.getDependencies(id);
+      setDependencies(data);
+    } catch { /* ignore */ } finally {
+      setDepsLoading(false);
+    }
+  }, []);
+
   // ── Edit task ─────────────────────────────────────────────
   const handleEnterEdit = () => {
     if (!task) return;
@@ -274,6 +328,8 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
       priority: task.priority,
       assigneeId: task.assigneeId ?? null,
       dueDate: task.dueDate ? dayjs(task.dueDate) : null,
+      startDate: task.startDate ? dayjs(task.startDate) : null,
+      estimatedHours: task.estimatedHours,
     });
     setEditMode(true);
   };
@@ -288,6 +344,8 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
         priority: values.priority,
         assigneeId: values.assigneeId ?? undefined,
         dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
+        startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : undefined,
+        estimatedHours: values.estimatedHours,
       });
       message.success('Đã cập nhật task');
       setEditMode(false);
@@ -326,10 +384,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     if (!taskId || !newComment.trim()) return;
     setCommentSending(true);
     try {
-      await addComment(taskId, {
-        content: newComment.trim(),
-        parentId: replyTo?.id,
-      });
+      await addComment(taskId, { content: newComment.trim(), parentId: replyTo?.id });
       setNewComment('');
       setReplyTo(null);
     } catch (e: any) {
@@ -378,7 +433,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
       } finally {
         setUploading(false);
       }
-      return false; // chặn upload mặc định của antd
+      return false;
     },
   };
 
@@ -391,7 +446,129 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     }
   };
 
-  // ── Options assignee ──────────────────────────────────────
+  // ── Checklist ─────────────────────────────────────────────
+  const handleAddCheckItem = async () => {
+    if (!taskId || !newCheckItem.trim()) return;
+    setAddingCheckItem(true);
+    try {
+      await checklistService.addItem(taskId, { content: newCheckItem.trim() });
+      setNewCheckItem('');
+      fetchChecklist(taskId);
+    } catch (e: any) {
+      message.error(e.message || 'Thêm item thất bại');
+    } finally {
+      setAddingCheckItem(false);
+    }
+  };
+
+  const handleToggleCheckItem = async (item: ChecklistItem) => {
+    if (!taskId) return;
+    try {
+      await checklistService.updateItem(item.id, { isChecked: !item.isChecked });
+      fetchChecklist(taskId);
+    } catch (e: any) {
+      message.error(e.message || 'Cập nhật thất bại');
+    }
+  };
+
+  const handleDeleteCheckItem = async (id: string) => {
+    if (!taskId) return;
+    try {
+      await checklistService.deleteItem(id);
+      fetchChecklist(taskId);
+    } catch (e: any) {
+      message.error(e.message || 'Xóa thất bại');
+    }
+  };
+
+  // ── Time Tracking ─────────────────────────────────────────
+  const handleAddTime = async (values: any) => {
+    if (!taskId) return;
+    setTimeSaving(true);
+    try {
+      await timeTrackingService.logTime({
+        taskId,
+        hours: values.hours,
+        description: values.description,
+        workDate: values.workDate.format('YYYY-MM-DD'),
+      });
+      message.success('Đã ghi nhận giờ làm');
+      setAddTimeModal(false);
+      timeForm.resetFields();
+      await fetchTimeEntries(taskId);
+      fetchTaskById(taskId); // refresh actualHours trên task
+    } catch (e: any) {
+      message.error(e.message || 'Ghi nhận thất bại');
+    } finally {
+      setTimeSaving(false);
+    }
+  };
+
+  const handleDeleteTimeEntry = async (id: string) => {
+    if (!taskId) return;
+    try {
+      await timeTrackingService.delete(id);
+      message.success('Đã xóa mục');
+      await fetchTimeEntries(taskId);
+      fetchTaskById(taskId);
+    } catch (e: any) {
+      message.error(e.message || 'Xóa thất bại');
+    }
+  };
+
+  // ── Dependencies ──────────────────────────────────────────
+  const handleAddDependency = async (values: any) => {
+    if (!taskId) return;
+    setDepSaving(true);
+    try {
+      await dependencyService.addDependency(taskId, {
+        dependsOnTaskId: values.dependsOnTaskId.trim(),
+        type: values.type,
+      });
+      message.success('Đã thêm phụ thuộc');
+      setAddDepModal(false);
+      depForm.resetFields();
+      fetchDependencies(taskId);
+    } catch (e: any) {
+      message.error(e.message || 'Thêm phụ thuộc thất bại');
+    } finally {
+      setDepSaving(false);
+    }
+  };
+
+  const handleDeleteDependency = async (depId: string) => {
+    if (!taskId) return;
+    try {
+      await dependencyService.deleteDependency(taskId, depId);
+      message.success('Đã xóa phụ thuộc');
+      fetchDependencies(taskId);
+    } catch (e: any) {
+      message.error(e.message || 'Xóa thất bại');
+    }
+  };
+
+  // ── Watchers ──────────────────────────────────────────────
+  const handleToggleWatch = async () => {
+    if (!taskId) return;
+    setWatchLoading(true);
+    try {
+      if (watching) {
+        await watcherService.unwatch(taskId);
+        setWatching(false);
+        message.success('Đã bỏ theo dõi task');
+      } else {
+        await watcherService.watch(taskId);
+        setWatching(true);
+        message.success('Đang theo dõi task');
+      }
+    } catch (e: any) {
+      message.error(e.message || 'Thao tác thất bại');
+    } finally {
+      setWatchLoading(false);
+    }
+  };
+
+  // ── Member options for assignee ───────────────────────────
   const memberOptions = [
     { label: <Text type="secondary">— Bỏ trống —</Text>, value: null },
     ...members.map((m) => ({
@@ -406,7 +583,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     })),
   ];
 
-  // ── Root-level comments ───────────────────────────────────
   const rootComments = comments.filter((c) => !c.parentId);
 
   // ── Tabs ──────────────────────────────────────────────────
@@ -414,7 +590,20 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     {
       key: 'detail',
       label: 'Chi tiết',
-      children: null, // rendered below
+      children: null,
+    },
+    {
+      key: 'checklist',
+      label: (
+        <Space size={4}>
+          <CheckSquareOutlined />
+          Checklist
+          {checklist && checklist.totalItems > 0 && (
+            <Badge count={`${checklist.checkedItems}/${checklist.totalItems}`} style={{ backgroundColor: '#52c41a' }} />
+          )}
+        </Space>
+      ),
+      children: null,
     },
     {
       key: 'comments',
@@ -442,46 +631,80 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
       ),
       children: null,
     },
+    {
+      key: 'time',
+      label: (
+        <Space size={4}>
+          <ClockCircleOutlined />
+          Giờ làm
+        </Space>
+      ),
+      children: null,
+    },
+    {
+      key: 'dependencies',
+      label: (
+        <Space size={4}>
+          <LinkOutlined />
+          Liên kết
+          {dependencies.length > 0 && (
+            <Badge count={dependencies.length} size="small" color="#722ed1" />
+          )}
+        </Space>
+      ),
+      children: null,
+    },
   ];
 
   return (
     <Drawer
       open={open}
       onClose={handleClose}
-      width={580}
+      width={640}
       styles={{ body: { padding: '0 0 0 0', display: 'flex', flexDirection: 'column', height: '100%' } }}
       title={
         task ? (
-          <Space size={8}>
+          <Space size={8} wrap>
             <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{task.taskKey}</Tag>
             <Tag color={PRIORITY_COLOR[task.priority]} style={{ margin: 0 }}>
               {PRIORITY_LABEL[task.priority]}
             </Tag>
             <StatusTag status={task.status} />
             {task.overdue && (
-              <Tag color="error" icon={<ExclamationCircleOutlined />} style={{ margin: 0 }}>
-                Quá hạn
-              </Tag>
+              <Tag color="error" icon={<ExclamationCircleOutlined />} style={{ margin: 0 }}>Quá hạn</Tag>
             )}
           </Space>
         ) : 'Chi tiết task'
       }
       extra={
-        task && activeTab === 'detail' && !editMode ? (
+        task ? (
           <Space>
-            <Button icon={<EditOutlined />} size="small" onClick={handleEnterEdit}>Sửa</Button>
-            <Popconfirm
-              title="Xóa task này?" description="Hành động này không thể hoàn tác."
-              onConfirm={handleDelete} okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}
-            >
-              <Button danger icon={<DeleteOutlined />} size="small">Xóa</Button>
-            </Popconfirm>
-          </Space>
-        ) : task && activeTab === 'detail' && editMode ? (
-          <Space>
-            <Button icon={<SaveOutlined />} type="primary" size="small" loading={saving}
-              onClick={() => form.submit()}>Lưu</Button>
-            <Button icon={<CloseOutlined />} size="small" onClick={() => setEditMode(false)}>Hủy</Button>
+            <Tooltip title={watching ? 'Bỏ theo dõi' : 'Theo dõi task'}>
+              <Button
+                size="small"
+                icon={watching ? <BellFilled style={{ color: '#1890ff' }} /> : <BellOutlined />}
+                onClick={handleToggleWatch}
+                loading={watchLoading}
+              />
+            </Tooltip>
+            {activeTab === 'detail' && !editMode && (
+              <>
+                <Button icon={<EditOutlined />} size="small" onClick={handleEnterEdit}>Sửa</Button>
+                <Popconfirm
+                  title="Xóa task này?" description="Hành động này không thể hoàn tác."
+                  onConfirm={handleDelete} okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}
+                >
+                  <Button danger icon={<DeleteOutlined />} size="small">Xóa</Button>
+                </Popconfirm>
+              </>
+            )}
+            {activeTab === 'detail' && editMode && (
+              <>
+                <Button icon={<SaveOutlined />} type="primary" size="small" loading={saving}
+                  onClick={() => form.submit()}>Lưu</Button>
+                <Button icon={<CloseOutlined />} size="small" onClick={() => setEditMode(false)}>Hủy</Button>
+              </>
+            )}
           </Space>
         ) : null
       }
@@ -490,7 +713,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
         <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>
       ) : !task ? null : (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          {/* Tabs header */}
           <Tabs
             activeKey={activeTab}
             onChange={(k) => { setActiveTab(k); setEditMode(false); }}
@@ -498,10 +720,8 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
             style={{ paddingLeft: 24, paddingRight: 24 }}
             tabBarStyle={{ marginBottom: 0 }}
           />
-
           <Divider style={{ margin: 0 }} />
 
-          {/* Tab content */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
 
             {/* ═══════════ CHI TIẾT ═══════════ */}
@@ -509,10 +729,10 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
               <Form form={form} layout="vertical" onFinish={handleSave}>
                 <Form.Item name="title" label="Tiêu đề"
                   rules={[{ required: true, message: 'Vui lòng nhập tiêu đề' }]}>
-                  <Input placeholder="Tiêu đề task" maxLength={200} />
+                  <Input placeholder="Tiêu đề task" maxLength={500} />
                 </Form.Item>
                 <Form.Item name="description" label="Mô tả">
-                  <TextArea rows={4} placeholder="Mô tả chi tiết..." maxLength={2000} />
+                  <TextArea rows={4} placeholder="Mô tả chi tiết..." maxLength={5000} />
                 </Form.Item>
                 <Form.Item name="priority" label="Mức ưu tiên">
                   <Select options={[
@@ -545,8 +765,16 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                     }
                   />
                 </Form.Item>
-                <Form.Item name="dueDate" label="Hạn chót">
-                  <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+                <Space style={{ width: '100%' }}>
+                  <Form.Item name="startDate" label="Ngày bắt đầu" style={{ flex: 1 }}>
+                    <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+                  </Form.Item>
+                  <Form.Item name="dueDate" label="Hạn chót" style={{ flex: 1 }}>
+                    <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+                  </Form.Item>
+                </Space>
+                <Form.Item name="estimatedHours" label="Giờ ước tính">
+                  <InputNumber min={0} step={0.5} style={{ width: '100%' }} placeholder="VD: 8" />
                 </Form.Item>
               </Form>
             ) : (
@@ -615,11 +843,13 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                       {dayjs(task.startDate).format('DD/MM/YYYY')}
                     </Descriptions.Item>
                   )}
-                  {(task.estimatedHours != null || task.actualHours != null) && (
-                    <Descriptions.Item label="Giờ (ước tính/thực)">
-                      {task.estimatedHours ?? '—'} / {task.actualHours ?? '—'} giờ
-                    </Descriptions.Item>
-                  )}
+                  <Descriptions.Item label="Giờ (ước tính/thực)">
+                    <Space>
+                      <Text>{task.estimatedHours ?? '—'} giờ dự kiến</Text>
+                      <Text type="secondary">/</Text>
+                      <Text style={{ color: '#1890ff' }}>{task.actualHours ?? 0} giờ thực tế</Text>
+                    </Space>
+                  </Descriptions.Item>
                   <Descriptions.Item label="Tạo lúc">
                     {dayjs(task.createdAt).format('DD/MM/YYYY HH:mm')}
                   </Descriptions.Item>
@@ -634,8 +864,139 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                     </Space>
                   </>
                 )}
+
+                {/* ── Parent task ── */}
+                {task.parentTaskId && (
+                  <>
+                    <Divider style={{ margin: '12px 0' }} />
+                    <div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>Task cha</Text>
+                      <div style={{
+                        marginTop: 6, padding: '8px 12px',
+                        background: '#f5f5f5', borderRadius: 6,
+                        display: 'flex', alignItems: 'center', gap: 8,
+                      }}>
+                        <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{task.parentTaskKey}</Tag>
+                        <Text style={{ fontSize: 13 }}>{task.parentTaskTitle}</Text>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ── Subtasks ── */}
+                {task.subTasks && task.subTasks.length > 0 && (
+                  <>
+                    <Divider style={{ margin: '12px 0' }} />
+                    <div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        Subtasks ({task.subTasks.length})
+                      </Text>
+                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {task.subTasks.map((sub) => (
+                          <div key={sub.id} style={{
+                            padding: '8px 12px', background: '#fafafa',
+                            borderRadius: 6, border: '1px solid #f0f0f0',
+                            display: 'flex', alignItems: 'center', gap: 8,
+                          }}>
+                            <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{sub.taskKey}</Tag>
+                            <Text style={{ flex: 1, fontSize: 13 }} ellipsis={{ tooltip: sub.title }}>
+                              {sub.title}
+                            </Text>
+                            {sub.assigneeName && (
+                              <Text type="secondary" style={{ fontSize: 12 }}>{sub.assigneeName}</Text>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </>
             ))}
+
+            {/* ═══════════ CHECKLIST ═══════════ */}
+            {activeTab === 'checklist' && (
+              <>
+                {checklistLoading ? (
+                  <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+                ) : (
+                  <>
+                    {checklist && checklist.totalItems > 0 && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <Text type="secondary" style={{ fontSize: 13 }}>
+                            {checklist.checkedItems}/{checklist.totalItems} hoàn thành
+                          </Text>
+                          <Text strong style={{ color: '#52c41a', fontSize: 13 }}>
+                            {checklist.completionPercentage}%
+                          </Text>
+                        </div>
+                        <Progress
+                          percent={checklist.completionPercentage}
+                          showInfo={false}
+                          strokeColor="#52c41a"
+                          size="small"
+                        />
+                      </div>
+                    )}
+                    <div style={{ marginBottom: 16 }}>
+                      {checklist?.items.map((item) => (
+                        <div
+                          key={item.id}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '6px 0', borderBottom: '1px solid #f0f0f0',
+                          }}
+                        >
+                          <Checkbox
+                            checked={item.isChecked}
+                            onChange={() => handleToggleCheckItem(item)}
+                          />
+                          <Text
+                            style={{
+                              flex: 1, fontSize: 13,
+                              textDecoration: item.isChecked ? 'line-through' : 'none',
+                              color: item.isChecked ? '#8c8c8c' : undefined,
+                            }}
+                          >
+                            {item.content}
+                          </Text>
+                          {item.checkedByName && item.isChecked && (
+                            <Text type="secondary" style={{ fontSize: 11 }}>
+                              {item.checkedByName}
+                            </Text>
+                          )}
+                          <Popconfirm
+                            title="Xóa item này?"
+                            onConfirm={() => handleDeleteCheckItem(item.id)}
+                            okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}
+                          >
+                            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                          </Popconfirm>
+                        </div>
+                      ))}
+                    </div>
+                    <Space.Compact style={{ width: '100%' }}>
+                      <Input
+                        value={newCheckItem}
+                        onChange={(e) => setNewCheckItem(e.target.value)}
+                        placeholder="Thêm mục việc cần làm..."
+                        onPressEnter={handleAddCheckItem}
+                      />
+                      <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        loading={addingCheckItem}
+                        disabled={!newCheckItem.trim()}
+                        onClick={handleAddCheckItem}
+                      >
+                        Thêm
+                      </Button>
+                    </Space.Compact>
+                  </>
+                )}
+              </>
+            )}
 
             {/* ═══════════ BÌNH LUẬN ═══════════ */}
             {activeTab === 'comments' && (
@@ -676,9 +1037,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
             {activeTab === 'attachments' && (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <Text type="secondary" style={{ fontSize: 13 }}>
-                    {attachments.length} tệp
-                  </Text>
+                  <Text type="secondary" style={{ fontSize: 13 }}>{attachments.length} tệp</Text>
                   <Space>
                     <Button size="small" icon={<ReloadOutlined />}
                       onClick={() => taskId && fetchAttachments(taskId)} loading={attachmentsLoading}>
@@ -707,21 +1066,13 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                         style={{ padding: '10px 0' }}
                         actions={[
                           <Tooltip title="Tải xuống" key="dl">
-                            <Button
-                              type="text"
-                              size="small"
-                              icon={<DownloadOutlined />}
-                              href={att.fileUrl}
-                              target="_blank"
-                            />
+                            <Button type="text" size="small" icon={<DownloadOutlined />}
+                              href={att.fileUrl} target="_blank" />
                           </Tooltip>,
                           user?.id === att.uploadedById ? (
-                            <Popconfirm
-                              key="del"
-                              title="Xóa tệp này?"
+                            <Popconfirm key="del" title="Xóa tệp này?"
                               onConfirm={() => handleDeleteAttachment(att.id)}
-                              okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}
-                            >
+                              okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
                               <Button type="text" size="small" danger icon={<DeleteOutlined />} />
                             </Popconfirm>
                           ) : null,
@@ -730,13 +1081,8 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                         <List.Item.Meta
                           avatar={
                             att.image ? (
-                              <Image
-                                src={att.fileUrl}
-                                width={40}
-                                height={40}
-                                style={{ objectFit: 'cover', borderRadius: 4 }}
-                                preview={{ mask: false }}
-                              />
+                              <Image src={att.fileUrl} width={40} height={40}
+                                style={{ objectFit: 'cover', borderRadius: 4 }} preview={{ mask: false }} />
                             ) : (
                               <div style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {getFileIcon(att.fileType, att.fileName)}
@@ -744,19 +1090,15 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                             )
                           }
                           title={
-                            <Text
-                              style={{ fontSize: 13, cursor: 'pointer' }}
-                              onClick={() => window.open(att.fileUrl, '_blank')}
-                            >
+                            <Text style={{ fontSize: 13, cursor: 'pointer' }}
+                              onClick={() => window.open(att.fileUrl, '_blank')}>
                               {att.fileName}
                             </Text>
                           }
                           description={
                             <Space size={8} style={{ fontSize: 11 }}>
                               <Text type="secondary">{att.formattedFileSize ?? `${Math.round(att.fileSize / 1024)} KB`}</Text>
-                              {att.uploadedByName && (
-                                <Text type="secondary">· {att.uploadedByName}</Text>
-                              )}
+                              {att.uploadedByName && <Text type="secondary">· {att.uploadedByName}</Text>}
                               <Text type="secondary">· {dayjs(att.createdAt).format('DD/MM/YYYY HH:mm')}</Text>
                             </Space>
                           }
@@ -767,6 +1109,125 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                 )}
               </>
             )}
+
+            {/* ═══════════ GIỜ LÀM VIỆC ═══════════ */}
+            {activeTab === 'time' && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <Space>
+                    <ClockCircleOutlined style={{ color: '#1890ff' }} />
+                    <Text strong>Tổng: {task.actualHours ?? timeTotal} giờ</Text>
+                    {task.estimatedHours && (
+                      <Text type="secondary">/ {task.estimatedHours} giờ ước tính</Text>
+                    )}
+                  </Space>
+                  <Button type="primary" icon={<PlusOutlined />} size="small"
+                    onClick={() => { timeForm.resetFields(); setAddTimeModal(true); }}>
+                    Ghi nhận giờ
+                  </Button>
+                </div>
+
+                {task.estimatedHours && (
+                  <Progress
+                    percent={Math.min(Math.round(((task.actualHours ?? timeTotal) / task.estimatedHours) * 100), 100)}
+                    strokeColor={(task.actualHours ?? timeTotal) > task.estimatedHours ? '#f5222d' : '#1890ff'}
+                    size="small"
+                    style={{ marginBottom: 16 }}
+                  />
+                )}
+
+                {timeLoading ? (
+                  <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+                ) : timeEntries.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '30px 0', color: '#bfbfbf' }}>
+                    <ClockCircleOutlined style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
+                    Chưa có nhật ký giờ làm nào
+                  </div>
+                ) : (
+                  <List
+                    dataSource={timeEntries}
+                    renderItem={(entry) => (
+                      <List.Item
+                        style={{ padding: '10px 0' }}
+                        actions={[
+                          user?.id === entry.userId ? (
+                            <Popconfirm key="del" title="Xóa mục này?"
+                              onConfirm={() => handleDeleteTimeEntry(entry.id)}
+                              okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
+                              <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                            </Popconfirm>
+                          ) : null,
+                        ]}
+                      >
+                        <List.Item.Meta
+                          avatar={<Avatar size={32} icon={<UserOutlined />} />}
+                          title={
+                            <Space>
+                              <Text strong style={{ fontSize: 13 }}>{(entry as any).hours ?? 0} giờ</Text>
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                · {entry.userFullName || entry.username}
+                              </Text>
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                · {dayjs((entry as any).workDate).format('DD/MM/YYYY')}
+                              </Text>
+                            </Space>
+                          }
+                          description={entry.description || <Text type="secondary" style={{ fontSize: 12 }}>Không có mô tả</Text>}
+                        />
+                      </List.Item>
+                    )}
+                  />
+                )}
+              </>
+            )}
+
+            {/* ═══════════ LIÊN KẾT / DEPENDENCIES ═══════════ */}
+            {activeTab === 'dependencies' && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <Text type="secondary" style={{ fontSize: 13 }}>
+                    {dependencies.length} liên kết
+                  </Text>
+                  <Button type="primary" icon={<PlusOutlined />} size="small"
+                    onClick={() => { depForm.resetFields(); setAddDepModal(true); }}>
+                    Thêm liên kết
+                  </Button>
+                </div>
+
+                {depsLoading ? (
+                  <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+                ) : dependencies.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '30px 0', color: '#bfbfbf' }}>
+                    <LinkOutlined style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
+                    Chưa có liên kết nào
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {dependencies.map((dep) => (
+                      <div key={dep.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '10px 12px', background: '#fafafa',
+                        borderRadius: 6, border: '1px solid #f0f0f0',
+                      }}>
+                        <Tag color="purple" style={{ margin: 0 }}>{DEP_TYPE_LABEL[dep.type] || dep.type}</Tag>
+                        <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{dep.dependsOnTaskKey}</Tag>
+                        <Text style={{ flex: 1, fontSize: 13 }} ellipsis={{ tooltip: dep.dependsOnTaskTitle }}>
+                          {dep.dependsOnTaskTitle}
+                        </Text>
+                        <Popconfirm
+                          title="Xóa liên kết này?"
+                          onConfirm={() => handleDeleteDependency(dep.id)}
+                          okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}
+                        >
+                          <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                        </Popconfirm>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
           </div>
 
           {/* ═══ Input bình luận (bottom sticky) ═══ */}
@@ -788,7 +1249,9 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                   ref={commentInputRef}
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
-                  placeholder={replyTo ? `Trả lời ${replyTo.userFullName || replyTo.username}...` : 'Viết bình luận... (Enter để xuống dòng, Ctrl+Enter để gửi)'}
+                  placeholder={replyTo
+                    ? `Trả lời ${replyTo.userFullName || replyTo.username}...`
+                    : 'Viết bình luận... (Ctrl+Enter để gửi)'}
                   autoSize={{ minRows: 1, maxRows: 5 }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && e.ctrlKey) {
@@ -811,6 +1274,59 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
           )}
         </div>
       )}
+
+      {/* Modal ghi nhận giờ */}
+      <Modal
+        title={<Space><ClockCircleOutlined />Ghi nhận giờ làm việc</Space>}
+        open={addTimeModal}
+        onCancel={() => setAddTimeModal(false)}
+        footer={null}
+        destroyOnHidden
+      >
+        <Form form={timeForm} layout="vertical" onFinish={handleAddTime} style={{ marginTop: 8 }}>
+          <Form.Item name="hours" label="Số giờ"
+            rules={[{ required: true, message: 'Vui lòng nhập số giờ' }]}>
+            <InputNumber min={0.1} max={24} step={0.5} style={{ width: '100%' }} placeholder="VD: 2.5" />
+          </Form.Item>
+          <Form.Item name="workDate" label="Ngày làm việc"
+            rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}
+            initialValue={dayjs()}>
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+          </Form.Item>
+          <Form.Item name="description" label="Mô tả công việc">
+            <TextArea rows={3} placeholder="Đã làm gì hôm nay..." />
+          </Form.Item>
+          <Space>
+            <Button type="primary" htmlType="submit" loading={timeSaving}>Ghi nhận</Button>
+            <Button onClick={() => setAddTimeModal(false)}>Hủy</Button>
+          </Space>
+        </Form>
+      </Modal>
+
+      {/* Modal thêm dependency */}
+      <Modal
+        title={<Space><LinkOutlined />Thêm liên kết task</Space>}
+        open={addDepModal}
+        onCancel={() => setAddDepModal(false)}
+        footer={null}
+        destroyOnHidden
+      >
+        <Form form={depForm} layout="vertical" onFinish={handleAddDependency} style={{ marginTop: 8 }}>
+          <Form.Item name="type" label="Loại liên kết"
+            rules={[{ required: true, message: 'Chọn loại liên kết' }]}
+            initialValue={DependencyType.RELATES_TO}>
+            <Select options={Object.entries(DEP_TYPE_LABEL).map(([k, v]) => ({ value: k, label: v }))} />
+          </Form.Item>
+          <Form.Item name="dependsOnTaskId" label="Task ID liên kết"
+            rules={[{ required: true, message: 'Vui lòng nhập Task ID' }]}>
+            <Input placeholder="Nhập UUID của task cần liên kết" />
+          </Form.Item>
+          <Space>
+            <Button type="primary" htmlType="submit" loading={depSaving}>Thêm liên kết</Button>
+            <Button onClick={() => setAddDepModal(false)}>Hủy</Button>
+          </Space>
+        </Form>
+      </Modal>
     </Drawer>
   );
 };

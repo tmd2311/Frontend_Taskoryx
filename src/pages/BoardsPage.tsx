@@ -472,10 +472,10 @@ const BoardsPage: React.FC = () => {
 
     setTaskSaving(true);
     try {
-      const payload = {
+      const payload: import('../types').CreateTaskRequest = {
         title: values.title as string,
         description: values.description || undefined,
-        priority: (values.priority as string) || TaskPriority.MEDIUM,
+        priority: (values.priority as import('../types').TaskPriority) || TaskPriority.MEDIUM,
         dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
         boardId: activeBoardId,    // board đang mở — không hỏi user
         columnId: targetColumn.id, // cột user click — không hỏi user
@@ -640,7 +640,7 @@ const BoardsPage: React.FC = () => {
         open={boardModalOpen}
         onCancel={() => setBoardModalOpen(false)}
         footer={null}
-        destroyOnHide
+        destroyOnHidden
       >
         <Form form={boardForm} layout="vertical" onFinish={handleBoardSubmit}>
           <Form.Item
@@ -670,7 +670,7 @@ const BoardsPage: React.FC = () => {
         open={colModalOpen}
         onCancel={() => setColModalOpen(false)}
         footer={null}
-        destroyOnHide
+        destroyOnHidden
       >
         <Form form={colForm} layout="vertical" onFinish={handleColSubmit}>
           <Form.Item
@@ -738,7 +738,7 @@ const BoardsPage: React.FC = () => {
         open={taskModalOpen}
         onCancel={() => { setTaskModalOpen(false); taskForm.resetFields(); }}
         footer={null}
-        destroyOnHide
+        destroyOnHidden
         width={520}
       >
         <Form

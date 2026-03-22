@@ -59,7 +59,7 @@ interface TaskState {
   clearError: () => void;
 }
 
-export const useTaskStore = create<TaskState>((set, get) => ({
+export const useTaskStore = create<TaskState>((set) => ({
   myTasks: [],
   projectTasks: null,
   backlog: [],

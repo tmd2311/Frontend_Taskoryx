@@ -49,8 +49,6 @@ interface StatusSelectProps {
 
 /** Dropdown chọn trạng thái */
 const StatusSelect: React.FC<StatusSelectProps> = ({ value, onChange, loading, size, style }) => {
-  const cfg = value ? STATUS_CONFIG[value] : undefined;
-
   return (
     <Select
       value={value}

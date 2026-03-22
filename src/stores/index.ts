@@ -6,3 +6,4 @@ export { useBoardStore } from './boardStore';
 export { useNotificationStore } from './notificationStore';
 export { useAdminStore } from './adminStore';
 export { useSearchStore } from './searchStore';
+export { useThemeStore } from './themeStore';

@@ -10,7 +10,14 @@
       "Bash(cd /e/DOAN/FE/task-management-app && npx tsc --noEmit 2>&1)",
       "Bash(cd:*)",
       "Bash(head:*)",
-      "Bash(cd E:/DOAN/FE && npx tsc --noEmit 2>&1)"
+      "Bash(cd E:/DOAN/FE && npx tsc --noEmit 2>&1)",
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(cd \"E:\\\\DOAN\\\\FE\" && npx vite build 2>&1 | tail -30)",
+      "Bash(cd \"E:\\\\DOAN\\\\FE\" && npx vite build 2>&1 | tail -15)",
+      "Bash(cd \"E:\\\\DOAN\\\\FE\" && sed -i 's/onClick={\\(\\) => setCreateModalOpen\\(true\\)}/onClick={openCreateModal}/g' src/pages/ProjectsPage.tsx)",
+      "Bash(cd \"E:\\\\DOAN\\\\FE\" && npx vite build 2>&1 | tail -10)"
     ]
   }
 }

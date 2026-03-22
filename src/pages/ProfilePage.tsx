@@ -15,6 +15,10 @@ import {
   Alert,
   message,
   Select,
+  Modal,
+  Image,
+  Spin,
+  Switch,
 } from 'antd';
 import {
   UserOutlined,
@@ -25,10 +29,13 @@ import {
   SaveOutlined,
   GlobalOutlined,
   ClockCircleOutlined,
+  SafetyCertificateOutlined,
+  QrcodeOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../stores/authStore';
 import { userService } from '../services/userService';
-import type { UpdateProfileRequest, ChangePasswordRequest } from '../types';
+import { authService } from '../services/authService';
+import type { UpdateProfileRequest, ChangePasswordRequest, TwoFactorSetupResponse } from '../types';
 
 const { Title, Text } = Typography;
 
@@ -54,11 +61,84 @@ const ProfilePage: React.FC = () => {
 
   const [profileForm] = Form.useForm<UpdateProfileRequest>();
   const [passwordForm] = Form.useForm<ChangePasswordRequest>();
+  const [twoFaForm] = Form.useForm<{ code: string }>();
 
   const [profileSaving, setProfileSaving] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  // 2FA state
+  const [twoFaEnabled, setTwoFaEnabled] = useState<boolean>(user?.twoFactorEnabled ?? false);
+  const [twoFaLoading, setTwoFaLoading] = useState(false);
+  const [setupData, setSetupData] = useState<TwoFactorSetupResponse | null>(null);
+  const [showSetupModal, setShowSetupModal] = useState(false);
+  const [showDisableModal, setShowDisableModal] = useState(false);
+  const [twoFaError, setTwoFaError] = useState<string | null>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
+
+  useEffect(() => {
+    // Kiểm tra trạng thái 2FA từ server
+    const fetchStatus = async () => {
+      setStatusLoading(true);
+      try {
+        const res = await authService.twoFactorStatus();
+        setTwoFaEnabled(res.enabled);
+      } catch {
+        // dùng giá trị từ user profile
+      } finally {
+        setStatusLoading(false);
+      }
+    };
+    fetchStatus();
+  }, []);
+
+  const handleSetup2FA = async () => {
+    setTwoFaLoading(true);
+    setTwoFaError(null);
+    try {
+      const data = await authService.twoFactorSetup();
+      setSetupData(data);
+      twoFaForm.resetFields();
+      setShowSetupModal(true);
+    } catch (err: any) {
+      setTwoFaError(err.message || 'Không thể thiết lập 2FA');
+    } finally {
+      setTwoFaLoading(false);
+    }
+  };
+
+  const handleEnable2FA = async (values: { code: string }) => {
+    setTwoFaLoading(true);
+    setTwoFaError(null);
+    try {
+      await authService.twoFactorEnable({ code: values.code });
+      setTwoFaEnabled(true);
+      setShowSetupModal(false);
+      setSetupData(null);
+      message.success('Đã bật xác thực 2 yếu tố!');
+    } catch (err: any) {
+      setTwoFaError(err.message || 'Mã xác thực không hợp lệ');
+    } finally {
+      setTwoFaLoading(false);
+    }
+  };
+
+  const handleDisable2FA = async (values: { code: string }) => {
+    setTwoFaLoading(true);
+    setTwoFaError(null);
+    try {
+      await authService.twoFactorDisable({ code: values.code });
+      setTwoFaEnabled(false);
+      setShowDisableModal(false);
+      twoFaForm.resetFields();
+      message.success('Đã tắt xác thực 2 yếu tố');
+    } catch (err: any) {
+      setTwoFaError(err.message || 'Mã xác thực không hợp lệ');
+    } finally {
+      setTwoFaLoading(false);
+    }
+  };
 
   // Điền sẵn form với dữ liệu hiện tại
   useEffect(() => {
@@ -146,6 +226,71 @@ const ProfilePage: React.FC = () => {
           </Col>
         </Row>
       </Card>
+
+      {/* Modal thiết lập 2FA */}
+      <Modal
+        title={<Space><QrcodeOutlined />Thiết lập xác thực 2 yếu tố</Space>}
+        open={showSetupModal}
+        onCancel={() => { setShowSetupModal(false); setSetupData(null); setTwoFaError(null); }}
+        footer={null}
+        width={480}
+      >
+        {setupData ? (
+          <div style={{ textAlign: 'center' }}>
+            <Alert
+              type="info"
+              message="Scan QR code bằng Google Authenticator hoặc ứng dụng TOTP tương tự"
+              style={{ marginBottom: 16 }}
+            />
+            <div style={{ marginBottom: 16 }}>
+              <Image src={setupData.qrCodeUrl} width={200} preview={false} />
+            </div>
+            <div style={{ marginBottom: 16, background: '#f5f5f5', padding: '8px 12px', borderRadius: 6 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>Secret key (nhập thủ công)</Text>
+              <br />
+              <Text copyable strong style={{ fontFamily: 'monospace' }}>{setupData.secret}</Text>
+            </div>
+            {twoFaError && (
+              <Alert type="error" message={twoFaError} style={{ marginBottom: 12 }} closable onClose={() => setTwoFaError(null)} />
+            )}
+            <Form form={twoFaForm} onFinish={handleEnable2FA} layout="inline" style={{ justifyContent: 'center' }}>
+              <Form.Item name="code" rules={[
+                { required: true, message: 'Nhập mã' },
+                { len: 6, message: 'Mã gồm 6 chữ số' },
+              ]}>
+                <Input placeholder="Mã 6 chữ số" maxLength={6} style={{ width: 160 }} />
+              </Form.Item>
+              <Form.Item>
+                <Button type="primary" htmlType="submit" loading={twoFaLoading} icon={<SafetyCertificateOutlined />}>
+                  Kích hoạt
+                </Button>
+              </Form.Item>
+            </Form>
+          </div>
+        ) : <div style={{ textAlign: 'center' }}><Spin /></div>}
+      </Modal>
+
+      {/* Modal tắt 2FA */}
+      <Modal
+        title="Tắt xác thực 2 yếu tố"
+        open={showDisableModal}
+        onCancel={() => { setShowDisableModal(false); setTwoFaError(null); twoFaForm.resetFields(); }}
+        footer={null}
+        width={380}
+      >
+        <Alert type="warning" message="Nhập mã từ ứng dụng Authenticator để xác nhận tắt 2FA" style={{ marginBottom: 16 }} />
+        {twoFaError && (
+          <Alert type="error" message={twoFaError} style={{ marginBottom: 12 }} closable onClose={() => setTwoFaError(null)} />
+        )}
+        <Form form={twoFaForm} onFinish={handleDisable2FA} layout="inline" style={{ justifyContent: 'center' }}>
+          <Form.Item name="code" rules={[{ required: true, message: 'Nhập mã' }, { len: 6 }]}>
+            <Input placeholder="Mã 6 chữ số" maxLength={6} style={{ width: 160 }} />
+          </Form.Item>
+          <Form.Item>
+            <Button danger htmlType="submit" loading={twoFaLoading}>Tắt 2FA</Button>
+          </Form.Item>
+        </Form>
+      </Modal>
 
       {/* Tabs */}
       <Card style={{ borderRadius: 8 }}>
@@ -366,6 +511,60 @@ const ProfilePage: React.FC = () => {
                       </Button>
                     </div>
                   </Form>
+                </div>
+              ),
+            },
+            {
+              key: '2fa',
+              label: (
+                <Space>
+                  <SafetyCertificateOutlined />
+                  Bảo mật 2FA
+                </Space>
+              ),
+              children: (
+                <div style={{ paddingTop: 8, maxWidth: 480 }}>
+                  <Alert
+                    type="info"
+                    message="Xác thực 2 yếu tố (2FA)"
+                    description="Bật 2FA để bảo vệ tài khoản bằng mã TOTP từ Google Authenticator."
+                    style={{ marginBottom: 24 }}
+                  />
+                  {statusLoading ? (
+                    <div style={{ textAlign: 'center', padding: 24 }}><Spin /></div>
+                  ) : (
+                    <Card size="small">
+                      <Row align="middle" justify="space-between">
+                        <Col>
+                          <Space>
+                            <SafetyCertificateOutlined style={{ fontSize: 20, color: twoFaEnabled ? '#52c41a' : '#8c8c8c' }} />
+                            <div>
+                              <Text strong>Xác thực 2 yếu tố</Text>
+                              <br />
+                              <Tag color={twoFaEnabled ? 'green' : 'default'}>
+                                {twoFaEnabled ? 'Đang bật' : 'Đang tắt'}
+                              </Tag>
+                            </div>
+                          </Space>
+                        </Col>
+                        <Col>
+                          <Switch
+                            checked={twoFaEnabled}
+                            loading={twoFaLoading}
+                            onChange={(checked) => {
+                              if (checked) {
+                                handleSetup2FA();
+                              } else {
+                                twoFaForm.resetFields();
+                                setTwoFaError(null);
+                                setShowDisableModal(true);
+                              }
+                            }}
+                          />
+                        </Col>
+                      </Row>
+                    </Card>
+                  )}
                 </div>
               ),
             },

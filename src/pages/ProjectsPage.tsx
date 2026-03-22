@@ -14,7 +14,6 @@ import {
   Tooltip,
   Spin,
   Alert,
-  Badge,
   Popconfirm,
   Select,
   Avatar,
@@ -30,14 +29,14 @@ import {
   DeleteOutlined,
   ReloadOutlined,
   CrownOutlined,
-  UserOutlined,
 } from '@ant-design/icons';
 import { useProjectStore } from '../stores/projectStore';
 import { adminService } from '../services/adminService';
+import { templateService } from '../services/templateService';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
-import type { Project, CreateProjectRequest } from '../types';
+import type { Project, CreateProjectRequest, ProjectTemplate } from '../types';
 
 const { Title, Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -197,6 +196,7 @@ const ProjectCard: React.FC<{
 };
 
 const ProjectsPage: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const { projects, isLoading, error, fetchProjects, createProject, deleteProject } = useProjectStore();
 
@@ -209,6 +209,8 @@ const ProjectsPage: React.FC = () => {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm<CreateProjectRequest>();
+  const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
 
   // Phát hiện admin & tải projects
   useEffect(() => {
@@ -285,15 +287,37 @@ const ProjectsPage: React.FC = () => {
     }
   };
 
+  const openCreateModal = async () => {
+    form.resetFields();
+    setSelectedTemplate(null);
+    setCreateModalOpen(true);
+    try {
+      const tmplList = await templateService.getPublic();
+      setTemplates(tmplList);
+    } catch { /* ignore */ }
+  };
+
   const handleCreate = async (values: CreateProjectRequest) => {
     setSubmitting(true);
     try {
-      const newProject = await createProject(values);
+      let newProject;
+      if (selectedTemplate) {
+        newProject = await templateService.useTemplate(selectedTemplate, {
+          name: values.name,
+          key: values.key,
+          description: values.description,
+          color: values.color,
+          isPublic: values.isPublic,
+        });
+      } else {
+        newProject = await createProject(values);
+      }
       if (isAdmin) {
         setAdminProjects((prev) => [newProject, ...prev]);
       }
       message.success('Đã tạo dự án');
       form.resetFields();
+      setSelectedTemplate(null);
       setCreateModalOpen(false);
     } catch (e: any) {
       message.error(e.message || 'Tạo dự án thất bại');
@@ -355,7 +379,7 @@ const ProjectsPage: React.FC = () => {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => setCreateModalOpen(true)}
+            onClick={openCreateModal}
           >
             Tạo dự án
           </Button>
@@ -398,7 +422,7 @@ const ProjectsPage: React.FC = () => {
             }
           >
             {!search && (
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>
+              <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
                 Tạo Dự án đầu tiên
               </Button>
             )}
@@ -430,16 +454,58 @@ const ProjectsPage: React.FC = () => {
         open={createModalOpen}
         onCancel={() => {
           form.resetFields();
+          setSelectedTemplate(null);
           setCreateModalOpen(false);
         }}
         footer={null}
         destroyOnClose
+        width={560}
       >
+        {templates.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: '#595959' }}>
+              Chọn template (tùy chọn):
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div
+                onClick={() => setSelectedTemplate(null)}
+                style={{
+                  padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+                  border: `2px solid ${selectedTemplate === null ? '#1890ff' : '#d9d9d9'}`,
+                  background: selectedTemplate === null ? '#e6f4ff' : '#fff',
+                  color: selectedTemplate === null ? '#1890ff' : '#595959',
+                }}
+              >
+                Trống
+              </div>
+              {templates.map((t) => (
+                <div key={t.id}
+                  onClick={() => setSelectedTemplate(t.id)}
+                  style={{
+                    padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+                    border: `2px solid ${selectedTemplate === t.id ? '#1890ff' : '#d9d9d9'}`,
+                    background: selectedTemplate === t.id ? '#e6f4ff' : '#fff',
+                    color: selectedTemplate === t.id ? '#1890ff' : '#595959',
+                  }}
+                >
+                  {t.icon && <span style={{ marginRight: 4 }}>{t.icon}</span>}
+                  {t.name}
+                </div>
+              ))}
+            </div>
+            {selectedTemplate && (
+              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>
+                ✅ Sử dụng template: {templates.find(t => t.id === selectedTemplate)?.name}
+                {' '}(board + columns sẽ được tạo tự động)
+              </div>
+            )}
+          </div>
+        )}
         <Form
           form={form}
           layout="vertical"
           onFinish={handleCreate}
-          style={{ marginTop: 16 }}
+          style={{ marginTop: 8 }}
         >
           <Form.Item
             name="key"

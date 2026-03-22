@@ -13,10 +13,11 @@ interface AuthState {
   isAuthenticated: boolean;
   mustChangePassword: boolean;
   isAdmin: boolean | null; // null = chưa kiểm tra
+  pendingTwoFactor: boolean; // đang chờ TOTP sau login
   isLoading: boolean;
   error: string | null;
 
-  login: (credentials: LoginRequest) => Promise<void>;
+  login: (credentials: LoginRequest & { totpCode?: string }) => Promise<{ twoFactorRequired?: boolean }>;
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   getCurrentUser: () => Promise<void>;
@@ -36,14 +37,21 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       mustChangePassword: false,
       isAdmin: null,
+      pendingTwoFactor: false,
       isLoading: false,
       error: null,
 
-      login: async (credentials: LoginRequest) => {
+      login: async (credentials) => {
         set({ isLoading: true, error: null });
         try {
-          // response: { accessToken, refreshToken, userId, username, email, ... }
+          // response: { accessToken, refreshToken, userId, username, email, twoFactorEnabled, ... }
           const res = await authService.login(credentials);
+
+          // Nếu server yêu cầu 2FA và chưa cung cấp totpCode
+          if (res.twoFactorEnabled && !credentials.totpCode) {
+            set({ isLoading: false, pendingTwoFactor: true });
+            return { twoFactorRequired: true };
+          }
 
           localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, res.accessToken);
           localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refreshToken);
@@ -55,6 +63,7 @@ export const useAuthStore = create<AuthState>()(
             email: res.email,
             fullName: res.fullName,
             avatarUrl: res.avatarUrl,
+            twoFactorEnabled: res.twoFactorEnabled,
           };
           localStorage.setItem(STORAGE_KEYS.USER_INFO, JSON.stringify(user));
 
@@ -64,9 +73,11 @@ export const useAuthStore = create<AuthState>()(
             refreshToken: res.refreshToken,
             isAuthenticated: true,
             mustChangePassword: res.mustChangePassword === true,
+            pendingTwoFactor: false,
             isLoading: false,
             error: null,
           });
+          return {};
         } catch (error: any) {
           set({ error: error.message || 'Đăng nhập thất bại', isLoading: false });
           throw error;
@@ -113,7 +124,7 @@ export const useAuthStore = create<AuthState>()(
           localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
           localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
           localStorage.removeItem(STORAGE_KEYS.USER_INFO);
-          set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false, mustChangePassword: false, isAdmin: null });
+          set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false, mustChangePassword: false, isAdmin: null, pendingTwoFactor: false });
         }
       },
 
