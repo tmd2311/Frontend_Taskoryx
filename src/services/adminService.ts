@@ -9,8 +9,8 @@ import type {
   AssignPermissionsRequest,
   AdminUserFilter,
   CreateAdminUserRequest,
+  UpdateAdminUserRequest,
   AssignRoleRequest,
-  ResetPasswordRequest,
   SpringPage,
 } from '../types';
 
@@ -34,7 +34,7 @@ export const adminService = {
 
   /**
    * POST /admin/users
-   * Body: { email, fullName, password, username, phone? }
+   * Body: { email, fullName, username, phone? } — server tự tạo mật khẩu ngẫu nhiên và gửi email
    */
   createUser: async (data: CreateAdminUserRequest): Promise<AdminUser> => {
     const response: any = await api.post('/admin/users', data);
@@ -42,20 +42,35 @@ export const adminService = {
   },
 
   /**
-   * PATCH /admin/users/:id/status – Toggle kích hoạt/vô hiệu hoá
-   * Không cần body
+   * PUT /admin/users/:id – Chỉnh sửa thông tin người dùng
    */
-  toggleUserStatus: async (id: string): Promise<AdminUser> => {
-    const response: any = await api.patch(`/admin/users/${id}/status`);
+  updateUser: async (id: string, data: UpdateAdminUserRequest): Promise<AdminUser> => {
+    const response: any = await api.put(`/admin/users/${id}`, data);
+    return response.data ?? response;
+  },
+
+  /**
+   * DELETE /admin/users/:id – Vô hiệu hóa tài khoản
+   */
+  deactivateUser: async (id: string): Promise<AdminUser> => {
+    const response: any = await api.delete(`/admin/users/${id}`);
+    return response.data ?? response;
+  },
+
+  /**
+   * PATCH /admin/users/:id/activate – Kích hoạt lại tài khoản
+   */
+  activateUser: async (id: string): Promise<AdminUser> => {
+    const response: any = await api.patch(`/admin/users/${id}/activate`);
     return response.data ?? response;
   },
 
   /**
    * POST /admin/users/:id/reset-password
-   * Body: { newPassword }
+   * Không cần body — server tự tạo mật khẩu ngẫu nhiên và gửi email cho user
    */
-  resetPassword: async (id: string, data: ResetPasswordRequest): Promise<void> => {
-    await api.post(`/admin/users/${id}/reset-password`, data);
+  resetPassword: async (id: string): Promise<void> => {
+    await api.post(`/admin/users/${id}/reset-password`);
   },
 
   /**

@@ -15,19 +15,21 @@ import {
   message,
   Badge,
   Dropdown,
+  Alert,
 } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   UserAddOutlined,
   SearchOutlined,
   ReloadOutlined,
-  LockOutlined,
   UserOutlined,
   EditOutlined,
   MoreOutlined,
   CheckCircleOutlined,
   StopOutlined,
   KeyOutlined,
+  ExclamationCircleOutlined,
+  MailOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useNavigate } from 'react-router-dom';
@@ -50,7 +52,9 @@ const AdminUsersPage: React.FC = () => {
     fetchUsers,
     fetchRoles,
     createUser,
-    toggleUserStatus,
+    updateUser,
+    deactivateUser,
+    activateUser,
     resetPassword,
     assignRole,
     removeRole,
@@ -67,11 +71,11 @@ const AdminUsersPage: React.FC = () => {
   const [createForm] = Form.useForm();
   const [createSaving, setCreateSaving] = useState(false);
 
-  // Modal reset mật khẩu
-  const [resetModalOpen, setResetModalOpen] = useState(false);
-  const [resetTargetUser, setResetTargetUser] = useState<AdminUser | null>(null);
-  const [resetForm] = Form.useForm();
-  const [resetSaving, setResetSaving] = useState(false);
+  // Modal chỉnh sửa user
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editTargetUser, setEditTargetUser] = useState<AdminUser | null>(null);
+  const [editForm] = Form.useForm();
+  const [editSaving, setEditSaving] = useState(false);
 
   // Modal gán role
   const [roleModalOpen, setRoleModalOpen] = useState(false);
@@ -87,12 +91,10 @@ const AdminUsersPage: React.FC = () => {
     }
   }, [isAdmin]);
 
-  // Load danh sách roles (để filter và gán)
   useEffect(() => {
     fetchRoles();
   }, []);
 
-  // Load users khi filter/page thay đổi
   useEffect(() => {
     const params: any = { page: page - 1, size: PAGE_SIZE };
     if (search.trim()) params.search = search.trim();
@@ -117,11 +119,10 @@ const AdminUsersPage: React.FC = () => {
       await createUser({
         username: values.username.trim(),
         email: values.email.trim(),
-        password: values.password,
         fullName: values.fullName?.trim() || undefined,
         phone: values.phone?.trim() || undefined,
       });
-      message.success('Tạo người dùng thành công');
+      message.success('Tạo tài khoản thành công. Mật khẩu đã được gửi về email của người dùng.');
       setCreateModalOpen(false);
       createForm.resetFields();
       reload();
@@ -132,35 +133,81 @@ const AdminUsersPage: React.FC = () => {
     }
   };
 
-  // ── Toggle trạng thái ─────────────────────────────────────
-  const handleToggleStatus = async (user: AdminUser) => {
+  // ── Chỉnh sửa user ────────────────────────────────────────
+  const openEditUser = (user: AdminUser) => {
+    setEditTargetUser(user);
+    editForm.setFieldsValue({
+      fullName: user.fullName,
+      phone: user.phone,
+      timezone: (user as any).timezone,
+      language: (user as any).language,
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleEditUser = async (values: any) => {
+    if (!editTargetUser) return;
+    setEditSaving(true);
     try {
-      await toggleUserStatus(user.id);
-      message.success(user.isActive ? 'Đã vô hiệu hóa tài khoản' : 'Đã kích hoạt tài khoản');
+      await updateUser(editTargetUser.id, {
+        fullName: values.fullName?.trim() || undefined,
+        phone: values.phone?.trim() || undefined,
+        timezone: values.timezone?.trim() || undefined,
+        language: values.language?.trim() || undefined,
+      });
+      message.success('Cập nhật thông tin thành công');
+      setEditModalOpen(false);
     } catch (e: any) {
-      message.error(e.message || 'Thay đổi trạng thái thất bại');
+      message.error(e.message || 'Cập nhật thất bại');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // ── Vô hiệu hóa / Kích hoạt ──────────────────────────────
+  const handleDeactivate = async (user: AdminUser) => {
+    try {
+      await deactivateUser(user.id);
+      message.success('Đã vô hiệu hóa tài khoản');
+    } catch (e: any) {
+      message.error(e.message || 'Vô hiệu hóa thất bại');
+    }
+  };
+
+  const handleActivate = async (user: AdminUser) => {
+    try {
+      await activateUser(user.id);
+      message.success('Đã kích hoạt tài khoản');
+    } catch (e: any) {
+      message.error(e.message || 'Kích hoạt thất bại');
     }
   };
 
   // ── Reset mật khẩu ─────────────────────────────────────────
-  const openResetPassword = (user: AdminUser) => {
-    setResetTargetUser(user);
-    resetForm.resetFields();
-    setResetModalOpen(true);
-  };
-
-  const handleResetPassword = async (values: any) => {
-    if (!resetTargetUser) return;
-    setResetSaving(true);
-    try {
-      await resetPassword(resetTargetUser.id, { newPassword: values.newPassword });
-      message.success(`Đã đặt lại mật khẩu cho ${resetTargetUser.fullName || resetTargetUser.username}`);
-      setResetModalOpen(false);
-    } catch (e: any) {
-      message.error(e.message || 'Đặt lại mật khẩu thất bại');
-    } finally {
-      setResetSaving(false);
-    }
+  const handleResetPassword = (user: AdminUser) => {
+    Modal.confirm({
+      title: 'Đặt lại mật khẩu',
+      icon: <ExclamationCircleOutlined />,
+      content: (
+        <div>
+          <p>Đặt lại mật khẩu cho <strong>{user.fullName || user.username}</strong>?</p>
+          <p style={{ color: '#8c9ab0', fontSize: 13 }}>
+            Hệ thống sẽ tự tạo mật khẩu ngẫu nhiên và gửi về email <strong>{user.email}</strong>. Người dùng sẽ phải đổi mật khẩu khi đăng nhập lần tiếp theo.
+          </p>
+        </div>
+      ),
+      okText: 'Đặt lại',
+      cancelText: 'Hủy',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await resetPassword(user.id);
+          message.success(`Đã đặt lại mật khẩu. Email xác nhận đã được gửi tới ${user.email}`);
+        } catch (e: any) {
+          message.error(e.message || 'Đặt lại mật khẩu thất bại');
+        }
+      },
+    });
   };
 
   // ── Gán / xóa role ────────────────────────────────────────
@@ -204,7 +251,14 @@ const AdminUsersPage: React.FC = () => {
         <Space>
           <Avatar src={u.avatarUrl} icon={<UserOutlined />} size={36} />
           <div>
-            <div style={{ fontWeight: 600, fontSize: 13 }}>{u.fullName || u.username}</div>
+            <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+              {u.fullName || u.username}
+              {u.mustChangePassword && (
+                <Tag color="orange" style={{ fontSize: 11, padding: '0 5px', lineHeight: '18px' }}>
+                  Chưa đổi MK
+                </Tag>
+              )}
+            </div>
             <Text type="secondary" style={{ fontSize: 12 }}>@{u.username}</Text>
           </div>
         </Space>
@@ -259,10 +313,21 @@ const AdminUsersPage: React.FC = () => {
       ),
     },
     {
+      title: 'Đăng nhập cuối',
+      dataIndex: 'lastLoginAt',
+      key: 'lastLoginAt',
+      width: 140,
+      render: (d: string) => (
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {d ? dayjs(d).format('DD/MM/YYYY HH:mm') : '—'}
+        </Text>
+      ),
+    },
+    {
       title: 'Ngày tạo',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 120,
+      width: 110,
       render: (d: string) => (
         <Text type="secondary" style={{ fontSize: 12 }}>
           {d ? dayjs(d).format('DD/MM/YYYY') : '—'}
@@ -276,14 +341,14 @@ const AdminUsersPage: React.FC = () => {
       render: (_, u) => {
         const items: MenuProps['items'] = [
           {
-            key: 'toggle',
-            icon: u.isActive ? <StopOutlined /> : <CheckCircleOutlined />,
-            label: u.isActive ? 'Vô hiệu hóa' : 'Kích hoạt',
-            onClick: () => handleToggleStatus(u),
+            key: 'edit',
+            icon: <EditOutlined />,
+            label: 'Chỉnh sửa thông tin',
+            onClick: () => openEditUser(u),
           },
           {
             key: 'role',
-            icon: <EditOutlined />,
+            icon: <UserOutlined />,
             label: 'Gán vai trò',
             onClick: () => openAssignRole(u),
           },
@@ -291,8 +356,23 @@ const AdminUsersPage: React.FC = () => {
             key: 'reset',
             icon: <KeyOutlined />,
             label: 'Đặt lại mật khẩu',
-            onClick: () => openResetPassword(u),
+            onClick: () => handleResetPassword(u),
           },
+          { type: 'divider' },
+          u.isActive
+            ? {
+                key: 'deactivate',
+                icon: <StopOutlined />,
+                label: 'Vô hiệu hóa',
+                danger: true,
+                onClick: () => handleDeactivate(u),
+              }
+            : {
+                key: 'activate',
+                icon: <CheckCircleOutlined />,
+                label: 'Kích hoạt lại',
+                onClick: () => handleActivate(u),
+              },
         ];
         return (
           <Dropdown menu={{ items }} trigger={['click']} placement="bottomRight">
@@ -369,7 +449,7 @@ const AdminUsersPage: React.FC = () => {
           showTotal: (t) => `Tổng ${t} tài khoản`,
           showSizeChanger: false,
         }}
-        scroll={{ x: 900 }}
+        scroll={{ x: 1000 }}
       />
 
       {/* Modal tạo tài khoản */}
@@ -381,11 +461,17 @@ const AdminUsersPage: React.FC = () => {
         destroyOnHidden
         width={480}
       >
+        <Alert
+          type="info"
+          icon={<MailOutlined />}
+          showIcon
+          message="Hệ thống sẽ tự tạo mật khẩu ngẫu nhiên và gửi về email của người dùng. Người dùng phải đổi mật khẩu khi đăng nhập lần đầu."
+          style={{ marginBottom: 16, marginTop: 12 }}
+        />
         <Form
           form={createForm}
           layout="vertical"
           onFinish={handleCreate}
-          style={{ marginTop: 12 }}
         >
           <Form.Item
             name="username"
@@ -410,22 +496,9 @@ const AdminUsersPage: React.FC = () => {
           <Form.Item name="phone" label="Số điện thoại">
             <Input placeholder="Số điện thoại (tùy chọn)" />
           </Form.Item>
-          <Form.Item
-            name="password"
-            label="Mật khẩu tạm thời"
-            rules={[
-              { required: true, message: 'Vui lòng nhập mật khẩu!' },
-              { min: 6, message: 'Tối thiểu 6 ký tự!' },
-            ]}
-          >
-            <Input.Password
-              prefix={<LockOutlined />}
-              placeholder="Người dùng sẽ phải đổi khi đăng nhập lần đầu"
-            />
-          </Form.Item>
           <Form.Item style={{ marginBottom: 0 }}>
             <Space>
-              <Button type="primary" htmlType="submit" loading={createSaving}>
+              <Button type="primary" htmlType="submit" loading={createSaving} icon={<UserAddOutlined />}>
                 Tạo tài khoản
               </Button>
               <Button onClick={() => setCreateModalOpen(false)}>Hủy</Button>
@@ -434,57 +507,50 @@ const AdminUsersPage: React.FC = () => {
         </Form>
       </Modal>
 
-      {/* Modal đặt lại mật khẩu */}
+      {/* Modal chỉnh sửa user */}
       <Modal
         title={
           <Space>
-            <KeyOutlined />
-            Đặt lại mật khẩu — {resetTargetUser?.fullName || resetTargetUser?.username}
+            <EditOutlined />
+            Chỉnh sửa — {editTargetUser?.fullName || editTargetUser?.username}
           </Space>
         }
-        open={resetModalOpen}
-        onCancel={() => setResetModalOpen(false)}
+        open={editModalOpen}
+        onCancel={() => setEditModalOpen(false)}
         footer={null}
         destroyOnHidden
+        width={480}
       >
         <Form
-          form={resetForm}
+          form={editForm}
           layout="vertical"
-          onFinish={handleResetPassword}
+          onFinish={handleEditUser}
           style={{ marginTop: 12 }}
         >
-          <Form.Item
-            name="newPassword"
-            label="Mật khẩu mới"
-            rules={[
-              { required: true, message: 'Vui lòng nhập mật khẩu mới!' },
-              { min: 6, message: 'Tối thiểu 6 ký tự!' },
-            ]}
-          >
-            <Input.Password prefix={<LockOutlined />} placeholder="Nhập mật khẩu mới" />
+          <Form.Item name="fullName" label="Họ và tên">
+            <Input placeholder="Họ và tên" />
           </Form.Item>
-          <Form.Item
-            name="confirmPassword"
-            label="Xác nhận mật khẩu"
-            dependencies={['newPassword']}
-            rules={[
-              { required: true, message: 'Vui lòng xác nhận mật khẩu!' },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue('newPassword') === value) return Promise.resolve();
-                  return Promise.reject(new Error('Mật khẩu xác nhận không khớp!'));
-                },
-              }),
-            ]}
-          >
-            <Input.Password prefix={<LockOutlined />} placeholder="Nhập lại mật khẩu mới" />
+          <Form.Item name="phone" label="Số điện thoại">
+            <Input placeholder="Số điện thoại" />
+          </Form.Item>
+          <Form.Item name="timezone" label="Múi giờ">
+            <Input placeholder="VD: Asia/Ho_Chi_Minh" />
+          </Form.Item>
+          <Form.Item name="language" label="Ngôn ngữ">
+            <Select
+              placeholder="Chọn ngôn ngữ"
+              options={[
+                { label: 'Tiếng Việt', value: 'vi' },
+                { label: 'English', value: 'en' },
+              ]}
+            />
           </Form.Item>
           <Form.Item style={{ marginBottom: 0 }}>
             <Space>
-              <Button type="primary" htmlType="submit" loading={resetSaving} danger>
-                Đặt lại mật khẩu
+              <Button type="primary" htmlType="submit" loading={editSaving}>
+                Lưu thay đổi
               </Button>
-              <Button onClick={() => setResetModalOpen(false)}>Hủy</Button>
+              <Button onClick={() => setEditModalOpen(false)}>Hủy</Button>
             </Space>
           </Form.Item>
         </Form>
@@ -494,7 +560,7 @@ const AdminUsersPage: React.FC = () => {
       <Modal
         title={
           <Space>
-            <EditOutlined />
+            <UserOutlined />
             Gán vai trò — {roleTargetUser?.fullName || roleTargetUser?.username}
           </Space>
         }
@@ -523,7 +589,10 @@ const AdminUsersPage: React.FC = () => {
             style={{ width: '100%' }}
             value={selectedRoleId || undefined}
             onChange={(v) => setSelectedRoleId(v)}
-            options={roles.map((r) => ({ label: r.name, value: r.id }))}
+            options={roles
+              .filter((r) => !roleTargetUser?.roles?.some((ur) => ur.id === r.id))
+              .map((r) => ({ label: r.name, value: r.id }))}
+            notFoundContent={<Text type="secondary">Người dùng đã có tất cả vai trò</Text>}
           />
         </div>
       </Modal>

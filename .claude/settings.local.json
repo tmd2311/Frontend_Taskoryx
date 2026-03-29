@@ -17,7 +17,22 @@
       "Bash(cd \"E:\\\\DOAN\\\\FE\" && npx vite build 2>&1 | tail -30)",
       "Bash(cd \"E:\\\\DOAN\\\\FE\" && npx vite build 2>&1 | tail -15)",
       "Bash(cd \"E:\\\\DOAN\\\\FE\" && sed -i 's/onClick={\\(\\) => setCreateModalOpen\\(true\\)}/onClick={openCreateModal}/g' src/pages/ProjectsPage.tsx)",
-      "Bash(cd \"E:\\\\DOAN\\\\FE\" && npx vite build 2>&1 | tail -10)"
+      "Bash(cd \"E:\\\\DOAN\\\\FE\" && npx vite build 2>&1 | tail -10)",
+      "Bash(npx vite:*)",
+      "mcp__agentica__pipeline_list",
+      "mcp__agentica__registry_list_playbooks",
+      "mcp__agentica__pipeline_start",
+      "mcp__agentica__pipeline_current_role",
+      "mcp__agentica__cmmi_get_document",
+      "mcp__agentica__cmmi_get_checklist_template",
+      "mcp__agentica__pipeline_complete_role",
+      "mcp__agentica__pipeline_confirm_advance",
+      "mcp__agentica__registry_save_artifact",
+      "Bash(npm run:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "agentica"
+  ]
 }

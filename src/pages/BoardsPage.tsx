@@ -34,7 +34,7 @@ import {
 import { useProjectStore } from '../stores/projectStore';
 import { useBoardStore } from '../stores/boardStore';
 import { useTaskStore } from '../stores/taskStore';
-import TaskDetailDrawer from '../components/TaskDetailDrawer';
+import { useNavigate } from 'react-router-dom';
 import { StatusTag } from '../components/StatusSelect';
 import type { Board, KanbanColumn, TaskSummary } from '../types';
 import { TaskPriority } from '../types';
@@ -57,9 +57,9 @@ const PRIORITY_LABEL: Record<string, string> = {
 };
 
 // ─── Task Card ───────────────────────────────────────────────
-const TaskCard: React.FC<{ task: TaskSummary; onOpen: (id: string) => void }> = ({ task, onOpen }) => (
+const TaskCard: React.FC<{ task: TaskSummary; onOpen: (taskKey: string) => void }> = ({ task, onOpen }) => (
   <div
-    onClick={() => onOpen(task.id)}
+    onClick={() => onOpen(task.taskKey)}
     style={{
       background: '#fff',
       border: '1px solid #f0f0f0',
@@ -144,7 +144,7 @@ interface ColumnCardProps {
   onMoveLeft: (colId: string, index: number) => void;
   onMoveRight: (colId: string, index: number) => void;
   onAddTask: (col: KanbanColumn) => void;
-  onOpenTask: (taskId: string) => void;
+  onOpenTask: (taskKey: string) => void;
 }
 
 const ColumnCard: React.FC<ColumnCardProps> = ({
@@ -276,6 +276,7 @@ const ColumnCard: React.FC<ColumnCardProps> = ({
 
 // ─── BoardsPage ──────────────────────────────────────────────
 const BoardsPage: React.FC = () => {
+  const navigate = useNavigate();
   const { projects, fetchProjects } = useProjectStore();
   const {
     boards,
@@ -313,9 +314,6 @@ const BoardsPage: React.FC = () => {
   const [targetColumn, setTargetColumn] = useState<KanbanColumn | null>(null);
   const [taskForm] = Form.useForm();
   const [taskSaving, setTaskSaving] = useState(false);
-
-  // Task detail drawer
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   // Load projects khi vào trang
   useEffect(() => {
@@ -614,7 +612,7 @@ const BoardsPage: React.FC = () => {
                     onMoveLeft={(id, idx) => handleMoveColumn(id, idx, 'left')}
                     onMoveRight={(id, idx) => handleMoveColumn(id, idx, 'right')}
                     onAddTask={openAddTask}
-                    onOpenTask={(id) => setSelectedTaskId(id)}
+                    onOpenTask={(taskKey) => navigate(`/tasks/${taskKey}`)}
                   />
                 ))}
 
@@ -708,14 +706,6 @@ const BoardsPage: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-
-      {/* Drawer xem / sửa / xóa task */}
-      <TaskDetailDrawer
-        taskId={selectedTaskId}
-        onClose={() => setSelectedTaskId(null)}
-        onUpdated={() => activeBoardId && fetchKanban(activeBoardId)}
-        onDeleted={() => activeBoardId && fetchKanban(activeBoardId)}
-      />
 
       {/* Modal tạo Task — boardId + columnId ẩn, lấy từ context */}
       <Modal

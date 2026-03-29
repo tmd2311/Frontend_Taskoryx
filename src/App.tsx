@@ -11,6 +11,9 @@ import BoardsPage from './pages/BoardsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import AdminUsersPage from './pages/AdminUsersPage';
+import AdminRolesPage from './pages/AdminRolesPage';
+import TimeReportPage from './pages/TimeReportPage';
+import TaskDetailPage from './pages/TaskDetailPage';
 import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -95,6 +98,16 @@ function App() {
             }
           />
           <Route
+            path="/tasks/:taskKey"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <TaskDetailPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/projects"
             element={
               <ProtectedRoute>
@@ -137,11 +150,33 @@ function App() {
           />
 
           <Route
+            path="/time-report"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <TimeReportPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/admin/users"
             element={
               <ProtectedRoute>
                 <MainLayout>
                   <AdminUsersPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/roles"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <AdminRolesPage />
                 </MainLayout>
               </ProtectedRoute>
             }

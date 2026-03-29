@@ -431,6 +431,13 @@ export interface MoveColumnRequest {
 // COMMENT
 // ============================================================
 
+export interface MentionedUser {
+  userId: string;
+  username: string;
+  fullName?: string;
+  avatarUrl?: string;
+}
+
 export interface Comment {
   id: string;
   taskId: string;
@@ -442,6 +449,8 @@ export interface Comment {
   parentId?: string;   // null nếu là comment gốc
   isEdited: boolean;
   replies?: Comment[]; // nested replies
+  mentionedUsernames?: string[];
+  mentionedUsers?: MentionedUser[];
   createdAt: string;
   updatedAt?: string;
 }
@@ -462,14 +471,18 @@ export interface UpdateCommentRequest {
 export interface Attachment {
   id: string;
   taskId: string;
+  commentId?: string;
   uploadedById: string;
   uploadedByName?: string;
   fileName: string;
   fileSize: number;
   formattedFileSize?: string;
   fileType: string;
+  fileCategory?: string;
   fileUrl: string;
+  /** @deprecated dùng isImage */
   image?: boolean;
+  isImage?: boolean;
   createdAt: string;
 }
 
@@ -532,9 +545,15 @@ export interface AdminUserFilter extends PageParams {
 export interface CreateAdminUserRequest {
   username: string;
   email: string;
-  password: string;
   fullName?: string;
   phone?: string;
+}
+
+export interface UpdateAdminUserRequest {
+  fullName?: string;
+  phone?: string;
+  timezone?: string;
+  language?: string;
 }
 
 export interface AssignRoleRequest {
@@ -649,6 +668,86 @@ export interface UpdateTimeEntryRequest {
 
 export interface TimeTotal {
   totalHours: number;
+}
+
+export interface DailyTimeStats {
+  date: string;
+  dayOfWeek: string;
+  totalHours: number;
+  formattedHours: string;
+  entryCount: number;
+  entries: TimeEntry[];
+}
+
+export interface WeeklyTimeStats {
+  year: number;
+  weekOfYear: number;
+  weekStart: string;
+  weekEnd: string;
+  weekLabel: string;
+  totalHours: number;
+  formattedHours: string;
+  entryCount: number;
+  days: DailyTimeStats[];
+}
+
+export interface MonthlyTimeStats {
+  year: number;
+  month: number;
+  monthName: string;
+  totalHours: number;
+  formattedHours: string;
+  entryCount: number;
+  activeDays: number;
+  days?: DailyTimeStats[];
+}
+
+export interface TimeStatsByProject {
+  projectId: string;
+  projectName: string;
+  projectKey: string;
+  totalHours: number;
+  formattedHours: string;
+  entryCount: number;
+}
+
+export interface TimeStatsSummary {
+  totalHours: number;
+  formattedTotalHours: string;
+  totalEntries: number;
+  activeDays: number;
+  avgHoursPerActiveDay: number;
+  avgHoursPerDay: number;
+  byProject: TimeStatsByProject[];
+  byDay: DailyTimeStats[];
+}
+
+export interface TimeStatsByMember {
+  userId: string;
+  userName: string;
+  totalHours: number;
+  formattedHours: string;
+  entryCount: number;
+}
+
+export interface TimeStatsByTask {
+  taskKey: string;
+  taskTitle: string;
+  estimatedHours?: number;
+  loggedHours: number;
+  formattedLoggedHours: string;
+  progressPercent?: number;
+}
+
+export interface ProjectTimeStats {
+  projectId: string;
+  projectName: string;
+  totalHours: number;
+  formattedTotalHours: string;
+  totalEntries: number;
+  byMember: TimeStatsByMember[];
+  byTask: TimeStatsByTask[];
+  byDay: DailyTimeStats[];
 }
 
 // ============================================================

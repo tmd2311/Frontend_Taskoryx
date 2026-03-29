@@ -16,6 +16,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useProjectStore } from '../stores/projectStore';
 import { useTaskStore } from '../stores/taskStore';
+import { useAdminStore } from '../stores/adminStore';
 import { projectService } from '../services/projectService';
 import { boardService } from '../services/boardService';
 import { sprintService } from '../services/sprintService';
@@ -23,13 +24,13 @@ import { taskService } from '../services/taskService';
 import { versionService } from '../services/versionService';
 import { categoryService } from '../services/categoryService';
 import { activityService } from '../services/activityService';
+import { searchService } from '../services/searchService';
 import { useAuthStore } from '../stores/authStore';
 import type {
   TaskSummary, ProjectMember, Board, Sprint, Version, IssueCategory, ActivityLog, GanttTask,
 } from '../types';
 import { TaskPriority, ProjectRole, TaskStatus, SprintStatus, VersionStatus } from '../types';
 import StatusSelect from '../components/StatusSelect';
-import TaskDetailDrawer from '../components/TaskDetailDrawer';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -42,7 +43,8 @@ const PRIORITY_LABEL: Record<string, string> = {
   [TaskPriority.LOW]: 'Thấp', [TaskPriority.MEDIUM]: 'Trung bình',
   [TaskPriority.HIGH]: 'Cao', [TaskPriority.URGENT]: 'Khẩn cấp',
 };
-const ROLE_OPTIONS = [
+// Fallback khi chưa tải được roles từ API
+const DEFAULT_ROLE_OPTIONS = [
   { label: 'Quản lý', value: ProjectRole.MANAGER },
   { label: 'Lập trình viên', value: ProjectRole.DEVELOPER },
   { label: 'Người xem', value: ProjectRole.VIEWER },
@@ -128,9 +130,13 @@ const ProjectDetailPage: React.FC = () => {
     updateTaskStatus, moveTask, createTask,
   } = useTaskStore();
   const { isAdmin } = useAuthStore();
-
-  // Task detail drawer
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const { roles: systemRoles, fetchRoles } = useAdminStore();
+  // Roles cho project member — ưu tiên từ API, fallback về hardcoded nếu chưa tải
+  const projectRoleOptions = systemRoles.length > 0
+    ? systemRoles
+        .filter((r) => r.name !== 'OWNER')
+        .map((r) => ({ label: r.name, value: r.name }))
+    : DEFAULT_ROLE_OPTIONS;
 
   // Task list filters
   const [keyword, setKeyword] = useState('');
@@ -144,6 +150,9 @@ const ProjectDetailPage: React.FC = () => {
   const [addForm] = Form.useForm();
   const [addSaving, setAddSaving] = useState(false);
   const [roleUpdating, setRoleUpdating] = useState<string>('');
+  const [memberSearchResults, setMemberSearchResults] = useState<{ label: React.ReactNode; value: string }[]>([]);
+  const [memberSearchLoading, setMemberSearchLoading] = useState(false);
+  const memberSearchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Delete project
   const [deleting, setDeleting] = useState(false);
@@ -217,6 +226,8 @@ const ProjectDetailPage: React.FC = () => {
     fetchProjectById(projectId);
     fetchMembers(projectId);
     boardService.getProjectBoards(projectId).then(setBoards).catch(() => {});
+    // Tải roles từ API để dùng cho dropdown chọn vai trò thành viên (silent nếu không có quyền)
+    if (systemRoles.length === 0) fetchRoles().catch(() => {});
   }, [projectId]);
 
   useEffect(() => {
@@ -307,6 +318,32 @@ const ProjectDetailPage: React.FC = () => {
   };
 
   // ── Members ──────────────────────────────────────────────
+  const handleMemberSearch = (keyword: string) => {
+    if (memberSearchTimer.current) clearTimeout(memberSearchTimer.current);
+    if (!keyword.trim()) { setMemberSearchResults([]); return; }
+    setMemberSearchLoading(true);
+    memberSearchTimer.current = setTimeout(async () => {
+      try {
+        const result = await searchService.searchUsers({ keyword: keyword.trim(), page: 0, size: 10 });
+        const opts = (result.content ?? []).map((u) => ({
+          value: u.email,
+          label: (
+            <Space size={8}>
+              <Avatar src={u.avatarUrl} icon={<UserOutlined />} size={24} />
+              <span style={{ fontWeight: 500 }}>{u.fullName || u.username}</span>
+              <span style={{ color: '#8c9ab0', fontSize: 12 }}>{u.email}</span>
+            </Space>
+          ),
+        }));
+        setMemberSearchResults(opts);
+      } catch {
+        setMemberSearchResults([]);
+      } finally {
+        setMemberSearchLoading(false);
+      }
+    }, 300);
+  };
+
   const handleAddMember = async (values: { email: string; role: string }) => {
     if (!projectId) return;
     setAddSaving(true);
@@ -315,6 +352,7 @@ const ProjectDetailPage: React.FC = () => {
       message.success('Đã thêm thành viên vào dự án');
       setAddModalOpen(false);
       addForm.resetFields();
+      setMemberSearchResults([]);
       fetchMembers(projectId);
     } catch (e: any) {
       message.error(e.message || 'Thêm thành viên thất bại');
@@ -677,7 +715,7 @@ const ProjectDetailPage: React.FC = () => {
         if (role === ProjectRole.OWNER) return <Tag color="gold">Quản trị viên</Tag>;
         return (
           <Select size="small" value={role} loading={roleUpdating === m.userId}
-            style={{ width: 150 }} options={ROLE_OPTIONS}
+            style={{ width: 150 }} options={projectRoleOptions}
             onChange={(v) => handleChangeRole(m.userId, v)} />
         );
       },
@@ -810,7 +848,7 @@ const ProjectDetailPage: React.FC = () => {
                   </Tooltip>
                 </div>
                 <Table
-                  columns={buildTaskColumns((r) => setSelectedTaskId(r.id))}
+                  columns={buildTaskColumns((r) => navigate(`/tasks/${r.taskKey}`))}
                   dataSource={tasks}
                   rowKey="id"
                   loading={isLoading}
@@ -897,7 +935,7 @@ const ProjectDetailPage: React.FC = () => {
                         />
                         <Tag style={{ fontFamily: 'monospace', margin: 0, width: 'fit-content' }}>{task.taskKey}</Tag>
                         <Button type="link" style={{ padding: 0, textAlign: 'left', height: 'auto', fontWeight: 400, fontSize: 13 }}
-                          onClick={() => setSelectedTaskId(task.id)}>
+                          onClick={() => navigate(`/tasks/${task.taskKey}`)}>
                           {task.title}
                         </Button>
                         <StatusSelect value={task.status} size="small"
@@ -1371,7 +1409,7 @@ const ProjectDetailPage: React.FC = () => {
                         title: 'Tiêu đề', dataIndex: 'title',
                         render: (t, r) => (
                           <Button type="link" style={{ padding: 0, height: 'auto', textAlign: 'left' }}
-                            onClick={() => setSelectedTaskId(r.id)}>{t}</Button>
+                            onClick={() => navigate(`/tasks/${r.taskKey}`)}>{t}</Button>
                         ),
                       },
                       {
@@ -1418,29 +1456,34 @@ const ProjectDetailPage: React.FC = () => {
         ]}
       />
 
-      {/* Task Detail Drawer */}
-      <TaskDetailDrawer
-        taskId={selectedTaskId}
-        onClose={() => setSelectedTaskId(null)}
-        onUpdated={() => fetchProjectTasks(projectId!, { page: page - 1, size: PAGE_SIZE })}
-        onDeleted={() => fetchProjectTasks(projectId!, { page: page - 1, size: PAGE_SIZE })}
-      />
 
       {/* Modal thêm thành viên */}
       <Modal title={<Space><UserAddOutlined />Thêm thành viên</Space>}
-        open={addModalOpen} onCancel={() => setAddModalOpen(false)} footer={null} destroyOnHidden>
+        open={addModalOpen}
+        onCancel={() => { setAddModalOpen(false); addForm.resetFields(); setMemberSearchResults([]); }}
+        footer={null} destroyOnHidden>
         <Form form={addForm} layout="vertical" onFinish={handleAddMember} style={{ marginTop: 8 }}
           initialValues={{ role: ProjectRole.DEVELOPER }}>
-          <Form.Item name="email" label="Email người dùng"
-            rules={[{ required: true, message: 'Vui lòng nhập email!' }, { type: 'email', message: 'Email không hợp lệ!' }]}>
-            <Input placeholder="Nhập email tài khoản cần thêm" size="large" />
+          <Form.Item name="email" label="Tìm kiếm người dùng"
+            rules={[{ required: true, message: 'Vui lòng chọn người dùng!' }]}>
+            <Select
+              size="large"
+              showSearch
+              filterOption={false}
+              placeholder="Nhập tên, email hoặc username..."
+              notFoundContent={memberSearchLoading ? <Spin size="small" /> : 'Không tìm thấy người dùng'}
+              onSearch={handleMemberSearch}
+              options={memberSearchResults}
+              allowClear
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           <Form.Item name="role" label="Vai trò" rules={[{ required: true }]}>
-            <Select size="large" options={ROLE_OPTIONS} />
+            <Select size="large" options={projectRoleOptions} />
           </Form.Item>
           <Space>
             <Button type="primary" htmlType="submit" loading={addSaving}>Thêm vào dự án</Button>
-            <Button onClick={() => setAddModalOpen(false)}>Hủy</Button>
+            <Button onClick={() => { setAddModalOpen(false); addForm.resetFields(); setMemberSearchResults([]); }}>Hủy</Button>
           </Space>
         </Form>
       </Modal>

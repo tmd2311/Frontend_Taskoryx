@@ -29,6 +29,12 @@ export const taskService = {
     return response.data ?? response;
   },
 
+  /** GET /tasks/key/:taskKey – Chi tiết task theo mã (VD: PROJ-123) */
+  getTaskByKey: async (taskKey: string): Promise<Task> => {
+    const response: any = await api.get(`/tasks/key/${taskKey}`);
+    return response.data ?? response;
+  },
+
   /**
    * GET /projects/:projectId/tasks – Danh sách task trong project
    * Hỗ trợ lọc: keyword, columnId, assigneeId, priorities (comma-sep),

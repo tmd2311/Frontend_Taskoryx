@@ -15,6 +15,7 @@ import {
   AppstoreOutlined,
   SunOutlined,
   MoonOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
@@ -109,6 +110,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       label: 'Bảng Kanban',
       onClick: () => navigate('/boards'),
     },
+    {
+      key: '/time-report',
+      icon: <BarChartOutlined />,
+      label: 'Báo cáo giờ',
+      onClick: () => navigate('/time-report'),
+    },
     ...(isAdmin ? [
       { type: 'divider' as const },
       {
@@ -116,6 +123,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         icon: <TeamOutlined />,
         label: 'Quản lý người dùng',
         onClick: () => navigate('/admin/users'),
+      },
+      {
+        key: '/admin/roles',
+        icon: <SafetyCertificateOutlined />,
+        label: 'Quản lý Role',
+        onClick: () => navigate('/admin/roles'),
       },
     ] : []),
   ];
@@ -192,14 +205,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           borderBottom: `1px solid ${siderBorder}`,
           overflow: 'hidden',
         }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-            background: 'linear-gradient(135deg, #4361ee 0%, #7c3aed 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'white', fontSize: 18,
-          }}>
-            <AppstoreOutlined />
-          </div>
+          <img
+            src="/logo.png"
+            alt="logo"
+            style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, objectFit: 'cover' }}
+          />
           {!collapsed && (
             <span style={{
               fontSize: 18, fontWeight: 700, whiteSpace: 'nowrap',

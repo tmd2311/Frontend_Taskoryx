@@ -32,3 +32,4 @@ dist-ssr
 
 # AI docs
 AI/
+.mcp.json

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Drawer, Button, Tag, Space, Typography, Spin, Form, Input, Select,
   DatePicker, Popconfirm, Divider, Descriptions, message, Avatar, Badge,
-  Tabs, List, Upload, Tooltip, Image, Checkbox, Progress, InputNumber,
+  Tabs, List, Upload, Tooltip, Checkbox, Progress, InputNumber,
   Modal,
 } from 'antd';
 import {
@@ -22,9 +22,12 @@ import { checklistService } from '../services/checklistService';
 import { timeTrackingService } from '../services/timeTrackingService';
 import { dependencyService } from '../services/dependencyService';
 import { watcherService } from '../services/watcherService';
+import { useMentionInput } from '../hooks/useMentionInput';
+import AuthImage from './AuthImage';
+import { downloadAttachment } from '../utils/attachment';
 import type {
   ProjectMember, Comment, Attachment, ChecklistItem, ChecklistSummary,
-  TimeEntry, TaskDependency,
+  TimeEntry, TaskDependency, MentionedUser,
 } from '../types';
 import { TaskPriority, TaskStatus, DependencyType } from '../types';
 import StatusSelect, { StatusTag } from './StatusSelect';
@@ -68,6 +71,54 @@ function getFileIcon(fileType: string, fileName: string) {
     return <FileZipOutlined style={{ color: '#fa8c16', fontSize: 22 }} />;
   return <FileOutlined style={{ color: '#8c8c8c', fontSize: 22 }} />;
 }
+
+// ─── CommentContent – render @mention highlight ──────────────
+interface CommentContentProps {
+  content: string;
+  mentionedUsers?: MentionedUser[];
+}
+
+const CommentContent: React.FC<CommentContentProps> = ({ content, mentionedUsers = [] }) => {
+  if (!content) return null;
+  if (mentionedUsers.length === 0) return <span>{content}</span>;
+
+  const parts: Array<{ type: 'text'; value: string } | { type: 'mention'; user: MentionedUser }> = [];
+  let remaining = content;
+
+  const sorted = [...mentionedUsers].sort((a, b) => {
+    return content.indexOf(`@${a.username}`) - content.indexOf(`@${b.username}`);
+  });
+
+  sorted.forEach((user) => {
+    const tag = `@${user.username}`;
+    const idx = remaining.indexOf(tag);
+    if (idx === -1) return;
+    if (idx > 0) parts.push({ type: 'text', value: remaining.slice(0, idx) });
+    parts.push({ type: 'mention', user });
+    remaining = remaining.slice(idx + tag.length);
+  });
+
+  if (remaining) parts.push({ type: 'text', value: remaining });
+
+  return (
+    <span>
+      {parts.map((part, i) =>
+        part.type === 'text' ? (
+          <span key={i}>{part.value}</span>
+        ) : (
+          <Tooltip key={i} title={part.user.fullName}>
+            <Tag
+              color="blue"
+              style={{ margin: '0 2px', cursor: 'default', fontSize: 12, padding: '0 5px' }}
+            >
+              @{part.user.username}
+            </Tag>
+          </Tooltip>
+        ),
+      )}
+    </span>
+  );
+};
 
 // ─── CommentItem ────────────────────────────────────────────
 interface CommentItemProps {
@@ -139,7 +190,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
               borderRadius: 8, padding: '8px 12px', fontSize: 13,
               whiteSpace: 'pre-wrap', wordBreak: 'break-word',
             }}>
-              {comment.content}
+              <CommentContent content={comment.content} mentionedUsers={comment.mentionedUsers} />
             </div>
           )}
 
@@ -205,11 +256,9 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
 
-  // Comments
-  const [newComment, setNewComment] = useState('');
+  // Comments & @mention
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [commentSending, setCommentSending] = useState(false);
-  const commentInputRef = useRef<any>(null);
 
   // Upload
   const [uploading, setUploading] = useState(false);
@@ -227,6 +276,8 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const [addTimeModal, setAddTimeModal] = useState(false);
   const [timeForm] = Form.useForm();
   const [timeSaving, setTimeSaving] = useState(false);
+  const [editTimeEntry, setEditTimeEntry] = useState<TimeEntry | null>(null);
+  const [editTimeForm] = Form.useForm();
 
   // Dependencies
   const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
@@ -242,13 +293,16 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const open = !!taskId;
   const task = currentTask?.id === taskId ? currentTask : null;
 
+  // useMentionInput phải gọi SAU khi `task` đã được tính toán
+  const mention = useMentionInput(task?.projectId ?? undefined);
+
   // ── Fetch task khi mở ──────────────────────────────────────
   useEffect(() => {
     if (taskId) {
       setEditMode(false);
       setActiveTab('detail');
       setMembers([]);
-      setNewComment('');
+      mention.reset();
       setReplyTo(null);
       setChecklist(null);
       setTimeEntries([]);
@@ -373,7 +427,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     setEditMode(false);
     form.resetFields();
     setMembers([]);
-    setNewComment('');
+    mention.reset();
     setReplyTo(null);
     setCurrentTask(null);
     onClose();
@@ -381,11 +435,11 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
 
   // ── Comments ──────────────────────────────────────────────
   const handleSendComment = async () => {
-    if (!taskId || !newComment.trim()) return;
+    if (!taskId || !mention.content.trim()) return;
     setCommentSending(true);
     try {
-      await addComment(taskId, { content: newComment.trim(), parentId: replyTo?.id });
-      setNewComment('');
+      await addComment(taskId, { content: mention.content.trim(), parentId: replyTo?.id });
+      mention.reset();
       setReplyTo(null);
     } catch (e: any) {
       message.error(e.message || 'Gửi bình luận thất bại');
@@ -412,7 +466,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
 
   const handleReply = (comment: Comment) => {
     setReplyTo(comment);
-    setTimeout(() => commentInputRef.current?.focus(), 100);
+    setTimeout(() => mention.textareaRef.current?.focus(), 100);
   };
 
   // ── Attachments ───────────────────────────────────────────
@@ -513,6 +567,36 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
       fetchTaskById(taskId);
     } catch (e: any) {
       message.error(e.message || 'Xóa thất bại');
+    }
+  };
+
+  const handleOpenEditTime = (entry: TimeEntry) => {
+    setEditTimeEntry(entry);
+    editTimeForm.setFieldsValue({
+      hours: entry.hours,
+      workDate: dayjs(entry.workDate),
+      description: entry.description,
+    });
+  };
+
+  const handleSaveEditTime = async (values: any) => {
+    if (!editTimeEntry || !taskId) return;
+    setTimeSaving(true);
+    try {
+      await timeTrackingService.update(editTimeEntry.id, {
+        hours: values.hours,
+        description: values.description,
+        workDate: values.workDate.format('YYYY-MM-DD'),
+      });
+      message.success('Đã cập nhật');
+      setEditTimeEntry(null);
+      editTimeForm.resetFields();
+      await fetchTimeEntries(taskId);
+      fetchTaskById(taskId);
+    } catch (e: any) {
+      message.error(e.message || 'Cập nhật thất bại');
+    } finally {
+      setTimeSaving(false);
     }
   };
 
@@ -1067,7 +1151,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                         actions={[
                           <Tooltip title="Tải xuống" key="dl">
                             <Button type="text" size="small" icon={<DownloadOutlined />}
-                              href={att.fileUrl} target="_blank" />
+                              onClick={() => downloadAttachment(att.id, att.fileName).catch(() => message.error('Tải xuống thất bại'))} />
                           </Tooltip>,
                           user?.id === att.uploadedById ? (
                             <Popconfirm key="del" title="Xóa tệp này?"
@@ -1080,9 +1164,17 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                       >
                         <List.Item.Meta
                           avatar={
-                            att.image ? (
-                              <Image src={att.fileUrl} width={40} height={40}
-                                style={{ objectFit: 'cover', borderRadius: 4 }} preview={{ mask: false }} />
+                            (att.isImage || att.image) ? (
+                              <AuthImage
+                                attachmentId={att.id}
+                                fileName={att.fileName}
+                                style={{ width: 40, height: 40, borderRadius: 4, cursor: 'pointer' }}
+                                onClick={() => {
+                                  const token = localStorage.getItem('accessToken');
+                                  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+                                  window.open(`${base}/attachments/${att.id}/inline?token=${token}`, '_blank');
+                                }}
+                              />
                             ) : (
                               <div style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {getFileIcon(att.fileType, att.fileName)}
@@ -1091,7 +1183,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                           }
                           title={
                             <Text style={{ fontSize: 13, cursor: 'pointer' }}
-                              onClick={() => window.open(att.fileUrl, '_blank')}>
+                              onClick={() => downloadAttachment(att.id, att.fileName).catch(() => message.error('Tải xuống thất bại'))}>
                               {att.fileName}
                             </Text>
                           }
@@ -1149,26 +1241,32 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                     renderItem={(entry) => (
                       <List.Item
                         style={{ padding: '10px 0' }}
-                        actions={[
-                          user?.id === entry.userId ? (
-                            <Popconfirm key="del" title="Xóa mục này?"
-                              onConfirm={() => handleDeleteTimeEntry(entry.id)}
-                              okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
-                              <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                            </Popconfirm>
-                          ) : null,
-                        ]}
+                        actions={
+                          user?.id === entry.userId
+                            ? [
+                                <Tooltip title="Sửa" key="edit">
+                                  <Button type="text" size="small" icon={<EditOutlined />}
+                                    onClick={() => handleOpenEditTime(entry)} />
+                                </Tooltip>,
+                                <Popconfirm key="del" title="Xóa mục này?"
+                                  onConfirm={() => handleDeleteTimeEntry(entry.id)}
+                                  okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
+                                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                                </Popconfirm>,
+                              ]
+                            : []
+                        }
                       >
                         <List.Item.Meta
                           avatar={<Avatar size={32} icon={<UserOutlined />} />}
                           title={
                             <Space>
-                              <Text strong style={{ fontSize: 13 }}>{(entry as any).hours ?? 0} giờ</Text>
+                              <Text strong style={{ fontSize: 13 }}>{entry.hours ?? 0} giờ</Text>
                               <Text type="secondary" style={{ fontSize: 12 }}>
                                 · {entry.userFullName || entry.username}
                               </Text>
                               <Text type="secondary" style={{ fontSize: 12 }}>
-                                · {dayjs((entry as any).workDate).format('DD/MM/YYYY')}
+                                · {dayjs(entry.workDate).format('DD/MM/YYYY')}
                               </Text>
                             </Space>
                           }
@@ -1230,7 +1328,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
 
           </div>
 
-          {/* ═══ Input bình luận (bottom sticky) ═══ */}
+          {/* ═══ Input bình luận (bottom sticky) với @mention ═══ */}
           {activeTab === 'comments' && (
             <div style={{ padding: '12px 24px', borderTop: '1px solid #f0f0f0', background: '#fff' }}>
               {replyTo && (
@@ -1244,32 +1342,71 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                   <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setReplyTo(null)} />
                 </div>
               )}
-              <Space.Compact style={{ width: '100%' }}>
-                <TextArea
-                  ref={commentInputRef}
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder={replyTo
-                    ? `Trả lời ${replyTo.userFullName || replyTo.username}...`
-                    : 'Viết bình luận... (Ctrl+Enter để gửi)'}
-                  autoSize={{ minRows: 1, maxRows: 5 }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.ctrlKey) {
-                      e.preventDefault();
-                      handleSendComment();
-                    }
-                  }}
-                  style={{ borderRadius: '6px 0 0 6px' }}
-                />
-                <Button
-                  type="primary"
-                  icon={<SendOutlined />}
-                  loading={commentSending}
-                  disabled={!newComment.trim()}
-                  onClick={handleSendComment}
-                  style={{ borderRadius: '0 6px 6px 0', height: 'auto', alignSelf: 'flex-end' }}
-                />
-              </Space.Compact>
+              <div style={{ position: 'relative' }}>
+                {/* Dropdown gợi ý @mention */}
+                {mention.showDropdown && mention.suggestions.length > 0 && (
+                  <div style={{
+                    position: 'absolute', bottom: '100%', left: 0,
+                    background: '#fff', border: '1px solid #e5e7eb',
+                    borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,.12)',
+                    padding: 4, zIndex: 1000,
+                    minWidth: 220, maxHeight: 200, overflowY: 'auto',
+                    marginBottom: 4,
+                  }}>
+                    {mention.suggestions.map((u) => (
+                      <div
+                        key={u.userId}
+                        onMouseDown={(e) => { e.preventDefault(); mention.selectMention(u); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '6px 10px', cursor: 'pointer', borderRadius: 6,
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = '#f3f4f6')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <Avatar
+                          size={24}
+                          src={u.avatarUrl}
+                          icon={<UserOutlined />}
+                          style={{ flexShrink: 0 }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>{u.fullName}</div>
+                          <div style={{ color: '#6b7280', fontSize: 11 }}>@{u.username}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Space.Compact style={{ width: '100%' }}>
+                  <TextArea
+                    ref={mention.textareaRef as any}
+                    value={mention.content}
+                    onChange={mention.handleChange}
+                    placeholder={replyTo
+                      ? `Trả lời ${replyTo.userFullName || replyTo.username}... (dùng @ để mention)`
+                      : 'Viết bình luận... dùng @ để mention thành viên (Ctrl+Enter để gửi)'}
+                    autoSize={{ minRows: 1, maxRows: 5 }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        mention.setShowDropdown(false);
+                      } else if (e.key === 'Enter' && e.ctrlKey) {
+                        e.preventDefault();
+                        handleSendComment();
+                      }
+                    }}
+                    style={{ borderRadius: '6px 0 0 6px' }}
+                  />
+                  <Button
+                    type="primary"
+                    icon={<SendOutlined />}
+                    loading={commentSending}
+                    disabled={!mention.content.trim()}
+                    onClick={handleSendComment}
+                    style={{ borderRadius: '0 6px 6px 0', height: 'auto', alignSelf: 'flex-end' }}
+                  />
+                </Space.Compact>
+              </div>
             </div>
           )}
         </div>
@@ -1299,6 +1436,33 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
           <Space>
             <Button type="primary" htmlType="submit" loading={timeSaving}>Ghi nhận</Button>
             <Button onClick={() => setAddTimeModal(false)}>Hủy</Button>
+          </Space>
+        </Form>
+      </Modal>
+
+      {/* Modal sửa time entry */}
+      <Modal
+        title={<Space><EditOutlined />Sửa nhật ký giờ làm</Space>}
+        open={!!editTimeEntry}
+        onCancel={() => { setEditTimeEntry(null); editTimeForm.resetFields(); }}
+        footer={null}
+        destroyOnHidden
+      >
+        <Form form={editTimeForm} layout="vertical" onFinish={handleSaveEditTime} style={{ marginTop: 8 }}>
+          <Form.Item name="hours" label="Số giờ"
+            rules={[{ required: true, message: 'Vui lòng nhập số giờ' }]}>
+            <InputNumber min={0.1} max={24} step={0.5} style={{ width: '100%' }} placeholder="VD: 2.5" />
+          </Form.Item>
+          <Form.Item name="workDate" label="Ngày làm việc"
+            rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}>
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+          </Form.Item>
+          <Form.Item name="description" label="Mô tả công việc">
+            <TextArea rows={3} placeholder="Đã làm gì hôm nay..." />
+          </Form.Item>
+          <Space>
+            <Button type="primary" htmlType="submit" loading={timeSaving}>Lưu thay đổi</Button>
+            <Button onClick={() => { setEditTimeEntry(null); editTimeForm.resetFields(); }}>Hủy</Button>
           </Space>
         </Form>
       </Modal>

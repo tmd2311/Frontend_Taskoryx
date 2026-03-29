@@ -8,8 +8,8 @@ import type {
   AssignPermissionsRequest,
   AdminUserFilter,
   CreateAdminUserRequest,
+  UpdateAdminUserRequest,
   AssignRoleRequest,
-  ResetPasswordRequest,
 } from '../types';
 import { adminService } from '../services/adminService';
 
@@ -27,8 +27,10 @@ interface AdminState {
   fetchUsers: (params?: AdminUserFilter) => Promise<void>;
   fetchUserById: (id: string) => Promise<void>;
   createUser: (data: CreateAdminUserRequest) => Promise<AdminUser>;
-  toggleUserStatus: (id: string) => Promise<void>;
-  resetPassword: (id: string, data: ResetPasswordRequest) => Promise<void>;
+  updateUser: (id: string, data: UpdateAdminUserRequest) => Promise<AdminUser>;
+  deactivateUser: (id: string) => Promise<void>;
+  activateUser: (id: string) => Promise<void>;
+  resetPassword: (id: string) => Promise<void>;
   assignRole: (userId: string, data: AssignRoleRequest) => Promise<void>;
   removeRole: (userId: string, roleId: string) => Promise<void>;
 
@@ -89,16 +91,33 @@ export const useAdminStore = create<AdminState>((set) => ({
     }
   },
 
-  toggleUserStatus: async (id) => {
-    const updated = await adminService.toggleUserStatus(id);
+  updateUser: async (id, data) => {
+    const updated = await adminService.updateUser(id, data);
+    set((state) => ({
+      users: state.users.map((u) => (u.id === id ? updated : u)),
+      currentUser: state.currentUser?.id === id ? updated : state.currentUser,
+    }));
+    return updated;
+  },
+
+  deactivateUser: async (id) => {
+    const updated = await adminService.deactivateUser(id);
     set((state) => ({
       users: state.users.map((u) => (u.id === id ? updated : u)),
       currentUser: state.currentUser?.id === id ? updated : state.currentUser,
     }));
   },
 
-  resetPassword: async (id, data) => {
-    await adminService.resetPassword(id, data);
+  activateUser: async (id) => {
+    const updated = await adminService.activateUser(id);
+    set((state) => ({
+      users: state.users.map((u) => (u.id === id ? updated : u)),
+      currentUser: state.currentUser?.id === id ? updated : state.currentUser,
+    }));
+  },
+
+  resetPassword: async (id) => {
+    await adminService.resetPassword(id);
   },
 
   assignRole: async (userId, data) => {

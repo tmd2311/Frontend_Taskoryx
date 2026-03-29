@@ -10,6 +10,7 @@ import {
   Space,
   Divider,
 } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import {
   BellOutlined,
   CheckOutlined,
@@ -22,7 +23,7 @@ import {
 } from '@ant-design/icons';
 import { useNotificationStore } from '../stores/notificationStore';
 import type { Notification } from '../types';
-import { NotificationType } from '../types';
+import { NotificationType, NotificationRelatedType } from '../types';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/vi';
@@ -43,17 +44,41 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   [NotificationType.PROJECT_INVITED]:<ProjectOutlined style={{ color: '#52c41a' }} />,
 };
 
+// ─── Tính URL đích từ notification ───────────────────────────
+function getNotifTarget(notif: Notification): string | null {
+  if (notif.relatedType === NotificationRelatedType.TASK) {
+    return `/tasks?openTask=${notif.relatedId}`;
+  }
+  if (notif.relatedType === NotificationRelatedType.PROJECT) {
+    return `/projects/${notif.relatedId}`;
+  }
+  if (notif.relatedType === NotificationRelatedType.COMMENT) {
+    return null;
+  }
+  return null;
+}
+
 // ─── Item thông báo ──────────────────────────────────────────
 const NotifItem: React.FC<{
   notif: Notification;
   onRead: (id: string) => void;
-}> = ({ notif, onRead }) => (
+  onNavigate: (notif: Notification) => void;
+}> = ({ notif, onRead, onNavigate }) => {
+  const target = getNotifTarget(notif);
+  const isClickable = !notif.isRead || !!target;
+
+  const handleClick = () => {
+    if (!notif.isRead) onRead(notif.id);
+    if (target) onNavigate(notif);
+  };
+
+  return (
   <div
-    onClick={() => !notif.isRead && onRead(notif.id)}
+    onClick={handleClick}
     style={{
       padding: '10px 16px',
       background: notif.isRead ? '#fff' : '#e6f7ff',
-      cursor: notif.isRead ? 'default' : 'pointer',
+      cursor: isClickable ? 'pointer' : 'default',
       transition: 'background .15s',
       borderBottom: '1px solid #f0f0f0',
       display: 'flex',
@@ -61,10 +86,10 @@ const NotifItem: React.FC<{
       alignItems: 'flex-start',
     }}
     onMouseEnter={(e) => {
-      if (!notif.isRead) (e.currentTarget as HTMLDivElement).style.background = '#bae7ff';
+      if (isClickable) (e.currentTarget as HTMLDivElement).style.background = notif.isRead ? '#f5f5f5' : '#bae7ff';
     }}
     onMouseLeave={(e) => {
-      if (!notif.isRead) (e.currentTarget as HTMLDivElement).style.background = '#e6f7ff';
+      if (isClickable) (e.currentTarget as HTMLDivElement).style.background = notif.isRead ? '#fff' : '#e6f7ff';
     }}
   >
     {/* Icon */}
@@ -94,24 +119,27 @@ const NotifItem: React.FC<{
       </div>
     </div>
 
-    {/* Chấm chưa đọc */}
-    {!notif.isRead && (
-      <div
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
-          background: '#1890ff',
-          flexShrink: 0,
-          marginTop: 6,
-        }}
-      />
-    )}
+    {/* Chấm chưa đọc / icon điều hướng */}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+      {!notif.isRead && (
+        <div
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: '#1890ff',
+            marginTop: 6,
+          }}
+        />
+      )}
+    </div>
   </div>
-);
+  );
+};
 
 // ─── NotificationDropdown ─────────────────────────────────────
 const NotificationDropdown: React.FC = () => {
+  const navigate = useNavigate();
   const {
     notifications,
     unreadCount,
@@ -145,6 +173,11 @@ const NotificationDropdown: React.FC = () => {
     if (currentPage + 1 < totalPages) {
       fetchNotifications(currentPage + 1);
     }
+  };
+
+  const handleNavigate = (notif: Notification) => {
+    const target = getNotifTarget(notif);
+    if (target) navigate(target);
   };
 
   // ─── Panel nội dung dropdown ─────────────────────────────
@@ -208,7 +241,7 @@ const NotificationDropdown: React.FC = () => {
         ) : (
           <>
             {notifications.map((n) => (
-              <NotifItem key={n.id} notif={n} onRead={markAsRead} />
+              <NotifItem key={n.id} notif={n} onRead={markAsRead} onNavigate={handleNavigate} />
             ))}
 
             {currentPage + 1 < totalPages && (

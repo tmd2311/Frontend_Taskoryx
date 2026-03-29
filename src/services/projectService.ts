@@ -8,6 +8,7 @@ import type {
   UpdateMemberRoleRequest,
   Label,
   CreateLabelRequest,
+  MentionedUser,
 } from '../types';
 
 export const projectService = {
@@ -51,6 +52,14 @@ export const projectService = {
   /** GET /projects/:id/members */
   getMembers: async (projectId: string): Promise<ProjectMember[]> => {
     const response: any = await api.get(`/projects/${projectId}/members`);
+    return response.data ?? response;
+  },
+
+  /** GET /projects/:id/members/search?keyword= – dùng cho @mention autocomplete */
+  searchMembers: async (projectId: string, keyword: string): Promise<MentionedUser[]> => {
+    const response: any = await api.get(`/projects/${projectId}/members/search`, {
+      params: { keyword },
+    });
     return response.data ?? response;
   },
 

@@ -32,7 +32,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useTaskStore } from '../stores/taskStore';
 import { useProjectStore } from '../stores/projectStore';
-import TaskDetailDrawer from '../components/TaskDetailDrawer';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import type { TaskSummary, CreateTaskRequest, UpdateTaskRequest } from '../types';
 import { TaskPriority } from '../types';
 import dayjs from 'dayjs';
@@ -56,11 +56,11 @@ const PRIORITY_LABEL: Record<string, string> = {
 // ─── Backlog row ──────────────────────────────────────────────
 const BacklogRow: React.FC<{
   task: TaskSummary;
-  onOpen: (id: string) => void;
+  onOpen: (taskKey: string) => void;
   onDelete: (id: string) => void;
 }> = ({ task, onOpen, onDelete }) => (
   <div
-    onClick={() => onOpen(task.id)}
+    onClick={() => onOpen(task.taskKey)}
     style={{
       display: 'flex',
       alignItems: 'center',
@@ -151,24 +151,25 @@ const BacklogRow: React.FC<{
 const TasksPage: React.FC = () => {
   const {
     myTasks,
-    currentTask,
     isLoading,
     fetchMyTasks,
     fetchTaskById,
     createTask,
     updateTask,
     deleteTask,
+    currentTask,
     setCurrentTask,
   } = useTaskStore();
 
   const { projects, fetchProjects } = useProjectStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const [view, setView] = useState<'list' | 'backlog'>('backlog');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskSummary | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [form] = Form.useForm();
-  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
 
   // Collapse state: mặc định mở tất cả nhóm
   const [openGroups, setOpenGroups] = useState<string[]>([]);
@@ -177,6 +178,19 @@ const TasksPage: React.FC = () => {
     fetchMyTasks();
     fetchProjects();
   }, []);
+
+  // Redirect từ URL param ?openTask=<taskId> (từ notification click) → /tasks/:taskKey
+  useEffect(() => {
+    const taskId = searchParams.get('openTask');
+    if (!taskId) return;
+    fetchTaskById(taskId)
+      .then(() => {
+        const task = useTaskStore.getState().currentTask;
+        if (task?.taskKey) navigate(`/tasks/${task.taskKey}`, { replace: true });
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Map projectKey → project để lấy màu & tên
   const projectByKey = useMemo(() => {
@@ -413,7 +427,7 @@ const TasksPage: React.FC = () => {
             <BacklogRow
               key={t.id}
               task={t}
-              onOpen={(id) => setDetailTaskId(id)}
+              onOpen={(taskKey) => navigate(`/tasks/${taskKey}`)}
               onDelete={handleDelete}
             />
           ))}
@@ -503,7 +517,7 @@ const TasksPage: React.FC = () => {
             onClick: (e) => {
               const target = e.target as HTMLElement;
               if (target.closest('button') || target.closest('.ant-btn') || target.closest('.ant-popconfirm')) return;
-              setDetailTaskId(record.id);
+              navigate(`/tasks/${record.taskKey}`);
             },
             style: { cursor: 'pointer' },
           })}
@@ -569,12 +583,6 @@ const TasksPage: React.FC = () => {
         </Form>
       </Modal>
 
-      <TaskDetailDrawer
-        taskId={detailTaskId}
-        onClose={() => setDetailTaskId(null)}
-        onUpdated={fetchMyTasks}
-        onDeleted={fetchMyTasks}
-      />
 
       <style>{`
         .row-overdue td { background: #fff2f0 !important; }

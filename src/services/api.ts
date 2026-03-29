@@ -18,7 +18,7 @@ api.interceptors.request.use(
     const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
 
     if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers.set('Authorization', `Bearer ${token}`);
     }
 
     return config;
@@ -39,7 +39,7 @@ api.interceptors.response.use(
 
     // Handle 401 Unauthorized - Token expired
     if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
+      try { originalRequest._retry = true; } catch { /* readonly in some axios versions */ }
 
       try {
         const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
@@ -58,7 +58,7 @@ api.interceptors.response.use(
 
           // Retry original request with new token
           if (originalRequest.headers) {
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            originalRequest.headers.set('Authorization', `Bearer ${newToken}`);
           }
           return api(originalRequest);
         }

@@ -100,14 +100,11 @@ const LoginPage: React.FC = () => {
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 48 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12,
-            background: 'rgba(255,255,255,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22,
-          }}>
-            <AppstoreOutlined />
-          </div>
+          <img
+            src="/logo.png"
+            alt="logo"
+            style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+          />
           <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.5px' }}>Taskoryx</span>
         </div>
 
