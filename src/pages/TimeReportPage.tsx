@@ -194,9 +194,9 @@ const TimeReportPage: React.FC = () => {
   const end = dateRange[1].format('YYYY-MM-DD');
 
   return (
-    <div style={{ padding: '24px', maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 8 }}>
         <Title level={3} style={{ margin: 0 }}>
           <ClockCircleOutlined style={{ marginRight: 8, color: '#4361ee' }} />
           Báo cáo thời gian
@@ -208,8 +208,8 @@ const TimeReportPage: React.FC = () => {
 
       {/* Bộ lọc */}
       <Card style={{ marginBottom: 20 }}>
-        <Space wrap size={16}>
-          <Space>
+        <Space wrap size={[12, 12]}>
+          <Space wrap size={4}>
             <Text type="secondary">Khoảng thời gian:</Text>
             <RangePicker
               value={dateRange}
@@ -218,8 +218,8 @@ const TimeReportPage: React.FC = () => {
               allowClear={false}
             />
           </Space>
-          <Space>
-            <Text type="secondary">Năm (biểu đồ tháng):</Text>
+          <Space wrap size={4}>
+            <Text type="secondary">Năm:</Text>
             <DatePicker
               picker="year"
               value={dayjs().year(year)}
@@ -227,10 +227,10 @@ const TimeReportPage: React.FC = () => {
               allowClear={false}
             />
           </Space>
-          <Space>
+          <Space wrap size={4}>
             <Text type="secondary">Dự án:</Text>
             <Select
-              style={{ width: 200 }}
+              style={{ minWidth: 160, maxWidth: 240 }}
               placeholder="Tất cả dự án"
               allowClear
               value={selectedProject}
@@ -291,15 +291,15 @@ const TimeReportPage: React.FC = () => {
         <Card
           style={{ marginBottom: 20 }}
           title={
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <Text strong>Biểu đồ thời gian làm việc</Text>
               <Segmented
                 value={viewMode}
                 onChange={(v) => setViewMode(v as any)}
                 options={[
-                  { label: 'Theo ngày', value: 'daily' },
-                  { label: 'Theo tuần', value: 'weekly' },
-                  { label: 'Theo tháng', value: 'monthly' },
+                  { label: 'Ngày', value: 'daily' },
+                  { label: 'Tuần', value: 'weekly' },
+                  { label: 'Tháng', value: 'monthly' },
                 ]}
               />
             </div>
@@ -366,6 +366,7 @@ const TimeReportPage: React.FC = () => {
                           columns={memberColumns}
                           rowKey="userId"
                           size="small"
+                          scroll={{ x: 'max-content' }}
                           pagination={false}
                         />
                       ),
@@ -379,6 +380,7 @@ const TimeReportPage: React.FC = () => {
                           columns={taskColumns}
                           rowKey="taskKey"
                           size="small"
+                          scroll={{ x: 'max-content' }}
                           pagination={{ pageSize: 10, size: 'small' }}
                         />
                       ),
@@ -397,6 +399,7 @@ const TimeReportPage: React.FC = () => {
               dataSource={dailyStats.filter((d) => d.entryCount > 0)}
               rowKey="date"
               size="small"
+              scroll={{ x: 'max-content' }}
               pagination={{ pageSize: 10, size: 'small' }}
               columns={[
                 { title: 'Ngày', dataIndex: 'date', width: 110, render: (v) => dayjs(v).format('DD/MM/YYYY') },

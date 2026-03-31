@@ -148,11 +148,11 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <Title level={2} style={{ marginBottom: 4 }}>
-          Xin chào, {user?.fullName || user?.username}! 👋
+      <div style={{ marginBottom: 20 }}>
+        <Title level={3} style={{ marginBottom: 4 }}>
+          Xin chào, {user?.fullName?.split(' ').pop() || user?.username}! 👋
         </Title>
-        <Text type="secondary">Đây là tổng quan công việc của bạn hôm nay – {dayjs().format('dddd, DD/MM/YYYY')}</Text>
+        <Text type="secondary" style={{ fontSize: 13 }}>Tổng quan hôm nay – {dayjs().format('DD/MM/YYYY')}</Text>
       </div>
 
       {/* Thẻ thống kê */}

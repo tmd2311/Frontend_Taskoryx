@@ -36,7 +36,7 @@ const RegisterPage: React.FC = () => {
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     }}>
-      <Card style={{ width: 400, boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}>
+      <Card style={{ width: '100%', maxWidth: 400, margin: '0 16px', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <Title level={2}>Tạo tài khoản</Title>
           <Text type="secondary">Đăng ký để bắt đầu sử dụng</Text>

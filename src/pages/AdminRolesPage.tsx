@@ -262,7 +262,7 @@ const AdminRolesPage: React.FC = () => {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <Title level={3} style={{ margin: 0 }}>Quản lý Role</Title>
           <Text type="secondary">Tổng cộng {roles.length} role trong hệ thống</Text>

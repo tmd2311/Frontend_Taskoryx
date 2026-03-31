@@ -365,11 +365,11 @@ const ProjectsPage: React.FC = () => {
           </div>
         </Space>
 
-        <Space>
+        <Space wrap>
           <Search
             placeholder="Tìm theo tên, key..."
             allowClear
-            style={{ width: 240 }}
+            style={{ width: 200 }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />

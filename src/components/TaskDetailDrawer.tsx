@@ -241,6 +241,7 @@ interface TaskDetailDrawerProps {
 const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   taskId, onClose, onUpdated, onDeleted,
 }) => {
+  const drawerWidth = window.innerWidth < 768 ? window.innerWidth : Math.min(640, window.innerWidth - 48);
   const { user } = useAuthStore();
   const {
     currentTask, isLoading, fetchTaskById, updateTask, updateTaskStatus, deleteTask, setCurrentTask,
@@ -744,7 +745,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     <Drawer
       open={open}
       onClose={handleClose}
-      width={640}
+      width={drawerWidth}
       styles={{ body: { padding: '0 0 0 0', display: 'flex', flexDirection: 'column', height: '100%' } }}
       title={
         task ? (

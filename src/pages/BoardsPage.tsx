@@ -508,11 +508,11 @@ const BoardsPage: React.FC = () => {
     <div>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <Title level={2} style={{ margin: 0 }}>
+        <Title level={3} style={{ margin: 0 }}>
           Bảng công việc
         </Title>
         <Select
-          style={{ width: 240 }}
+          style={{ flex: '1 1 180px', minWidth: 160, maxWidth: 280 }}
           placeholder="Chọn project"
           value={selectedProjectId || undefined}
           onChange={(v) => setSelectedProjectId(v)}

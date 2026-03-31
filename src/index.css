@@ -351,3 +351,118 @@ body {
 .kanban-card:active {
   cursor: grabbing;
 }
+
+/* ─── Responsive: Mobile (<768px) ─── */
+@media (max-width: 767px) {
+  .app-content {
+    margin: 8px !important;
+    padding: 14px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Modal responsive */
+  .ant-modal {
+    max-width: calc(100vw - 16px) !important;
+    margin: 8px auto !important;
+  }
+
+  .ant-modal-content {
+    border-radius: 12px !important;
+  }
+
+  .ant-modal-body {
+    padding: 16px !important;
+  }
+
+  /* Tables scroll horizontally */
+  .ant-table-wrapper {
+    overflow-x: auto;
+  }
+
+  /* Kanban */
+  .kanban-column {
+    min-height: 200px;
+  }
+
+  /* Drawer full width */
+  .ant-drawer-content-wrapper {
+    width: 100vw !important;
+  }
+
+  /* Tabs scrollable on mobile */
+  .ant-tabs-nav-list {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ant-tabs-tab {
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+  }
+
+  /* Title sizes */
+  .ant-typography h2,
+  h2.ant-typography {
+    font-size: 20px !important;
+  }
+
+  .ant-typography h3,
+  h3.ant-typography {
+    font-size: 17px !important;
+  }
+
+  /* Card padding */
+  .ant-card-body {
+    padding: 14px !important;
+  }
+
+  .ant-card-head {
+    padding: 0 14px !important;
+    min-height: 44px !important;
+  }
+
+  /* Statistic compact */
+  .ant-statistic-content-value {
+    font-size: 22px !important;
+  }
+
+  /* Pagination compact */
+  .ant-pagination {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  /* Form items */
+  .ant-form-item-label {
+    padding-bottom: 4px;
+  }
+
+  /* Space wrap by default */
+  .ant-space-compact {
+    flex-wrap: wrap;
+  }
+
+  /* Tag smaller */
+  .ant-tag {
+    font-size: 11px !important;
+    padding: 0 5px !important;
+  }
+
+  /* Button smaller text */
+  .ant-btn {
+    font-size: 13px !important;
+  }
+
+  /* Collapse header */
+  .ant-collapse-header {
+    padding: 8px 12px !important;
+  }
+}
+
+/* ─── Responsive: Tablet (768px–1024px) ─── */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .app-content {
+    margin: 12px !important;
+    padding: 20px !important;
+  }
+}

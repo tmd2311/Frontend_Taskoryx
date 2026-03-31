@@ -386,7 +386,7 @@ const AdminUsersPage: React.FC = () => {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <Title level={3} style={{ margin: 0 }}>Quản lý người dùng</Title>
           <Text type="secondary">Tổng cộng {totalElements} tài khoản trong hệ thống</Text>
@@ -406,7 +406,7 @@ const AdminUsersPage: React.FC = () => {
           prefix={<SearchOutlined />}
           placeholder="Tìm kiếm tên, email, username..."
           allowClear
-          style={{ width: 280 }}
+          style={{ flex: '1 1 180px', minWidth: 160 }}
           onPressEnter={(e) => { setSearch((e.target as HTMLInputElement).value); setPage(1); }}
           onChange={(e) => { if (!e.target.value) { setSearch(''); setPage(1); } }}
           onBlur={(e) => { setSearch(e.target.value); setPage(1); }}

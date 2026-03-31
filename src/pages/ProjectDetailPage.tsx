@@ -745,8 +745,8 @@ const ProjectDetailPage: React.FC = () => {
     <div>
       {/* Header */}
       <div style={{
-        background: color, borderRadius: 10, padding: '20px 24px', marginBottom: 20,
-        display: 'flex', alignItems: 'center', gap: 16,
+        background: color, borderRadius: 10, padding: '16px 20px', marginBottom: 20,
+        display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap',
       }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/projects')}
           style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff' }} />
@@ -767,14 +767,14 @@ const ProjectDetailPage: React.FC = () => {
           )}
         </div>
 
-        <Space size={16}>
+        <Space size={8} wrap>
           <Space size={4} style={{ color: 'rgba(255,255,255,0.9)' }}>
             <CheckSquareOutlined />
-            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>{project?.taskCount ?? total} công việc</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>{project?.taskCount ?? total} CV</Text>
           </Space>
           <Space size={4}>
             <TeamOutlined style={{ color: 'rgba(255,255,255,0.9)' }} />
-            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>{project?.memberCount ?? members.length} thành viên</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>{project?.memberCount ?? members.length} TV</Text>
           </Space>
           <Tooltip title="Xuất Excel">
             <Button icon={<DownloadOutlined />} size="small"
@@ -820,13 +820,13 @@ const ProjectDetailPage: React.FC = () => {
               <>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                   <Input prefix={<SearchOutlined />} placeholder="Tìm kiếm task..." allowClear
-                    style={{ width: 240 }}
+                    style={{ flex: '1 1 160px', minWidth: 140 }}
                     onPressEnter={(e) => { setKeyword((e.target as HTMLInputElement).value); setPage(1); }}
                     onChange={(e) => !e.target.value && (setKeyword(''), setPage(1))}
                     onBlur={(e) => { setKeyword(e.target.value); setPage(1); }}
                   />
-                  <Select mode="multiple" placeholder="Lọc theo ưu tiên" allowClear
-                    style={{ minWidth: 200 }} value={filterPriority}
+                  <Select mode="multiple" placeholder="Lọc ưu tiên" allowClear
+                    style={{ flex: '1 1 160px', minWidth: 140 }} value={filterPriority}
                     onChange={(v) => { setFilterPriority(v); setPage(1); }}
                     options={[
                       { label: 'Thấp', value: TaskPriority.LOW },
@@ -835,7 +835,7 @@ const ProjectDetailPage: React.FC = () => {
                       { label: 'Khẩn cấp', value: TaskPriority.URGENT },
                     ]}
                   />
-                  <Select placeholder="Trạng thái hạn" allowClear style={{ width: 160 }}
+                  <Select placeholder="Trạng thái hạn" allowClear style={{ flex: '1 1 130px', minWidth: 120 }}
                     value={filterOverdue}
                     onChange={(v) => { setFilterOverdue(v); setPage(1); }}
                     options={[{ label: 'Quá hạn', value: true }, { label: 'Còn hạn', value: false }]}
@@ -879,7 +879,7 @@ const ProjectDetailPage: React.FC = () => {
                   </Button>
                 </div>
                 <Table columns={buildMemberColumns()} dataSource={members} rowKey="id"
-                  pagination={false} locale={{ emptyText: <Empty description="Không có thành viên" /> }} />
+                  pagination={false} scroll={{ x: 'max-content' }} locale={{ emptyText: <Empty description="Không có thành viên" /> }} />
               </>
             ),
           },

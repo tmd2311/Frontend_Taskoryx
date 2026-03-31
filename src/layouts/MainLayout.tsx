@@ -33,12 +33,25 @@ interface MainLayoutProps {
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAdmin, checkAdminAccess } = useAuthStore();
   const { fetchUnreadCount, fetchNotifications } = useNotificationStore();
   const { isDark, toggle: toggleTheme } = useThemeStore();
   const [notifApi, notifContextHolder] = notification.useNotification();
+
+  // Responsive: track mobile breakpoint
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setMobileDrawerOpen(false);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Apply dark class to <html> for CSS variables
   useEffect(() => {
@@ -85,36 +98,41 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const contentBg = isDark ? '#1f1f1f' : '#ffffff';
   const contentShadow = isDark ? '0 1px 3px rgba(0,0,0,0.4)' : '0 1px 3px rgba(0,0,0,0.06)';
 
+  const navTo = (path: string) => {
+    navigate(path);
+    if (isMobile) setMobileDrawerOpen(false);
+  };
+
   const navItems = [
     {
       key: '/dashboard',
       icon: <BarChartOutlined />,
       label: 'Dashboard',
-      onClick: () => navigate('/dashboard'),
+      onClick: () => navTo('/dashboard'),
     },
     {
       key: '/projects',
       icon: <FolderOutlined />,
       label: 'Dự án',
-      onClick: () => navigate('/projects'),
+      onClick: () => navTo('/projects'),
     },
     {
       key: '/tasks',
       icon: <CheckSquareOutlined />,
       label: 'Đầu việc',
-      onClick: () => navigate('/tasks'),
+      onClick: () => navTo('/tasks'),
     },
     {
       key: '/boards',
       icon: <TableOutlined />,
       label: 'Bảng Kanban',
-      onClick: () => navigate('/boards'),
+      onClick: () => navTo('/boards'),
     },
     {
       key: '/time-report',
       icon: <BarChartOutlined />,
       label: 'Báo cáo giờ',
-      onClick: () => navigate('/time-report'),
+      onClick: () => navTo('/time-report'),
     },
     ...(isAdmin ? [
       { type: 'divider' as const },
@@ -122,13 +140,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         key: '/admin/users',
         icon: <TeamOutlined />,
         label: 'Quản lý người dùng',
-        onClick: () => navigate('/admin/users'),
+        onClick: () => navTo('/admin/users'),
       },
       {
         key: '/admin/roles',
         icon: <SafetyCertificateOutlined />,
         label: 'Quản lý Role',
-        onClick: () => navigate('/admin/roles'),
+        onClick: () => navTo('/admin/roles'),
       },
     ] : []),
   ];
@@ -171,15 +189,31 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     flexShrink: 0,
   };
 
+  const sidebarVisible = isMobile ? mobileDrawerOpen : true;
+  const sidebarLeft = isMobile ? (mobileDrawerOpen ? 0 : -240) : 0;
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       {notifContextHolder}
+
+      {/* ─── Mobile overlay backdrop ─── */}
+      {isMobile && mobileDrawerOpen && (
+        <div
+          onClick={() => setMobileDrawerOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            zIndex: 199,
+          }}
+        />
+      )}
 
       {/* ─── Sidebar ─── */}
       <Sider
         trigger={null}
         collapsible
-        collapsed={collapsed}
+        collapsed={isMobile ? false : collapsed}
         width={240}
         className="app-sider"
         style={{
@@ -187,12 +221,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           borderRight: `1px solid ${siderBorder}`,
           boxShadow: '2px 0 8px rgba(0,0,0,0.06)',
           position: 'fixed',
-          left: 0,
+          left: sidebarLeft,
           top: 0,
           bottom: 0,
           zIndex: 200,
           overflow: 'hidden',
-          transition: 'background 0.3s',
+          transition: 'left 0.25s ease, background 0.3s',
+          display: sidebarVisible || !isMobile ? 'flex' : undefined,
         }}
       >
         {/* Logo */}
@@ -210,7 +245,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             alt="logo"
             style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, objectFit: 'cover' }}
           />
-          {!collapsed && (
+          {(isMobile || !collapsed) && (
             <span style={{
               fontSize: 18, fontWeight: 700, whiteSpace: 'nowrap',
               background: 'linear-gradient(135deg, #4361ee, #7c3aed)',
@@ -240,7 +275,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         </div>
 
         {/* User section at bottom */}
-        {!collapsed ? (
+        {(isMobile || !collapsed) ? (
           <div style={{
             padding: '12px 16px',
             borderTop: `1px solid ${userBottomBorder}`,
@@ -289,7 +324,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       </Sider>
 
       {/* ─── Main area ─── */}
-      <Layout style={{ marginLeft: collapsed ? 80 : 240, transition: 'margin-left 0.2s' }}>
+      <Layout style={{
+        marginLeft: isMobile ? 0 : (collapsed ? 80 : 240),
+        transition: 'margin-left 0.2s',
+      }}>
         {/* Header */}
         <Header style={{
           background: headerBg,
@@ -307,16 +345,16 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         }}>
           {/* Toggle */}
           <div
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={() => isMobile ? setMobileDrawerOpen(!mobileDrawerOpen) : setCollapsed(!collapsed)}
             style={{ ...iconBtnStyle, marginLeft: 16 }}
             onMouseEnter={e => (e.currentTarget.style.background = iconHoverBg)}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
-            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            {(isMobile ? mobileDrawerOpen : !collapsed) ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
           </div>
 
           {/* Right actions */}
-          <div style={{ paddingRight: 20, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ paddingRight: isMobile ? 8 : 20, display: 'flex', alignItems: 'center', gap: 4 }}>
             {/* Dark / Light toggle */}
             <Tooltip title={isDark ? 'Chế độ sáng' : 'Chế độ tối'}>
               <div
@@ -354,9 +392,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 >
                   {initials}
                 </Avatar>
-                <Text style={{ fontSize: 13, fontWeight: 500, color: userTextColor }}>
-                  {user?.fullName?.split(' ').pop() || user?.username}
-                </Text>
+                {!isMobile && (
+                  <Text style={{ fontSize: 13, fontWeight: 500, color: userTextColor }}>
+                    {user?.fullName?.split(' ').pop() || user?.username}
+                  </Text>
+                )}
               </div>
             </Dropdown>
           </div>
@@ -364,10 +404,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
         {/* Content */}
         <Content style={{
-          margin: 20,
-          padding: 24,
+          margin: isMobile ? 8 : 20,
+          padding: isMobile ? 16 : 24,
           background: contentBg,
-          borderRadius: 16,
+          borderRadius: isMobile ? 8 : 16,
           boxShadow: contentShadow,
           minHeight: 'calc(100vh - 104px)',
           transition: 'background 0.3s',

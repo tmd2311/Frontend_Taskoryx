@@ -455,7 +455,7 @@ const TasksPage: React.FC = () => {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <Title level={3} style={{ margin: 0 }}>Đầu việc của tôi</Title>
           <Space size={8} style={{ marginTop: 4 }}>
@@ -468,7 +468,7 @@ const TasksPage: React.FC = () => {
           </Space>
         </div>
 
-        <Space>
+        <Space wrap>
           <Segmented
             value={view}
             onChange={(v) => setView(v as 'list' | 'backlog')}
@@ -512,6 +512,7 @@ const TasksPage: React.FC = () => {
           loading={isLoading}
           pagination={{ pageSize: 15, showSizeChanger: false }}
           locale={{ emptyText: 'Không có task nào được giao cho bạn' }}
+          scroll={{ x: 'max-content' }}
           rowClassName={(r) => r.overdue ? 'row-overdue' : ''}
           onRow={(record) => ({
             onClick: (e) => {

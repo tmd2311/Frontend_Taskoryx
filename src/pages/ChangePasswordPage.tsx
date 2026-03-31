@@ -50,7 +50,7 @@ const ChangePasswordPage: React.FC = () => {
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       }}
     >
-      <Card style={{ width: 440, boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
+      <Card style={{ width: '100%', maxWidth: 440, margin: '0 16px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <KeyOutlined style={{ fontSize: 40, color: '#1890ff', marginBottom: 12 }} />
           <Title level={3} style={{ margin: 0 }}>
