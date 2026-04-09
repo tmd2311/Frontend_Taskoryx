@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Typography, Button, Tabs, Table, Tag, Space, Input, Select, Badge,
   Avatar, Empty, Tooltip, Modal, Form, Popconfirm, message, Spin,
-  DatePicker, Card, Progress, List, Timeline, Row, Col, Checkbox,
+  DatePicker, Card, Progress, List, Timeline, Row, Col, Checkbox, Alert, Statistic,
 } from 'antd';
 import {
   ArrowLeftOutlined, CheckSquareOutlined, TeamOutlined, ExclamationCircleOutlined,
@@ -981,142 +981,194 @@ const ProjectDetailPage: React.FC = () => {
                 ) : sprints.length === 0 ? (
                   <Empty description="Chưa có sprint nào" style={{ padding: '40px 0' }} />
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {sprints.map((sprint) => {
+                      const isActive = sprint.status === SprintStatus.ACTIVE;
+                      const isCompleted = sprint.status === SprintStatus.COMPLETED;
                       const expanded = expandedSprints[sprint.id];
                       const sprintTasks = sprintBacklogs[sprint.id] || [];
                       const backlogLoading = sprintBacklogLoading[sprint.id];
                       const done = sprintTasks.filter(t => ['DONE','RESOLVED','CANCELLED'].includes(t.status)).length;
+                      const inProgress = sprintTasks.filter(t => t.status === 'IN_PROGRESS').length;
+                      const todo = sprintTasks.filter(t => ['TODO','OPEN'].includes(t.status)).length;
                       const total = sprint.taskCount ?? sprintTasks.length;
                       const completed = sprint.completedTaskCount ?? done;
                       const pct = total > 0 ? Math.round(completed / total * 100) : 0;
+                      const isOverdue = isActive && sprint.endDate && dayjs().isAfter(dayjs(sprint.endDate));
 
                       return (
                         <Card key={sprint.id} size="small"
-                          style={{ borderLeft: `4px solid ${sprint.status === SprintStatus.ACTIVE ? '#1890ff' : sprint.status === SprintStatus.COMPLETED ? '#52c41a' : '#d9d9d9'}` }}
-                          extra={
-                            <Space>
-                              {sprint.status === SprintStatus.PLANNED && (
-                                <Popconfirm title="Bắt đầu sprint này?" onConfirm={() => handleStartSprint(sprint.id)}
-                                  okText="Bắt đầu" cancelText="Hủy">
-                                  <Button size="small" type="primary" icon={<PlayCircleOutlined />}>Bắt đầu</Button>
-                                </Popconfirm>
-                              )}
-                              {sprint.status === SprintStatus.ACTIVE && (
-                                <Button size="small" icon={<CheckCircleOutlined />}
-                                  onClick={() => handleCompleteSprint(sprint)}>
-                                  Hoàn thành
-                                </Button>
-                              )}
-                              {sprint.status !== SprintStatus.COMPLETED && (
-                                <Button size="small" icon={<PlusOutlined />}
-                                  onClick={() => openAddTaskToSprint(sprint.id)}>
-                                  Thêm task
-                                </Button>
-                              )}
-                              <Button size="small" icon={<EditOutlined />}
-                                onClick={() => {
-                                  setEditSprint(sprint);
-                                  sprintForm.setFieldsValue({
-                                    name: sprint.name,
-                                    goal: sprint.goal,
-                                    startDate: sprint.startDate ? dayjs(sprint.startDate) : null,
-                                    endDate: sprint.endDate ? dayjs(sprint.endDate) : null,
-                                  });
-                                  setSprintModal(true);
-                                }} />
-                              {sprint.status === SprintStatus.PLANNED && (
-                                <Popconfirm title="Xóa sprint này?" onConfirm={() => handleDeleteSprint(sprint.id)}
-                                  okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
-                                  <Button size="small" danger icon={<DeleteOutlined />} />
-                                </Popconfirm>
-                              )}
-                            </Space>
-                          }
+                          style={{
+                            borderLeft: `4px solid ${isActive ? '#1890ff' : isCompleted ? '#52c41a' : '#d9d9d9'}`,
+                            boxShadow: isActive ? '0 2px 12px rgba(24,144,255,.15)' : '0 1px 4px rgba(0,0,0,.06)',
+                          }}
+                          styles={{ body: { padding: isActive ? '0' : undefined } }}
                         >
-                          {/* Header sprint */}
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                            <div style={{ flex: 1 }}>
-                              <Space wrap>
-                                <Text strong>{sprint.name}</Text>
-                                <Tag color={SPRINT_STATUS_COLOR[sprint.status]}>{SPRINT_STATUS_LABEL[sprint.status]}</Tag>
-                                {sprint.boardName && <Tag icon={<AppstoreAddOutlined />}>{sprint.boardName}</Tag>}
+                          {/* Banner ACTIVE sprint */}
+                          {isActive && (
+                            <div style={{ background: 'linear-gradient(90deg,#1890ff 0%,#096dd9 100%)', padding: '8px 16px', borderRadius: '0 0 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <Space>
+                                <PlayCircleOutlined style={{ color: '#fff', fontSize: 14 }} />
+                                <Text strong style={{ color: '#fff', fontSize: 13 }}>SPRINT ĐANG CHẠY</Text>
+                                {isOverdue && <Tag color="red" style={{ margin: 0 }}>Quá hạn!</Tag>}
                               </Space>
-                              {sprint.goal && <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 4 }}>{sprint.goal}</Text>}
-                              {/* Progress bar */}
-                              {total > 0 && (
-                                <div style={{ marginTop: 8 }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                                    <Text type="secondary">{completed}/{total} task hoàn thành</Text>
-                                    <Text style={{ color: pct === 100 ? '#52c41a' : '#1890ff' }}>{pct}%</Text>
-                                  </div>
-                                  <Progress percent={pct} size="small" showInfo={false}
-                                    strokeColor={pct === 100 ? '#52c41a' : '#1890ff'} />
-                                </div>
-                              )}
-                            </div>
-                            <Space direction="vertical" size={2} style={{ textAlign: 'right', fontSize: 12, flexShrink: 0 }}>
-                              {sprint.startDate && <Text type="secondary">Bắt đầu: {dayjs(sprint.startDate).format('DD/MM/YYYY')}</Text>}
-                              {sprint.endDate && <Text type="secondary">Kết thúc: {dayjs(sprint.endDate).format('DD/MM/YYYY')}</Text>}
-                              {sprint.status === SprintStatus.ACTIVE && sprint.endDate && dayjs().isAfter(dayjs(sprint.endDate)) && (
-                                <Tag color="red" style={{ margin: 0 }}>Quá hạn!</Tag>
-                              )}
-                            </Space>
-                          </div>
-
-                          {/* Toggle xem tasks */}
-                          <div style={{ marginTop: 10 }}>
-                            <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }}
-                              onClick={() => toggleSprintExpand(sprint.id)}>
-                              {expanded ? '▲ Ẩn task' : `▼ Xem task trong sprint${total > 0 ? ` (${total})` : ''}`}
-                            </Button>
-                          </div>
-
-                          {/* Danh sách tasks */}
-                          {expanded && (
-                            <div style={{ marginTop: 10 }}>
-                              {backlogLoading ? (
-                                <div style={{ textAlign: 'center', padding: 16 }}><Spin size="small" /></div>
-                              ) : sprintTasks.length === 0 ? (
-                                <Text type="secondary" style={{ fontSize: 12 }}>
-                                  Sprint chưa có task nào. Nhấn "Thêm task" để thêm từ Product Backlog.
-                                </Text>
-                              ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                  {sprintTasks.map((t) => (
-                                    <div key={t.id} style={{
-                                      display: 'flex', alignItems: 'center', gap: 8,
-                                      padding: '6px 10px', background: '#fafafa',
-                                      borderRadius: 4, border: '1px solid #f0f0f0',
-                                    }}>
-                                      <Tag style={{ fontFamily: 'monospace', margin: 0, fontSize: 11 }}>{t.taskKey}</Tag>
-                                      <Text style={{ flex: 1, fontSize: 13 }} ellipsis={{ tooltip: t.title }}>{t.title}</Text>
-                                      <Tag color={PRIORITY_COLOR[t.priority]} style={{ margin: 0, fontSize: 11 }}>{PRIORITY_LABEL[t.priority]}</Tag>
-                                      <StatusSelect value={t.status} size="small"
-                                        onChange={async (s) => {
-                                          try {
-                                            await import('../services/taskService').then(m =>
-                                              m.taskService.updateStatus(t.id, { status: s as TaskStatus })
-                                            );
-                                            fetchSprintBacklog(sprint.id);
-                                          } catch { /* ignore */ }
-                                        }} />
-                                      {t.assigneeName && (
-                                        <Tooltip title={t.assigneeName}>
-                                          <Avatar size={20} icon={<UserOutlined />} />
-                                        </Tooltip>
-                                      )}
-                                      <Popconfirm title="Gỡ task khỏi sprint?"
-                                        onConfirm={() => handleRemoveTaskFromSprint(sprint.id, t.id)}
-                                        okText="Gỡ" cancelText="Hủy" okButtonProps={{ danger: true }}>
-                                        <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                                      </Popconfirm>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                              <Space>
+                                {sprint.startDate && <Text style={{ color: 'rgba(255,255,255,.85)', fontSize: 12 }}>{dayjs(sprint.startDate).format('DD/MM')} → {sprint.endDate ? dayjs(sprint.endDate).format('DD/MM/YYYY') : '?'}</Text>}
+                              </Space>
                             </div>
                           )}
+
+                          <div style={{ padding: '12px 16px' }}>
+                            {/* Sprint name + actions */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                              <Text strong style={{ fontSize: 15, flex: 1 }}>{sprint.name}</Text>
+                              {!isActive && (
+                                <Tag color={SPRINT_STATUS_COLOR[sprint.status]} style={{ marginRight: 0 }}>{SPRINT_STATUS_LABEL[sprint.status]}</Tag>
+                              )}
+                              {sprint.boardName && <Tag icon={<AppstoreAddOutlined />} style={{ margin: 0 }}>{sprint.boardName}</Tag>}
+                              <Space size={4}>
+                                {sprint.status === SprintStatus.PLANNED && (
+                                  <Popconfirm title="Bắt đầu sprint này?" onConfirm={() => handleStartSprint(sprint.id)} okText="Bắt đầu" cancelText="Hủy">
+                                    <Button size="small" type="primary" icon={<PlayCircleOutlined />}>Bắt đầu</Button>
+                                  </Popconfirm>
+                                )}
+                                {isActive && (
+                                  <Button size="small" icon={<CheckCircleOutlined />} onClick={() => handleCompleteSprint(sprint)}>Hoàn thành Sprint</Button>
+                                )}
+                                {!isCompleted && (
+                                  <Button size="small" icon={<PlusOutlined />} onClick={() => openAddTaskToSprint(sprint.id)}>Thêm task</Button>
+                                )}
+                                <Button size="small" icon={<EditOutlined />}
+                                  onClick={() => {
+                                    setEditSprint(sprint);
+                                    sprintForm.setFieldsValue({
+                                      name: sprint.name, goal: sprint.goal,
+                                      startDate: sprint.startDate ? dayjs(sprint.startDate) : null,
+                                      endDate: sprint.endDate ? dayjs(sprint.endDate) : null,
+                                    });
+                                    setSprintModal(true);
+                                  }} />
+                                {sprint.status === SprintStatus.PLANNED && (
+                                  <Popconfirm title="Xóa sprint này?" onConfirm={() => handleDeleteSprint(sprint.id)} okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
+                                    <Button size="small" danger icon={<DeleteOutlined />} />
+                                  </Popconfirm>
+                                )}
+                              </Space>
+                            </div>
+
+                            {/* Sprint Goal */}
+                            {sprint.goal && (
+                              <Alert
+                                message={<Text style={{ fontSize: 12 }}><Text strong style={{ fontSize: 12 }}>Sprint Goal: </Text>{sprint.goal}</Text>}
+                                type={isActive ? 'info' : 'success'}
+                                showIcon={false}
+                                style={{ marginBottom: 10, padding: '6px 12px' }}
+                              />
+                            )}
+
+                            {/* Stats + Progress */}
+                            {total > 0 && (
+                              <div style={{ marginBottom: 10 }}>
+                                <Row gutter={16} style={{ marginBottom: 8 }}>
+                                  <Col span={6}>
+                                    <Statistic title="Tổng" value={total} valueStyle={{ fontSize: 18 }} />
+                                  </Col>
+                                  <Col span={6}>
+                                    <Statistic title="Cần làm" value={todo} valueStyle={{ fontSize: 18, color: '#8c8c8c' }} />
+                                  </Col>
+                                  <Col span={6}>
+                                    <Statistic title="Đang làm" value={inProgress} valueStyle={{ fontSize: 18, color: '#1890ff' }} />
+                                  </Col>
+                                  <Col span={6}>
+                                    <Statistic title="Hoàn thành" value={completed} valueStyle={{ fontSize: 18, color: '#52c41a' }} />
+                                  </Col>
+                                </Row>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <Progress
+                                    percent={pct}
+                                    size="small"
+                                    strokeColor={pct === 100 ? '#52c41a' : isActive ? '#1890ff' : '#d9d9d9'}
+                                    style={{ flex: 1, margin: 0 }}
+                                  />
+                                  <Text style={{ fontSize: 12, fontWeight: 600, color: pct === 100 ? '#52c41a' : '#1890ff', minWidth: 36 }}>{pct}%</Text>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Dates (non-active sprints) */}
+                            {!isActive && (sprint.startDate || sprint.endDate) && (
+                              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8 }}>
+                                {sprint.startDate && `${dayjs(sprint.startDate).format('DD/MM/YYYY')}`}
+                                {sprint.startDate && sprint.endDate && ' → '}
+                                {sprint.endDate && `${dayjs(sprint.endDate).format('DD/MM/YYYY')}`}
+                              </div>
+                            )}
+
+                            {/* Toggle Sprint Backlog */}
+                            <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }}
+                              onClick={() => toggleSprintExpand(sprint.id)}>
+                              {expanded ? '▲ Ẩn Sprint Backlog' : `▼ Sprint Backlog${total > 0 ? ` (${total} task)` : ''}`}
+                            </Button>
+
+                            {/* Sprint Backlog task list */}
+                            {expanded && (
+                              <div style={{ marginTop: 10 }}>
+                                {backlogLoading ? (
+                                  <div style={{ textAlign: 'center', padding: 16 }}><Spin size="small" /></div>
+                                ) : sprintTasks.length === 0 ? (
+                                  <div style={{ textAlign: 'center', padding: '16px 0', color: '#8c8c8c', fontSize: 12, border: '1px dashed #d9d9d9', borderRadius: 6 }}>
+                                    Sprint Backlog trống — nhấn "Thêm task" để thêm từ Product Backlog
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                    {/* Header row */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 90px 160px 28px 28px', gap: 8, padding: '4px 10px', fontSize: 11, color: '#8c8c8c', fontWeight: 600, background: '#fafafa', borderRadius: 4 }}>
+                                      <span>Mã</span><span>Tiêu đề</span><span>Ưu tiên</span><span>Trạng thái</span><span></span><span></span>
+                                    </div>
+                                    {sprintTasks.map((t) => (
+                                      <div key={t.id} style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '90px 1fr 90px 160px 28px 28px',
+                                        gap: 8,
+                                        padding: '6px 10px',
+                                        background: '#fff',
+                                        borderRadius: 4,
+                                        border: '1px solid #f0f0f0',
+                                        alignItems: 'center',
+                                        borderLeft: `3px solid ${t.status === 'DONE' || t.status === 'RESOLVED' ? '#52c41a' : t.status === 'IN_PROGRESS' ? '#1890ff' : '#d9d9d9'}`,
+                                      }}>
+                                        <Tag style={{ fontFamily: 'monospace', margin: 0, fontSize: 11 }}>{t.taskKey}</Tag>
+                                        <Button type="link" style={{ padding: 0, textAlign: 'left', height: 'auto', fontWeight: 400, fontSize: 13, overflow: 'hidden' }}
+                                          onClick={() => navigate(`/tasks/${t.taskKey}`)}>
+                                          <Text ellipsis={{ tooltip: t.title }} style={{ maxWidth: '100%' }}>{t.title}</Text>
+                                        </Button>
+                                        <Tag color={PRIORITY_COLOR[t.priority]} style={{ margin: 0, fontSize: 11 }}>{PRIORITY_LABEL[t.priority]}</Tag>
+                                        <StatusSelect value={t.status} size="small"
+                                          onChange={async (s) => {
+                                            try {
+                                              await import('../services/taskService').then(m =>
+                                                m.taskService.updateStatus(t.id, { status: s as TaskStatus })
+                                              );
+                                              fetchSprintBacklog(sprint.id);
+                                            } catch { /* ignore */ }
+                                          }} />
+                                        {t.assigneeName ? (
+                                          <Tooltip title={t.assigneeName}>
+                                            <Avatar size={20} icon={<UserOutlined />} />
+                                          </Tooltip>
+                                        ) : <span />}
+                                        <Popconfirm title="Gỡ task khỏi sprint?"
+                                          onConfirm={() => handleRemoveTaskFromSprint(sprint.id, t.id)}
+                                          okText="Gỡ" cancelText="Hủy" okButtonProps={{ danger: true }}>
+                                          <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                                        </Popconfirm>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </Card>
                       );
                     })}

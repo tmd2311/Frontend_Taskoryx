@@ -22,12 +22,13 @@ import { checklistService } from '../services/checklistService';
 import { timeTrackingService } from '../services/timeTrackingService';
 import { dependencyService } from '../services/dependencyService';
 import { watcherService } from '../services/watcherService';
-import { useMentionInput } from '../hooks/useMentionInput';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import AuthImage from './AuthImage';
 import { downloadAttachment } from '../utils/attachment';
 import type {
   ProjectMember, Comment, Attachment, ChecklistItem, ChecklistSummary,
-  TimeEntry, TaskDependency, MentionedUser,
+  TimeEntry, TaskDependency,
 } from '../types';
 import { TaskPriority, TaskStatus, DependencyType } from '../types';
 import StatusSelect, { StatusTag } from './StatusSelect';
@@ -72,53 +73,30 @@ function getFileIcon(fileType: string, fileName: string) {
   return <FileOutlined style={{ color: '#8c8c8c', fontSize: 22 }} />;
 }
 
-// ─── CommentContent – render @mention highlight ──────────────
+// ─── CommentContent – render HTML từ Quill ──────────────
 interface CommentContentProps {
   content: string;
-  mentionedUsers?: MentionedUser[];
 }
 
-const CommentContent: React.FC<CommentContentProps> = ({ content, mentionedUsers = [] }) => {
+const CommentContent: React.FC<CommentContentProps> = ({ content }) => {
   if (!content) return null;
-  if (mentionedUsers.length === 0) return <span>{content}</span>;
-
-  const parts: Array<{ type: 'text'; value: string } | { type: 'mention'; user: MentionedUser }> = [];
-  let remaining = content;
-
-  const sorted = [...mentionedUsers].sort((a, b) => {
-    return content.indexOf(`@${a.username}`) - content.indexOf(`@${b.username}`);
-  });
-
-  sorted.forEach((user) => {
-    const tag = `@${user.username}`;
-    const idx = remaining.indexOf(tag);
-    if (idx === -1) return;
-    if (idx > 0) parts.push({ type: 'text', value: remaining.slice(0, idx) });
-    parts.push({ type: 'mention', user });
-    remaining = remaining.slice(idx + tag.length);
-  });
-
-  if (remaining) parts.push({ type: 'text', value: remaining });
+  // Nếu content là plain text (không có thẻ HTML), hiển thị như cũ
+  const isHtml = /<[a-z][\s\S]*>/i.test(content);
+  if (!isHtml) return <span style={{ whiteSpace: 'pre-wrap' }}>{content}</span>;
 
   return (
-    <span>
-      {parts.map((part, i) =>
-        part.type === 'text' ? (
-          <span key={i}>{part.value}</span>
-        ) : (
-          <Tooltip key={i} title={part.user.fullName}>
-            <Tag
-              color="blue"
-              style={{ margin: '0 2px', cursor: 'default', fontSize: 12, padding: '0 5px' }}
-            >
-              @{part.user.username}
-            </Tag>
-          </Tooltip>
-        ),
-      )}
-    </span>
+    <div
+      className="quill-comment-display"
+      dangerouslySetInnerHTML={{ __html: content }}
+    />
   );
 };
+
+// Helper: kiểm tra Quill content có rỗng không
+const isQuillEmpty = (html: string) => {
+  return !html || html.replace(/<[^>]*>/g, '').trim() === '';
+};
+
 
 // ─── CommentItem ────────────────────────────────────────────
 interface CommentItemProps {
@@ -139,9 +117,9 @@ const CommentItem: React.FC<CommentItemProps> = ({
   const isOwn = currentUserId === comment.userId;
 
   const handleSaveEdit = async () => {
-    if (!editContent.trim()) return;
+    if (isQuillEmpty(editContent)) return;
     setEditSaving(true);
-    await onEdit(comment, editContent.trim());
+    await onEdit(comment, editContent);
     setEditSaving(false);
     setEditing(false);
   };
@@ -170,15 +148,15 @@ const CommentItem: React.FC<CommentItemProps> = ({
 
           {editing ? (
             <div>
-              <TextArea
+              <ReactQuill
                 value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                autoSize={{ minRows: 2 }}
+                onChange={setEditContent}
+                modules={{ toolbar: [['bold', 'italic', 'underline'], [{ list: 'ordered' }, { list: 'bullet' }], ['link'], ['clean']] }}
                 style={{ marginBottom: 6 }}
               />
-              <Space size={6}>
+              <Space size={6} style={{ marginTop: 6 }}>
                 <Button size="small" type="primary" loading={editSaving} onClick={handleSaveEdit}
-                  disabled={!editContent.trim()}>Lưu</Button>
+                  disabled={isQuillEmpty(editContent)}>Lưu</Button>
                 <Button size="small" onClick={() => { setEditing(false); setEditContent(comment.content); }}>
                   Hủy
                 </Button>
@@ -188,9 +166,9 @@ const CommentItem: React.FC<CommentItemProps> = ({
             <div style={{
               background: depth === 0 ? '#f5f5f5' : '#fafafa',
               borderRadius: 8, padding: '8px 12px', fontSize: 13,
-              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              wordBreak: 'break-word',
             }}>
-              <CommentContent content={comment.content} mentionedUsers={comment.mentionedUsers} />
+              <CommentContent content={comment.content} />
             </div>
           )}
 
@@ -257,7 +235,8 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
 
-  // Comments & @mention
+  // Comments
+  const [commentContent, setCommentContent] = useState('');
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [commentSending, setCommentSending] = useState(false);
 
@@ -294,16 +273,13 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const open = !!taskId;
   const task = currentTask?.id === taskId ? currentTask : null;
 
-  // useMentionInput phải gọi SAU khi `task` đã được tính toán
-  const mention = useMentionInput(task?.projectId ?? undefined);
-
   // ── Fetch task khi mở ──────────────────────────────────────
   useEffect(() => {
     if (taskId) {
       setEditMode(false);
       setActiveTab('detail');
       setMembers([]);
-      mention.reset();
+      setCommentContent('');
       setReplyTo(null);
       setChecklist(null);
       setTimeEntries([]);
@@ -428,7 +404,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     setEditMode(false);
     form.resetFields();
     setMembers([]);
-    mention.reset();
+    setCommentContent('');
     setReplyTo(null);
     setCurrentTask(null);
     onClose();
@@ -436,11 +412,11 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
 
   // ── Comments ──────────────────────────────────────────────
   const handleSendComment = async () => {
-    if (!taskId || !mention.content.trim()) return;
+    if (!taskId || isQuillEmpty(commentContent)) return;
     setCommentSending(true);
     try {
-      await addComment(taskId, { content: mention.content.trim(), parentId: replyTo?.id });
-      mention.reset();
+      await addComment(taskId, { content: commentContent, parentId: replyTo?.id });
+      setCommentContent('');
       setReplyTo(null);
     } catch (e: any) {
       message.error(e.message || 'Gửi bình luận thất bại');
@@ -467,7 +443,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
 
   const handleReply = (comment: Comment) => {
     setReplyTo(comment);
-    setTimeout(() => mention.textareaRef.current?.focus(), 100);
   };
 
   // ── Attachments ───────────────────────────────────────────
@@ -1329,7 +1304,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
 
           </div>
 
-          {/* ═══ Input bình luận (bottom sticky) với @mention ═══ */}
+          {/* ═══ Input bình luận (bottom sticky) ═══ */}
           {activeTab === 'comments' && (
             <div style={{ padding: '12px 24px', borderTop: '1px solid #f0f0f0', background: '#fff' }}>
               {replyTo && (
@@ -1343,70 +1318,32 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                   <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setReplyTo(null)} />
                 </div>
               )}
-              <div style={{ position: 'relative' }}>
-                {/* Dropdown gợi ý @mention */}
-                {mention.showDropdown && mention.suggestions.length > 0 && (
-                  <div style={{
-                    position: 'absolute', bottom: '100%', left: 0,
-                    background: '#fff', border: '1px solid #e5e7eb',
-                    borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,.12)',
-                    padding: 4, zIndex: 1000,
-                    minWidth: 220, maxHeight: 200, overflowY: 'auto',
-                    marginBottom: 4,
-                  }}>
-                    {mention.suggestions.map((u) => (
-                      <div
-                        key={u.userId}
-                        onMouseDown={(e) => { e.preventDefault(); mention.selectMention(u); }}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '6px 10px', cursor: 'pointer', borderRadius: 6,
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = '#f3f4f6')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        <Avatar
-                          size={24}
-                          src={u.avatarUrl}
-                          icon={<UserOutlined />}
-                          style={{ flexShrink: 0 }}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>{u.fullName}</div>
-                          <div style={{ color: '#6b7280', fontSize: 11 }}>@{u.username}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <Space.Compact style={{ width: '100%' }}>
-                  <TextArea
-                    ref={mention.textareaRef as any}
-                    value={mention.content}
-                    onChange={mention.handleChange}
-                    placeholder={replyTo
-                      ? `Trả lời ${replyTo.userFullName || replyTo.username}... (dùng @ để mention)`
-                      : 'Viết bình luận... dùng @ để mention thành viên (Ctrl+Enter để gửi)'}
-                    autoSize={{ minRows: 1, maxRows: 5 }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        mention.setShowDropdown(false);
-                      } else if (e.key === 'Enter' && e.ctrlKey) {
-                        e.preventDefault();
-                        handleSendComment();
-                      }
-                    }}
-                    style={{ borderRadius: '6px 0 0 6px' }}
-                  />
-                  <Button
-                    type="primary"
-                    icon={<SendOutlined />}
-                    loading={commentSending}
-                    disabled={!mention.content.trim()}
-                    onClick={handleSendComment}
-                    style={{ borderRadius: '0 6px 6px 0', height: 'auto', alignSelf: 'flex-end' }}
-                  />
-                </Space.Compact>
+              <ReactQuill
+                value={commentContent}
+                onChange={setCommentContent}
+                placeholder={replyTo
+                  ? `Trả lời ${replyTo.userFullName || replyTo.username}...`
+                  : 'Viết bình luận...'}
+                modules={{
+                  toolbar: [
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ list: 'ordered' }, { list: 'bullet' }],
+                    ['link', 'blockquote', 'code-block'],
+                    ['clean'],
+                  ],
+                }}
+                style={{ marginBottom: 8 }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  type="primary"
+                  icon={<SendOutlined />}
+                  loading={commentSending}
+                  disabled={isQuillEmpty(commentContent)}
+                  onClick={handleSendComment}
+                >
+                  Gửi
+                </Button>
               </div>
             </div>
           )}

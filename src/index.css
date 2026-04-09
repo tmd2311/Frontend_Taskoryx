@@ -18,6 +18,27 @@ body {
   min-height: 100vh;
 }
 
+/* ─── CSS variables ─── */
+:root {
+  --comment-box-bg: #f8f9fc;
+  --comment-box-border: #e2e8f0;
+  --header-bar-bg: #f5f6fa;
+  --header-bar-border: #e8eaf0;
+  --card-border: #e8eaf0;
+  --desc-bg: #fafbfc;
+  --desc-border: #f0f0f0;
+}
+
+[data-theme="dark"] {
+  --comment-box-bg: #1e1e2e;
+  --comment-box-border: #3a3a4a;
+  --header-bar-bg: #1a1a2e;
+  --header-bar-border: #3a3a4a;
+  --card-border: #3a3a4a;
+  --desc-bg: #1e1e2e;
+  --desc-border: #3a3a4a;
+}
+
 /* ─── Dark mode body ─── */
 [data-theme="dark"] body {
   background-color: #141414;
@@ -74,7 +95,7 @@ body {
 
 /* ─── Layout ─── */
 .app-sider {
-  background: #ffffff !important;
+  /* background handled by MainLayout inline styles */
   border-right: 1px solid #eef0f6;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
 }
@@ -133,7 +154,7 @@ body {
   margin: 2px 0 !important;
   height: 44px !important;
   line-height: 44px !important;
-  color: #5a6378 !important;
+  color: #5a6378;
   font-weight: 500;
 }
 
@@ -184,26 +205,27 @@ body {
 /* ─── Cards ─── */
 .ant-card {
   border-radius: 12px !important;
-  border-color: #eef0f6 !important;
 }
 
 .ant-card-head {
-  border-bottom-color: #eef0f6 !important;
   font-weight: 600 !important;
 }
 
 /* ─── Tables ─── */
 .ant-table-thead > tr > th {
-  background: #f8f9fc !important;
   font-weight: 600 !important;
-  color: #5a6378 !important;
-  border-bottom-color: #eef0f6 !important;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
-.ant-table-row:hover > td {
+[data-theme="light"] .ant-table-thead > tr > th {
+  background: #f8f9fc !important;
+  color: #5a6378 !important;
+  border-bottom-color: #eef0f6 !important;
+}
+
+[data-theme="light"] .ant-table-row:hover > td {
   background: #f8f9ff !important;
 }
 
@@ -221,8 +243,11 @@ body {
 /* ─── Statistic ─── */
 .ant-statistic-title {
   font-size: 13px !important;
-  color: #8c9ab0 !important;
   font-weight: 500 !important;
+}
+
+[data-theme="light"] .ant-statistic-title {
+  color: #8c9ab0 !important;
 }
 
 .ant-statistic-content-value {
@@ -236,8 +261,11 @@ body {
 }
 
 .ant-modal-header {
-  border-bottom: 1px solid #eef0f6 !important;
   padding: 16px 24px !important;
+}
+
+[data-theme="light"] .ant-modal-header {
+  border-bottom: 1px solid #eef0f6 !important;
 }
 
 .ant-modal-title {
@@ -245,7 +273,7 @@ body {
 }
 
 /* ─── Drawer ─── */
-.ant-drawer-header {
+[data-theme="light"] .ant-drawer-header {
   border-bottom: 1px solid #eef0f6 !important;
 }
 
@@ -256,6 +284,9 @@ body {
 /* ─── Tabs ─── */
 .ant-tabs-tab {
   font-weight: 500 !important;
+}
+
+[data-theme="light"] .ant-tabs-tab {
   color: #8c9ab0 !important;
 }
 
@@ -283,6 +314,12 @@ body {
 .ant-select-selector,
 .ant-picker {
   border-radius: 8px !important;
+}
+
+[data-theme="light"] .ant-input,
+[data-theme="light"] .ant-input-affix-wrapper,
+[data-theme="light"] .ant-select-selector,
+[data-theme="light"] .ant-picker {
   border-color: #e2e8f0 !important;
 }
 
@@ -333,6 +370,10 @@ body {
   min-height: 400px;
 }
 
+[data-theme="dark"] .kanban-column {
+  background: #1f1f2e;
+}
+
 .kanban-card {
   background: #ffffff;
   border-radius: 10px;
@@ -341,6 +382,11 @@ body {
   margin-bottom: 8px;
   cursor: grab;
   transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+[data-theme="dark"] .kanban-card {
+  background: #2a2a3d;
+  border-color: #3a3a4a;
 }
 
 .kanban-card:hover {
@@ -466,3 +512,27 @@ body {
     padding: 20px !important;
   }
 }
+
+/* ─── React Quill – comment display ─── */
+.quill-comment-display p { margin: 0 0 4px; }
+.quill-comment-display p:last-child { margin-bottom: 0; }
+.quill-comment-display ul,
+.quill-comment-display ol { padding-left: 20px; margin: 4px 0; }
+.quill-comment-display a { color: #1890ff; }
+.quill-comment-display blockquote {
+  border-left: 3px solid #d9d9d9;
+  margin: 4px 0;
+  padding-left: 8px;
+  color: #595959;
+}
+.quill-comment-display pre {
+  background: #f5f5f5;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  overflow-x: auto;
+}
+
+/* ─── React Quill – editor trong drawer ─── */
+.ql-container { font-size: 13px; }
+.ql-editor { min-height: 80px; max-height: 200px; overflow-y: auto; }
