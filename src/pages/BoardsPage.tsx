@@ -453,8 +453,8 @@ const BoardsPage: React.FC = () => {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <Title level={3} style={{ margin: 0 }}>Bảng Kanban</Title>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4, flexWrap: 'wrap' }}>
+        <Title level={3} style={{ margin: 0 }}>Bảng Kanban Cá Nhân</Title>
         <Select
           style={{ flex: '1 1 180px', minWidth: 160, maxWidth: 280 }}
           placeholder="Chọn project"
@@ -462,10 +462,10 @@ const BoardsPage: React.FC = () => {
           onChange={(v) => setSelectedProjectId(v)}
           options={projects.map((p) => ({ label: `[${p.key}] ${p.name}`, value: p.id }))}
         />
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          Kéo thả task giữa các cột để cập nhật trạng thái
-        </Text>
       </div>
+      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
+        Board cá nhân với cột tùy chỉnh. Để xem Kanban theo sprint (tự động cập nhật trạng thái), hãy vào tab <strong>Sprints</strong> trong từng dự án.
+      </Text>
 
       {!selectedProjectId ? (
         <Empty description="Vui lòng chọn dự án" />
