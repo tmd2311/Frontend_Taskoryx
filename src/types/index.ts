@@ -534,6 +534,7 @@ export interface UserSearchParams extends PageParams {
 /** Admin user response – có thêm roles array */
 export interface AdminUser extends Omit<User, 'role'> {
   roles: Role[];
+  mustChangePassword?: boolean;
 }
 
 export interface AdminUserFilter extends PageParams {
@@ -644,10 +645,12 @@ export interface UpdateChecklistItemRequest {
 export interface TimeEntry {
   id: string;
   taskId: string;
+  taskKey?: string;
   userId: string;
   username?: string;
   userFullName?: string;
   hours: number;
+  formattedHours?: string;
   description?: string;
   workDate: string;
   createdAt?: string;

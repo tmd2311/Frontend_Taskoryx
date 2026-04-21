@@ -1,15 +1,15 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Typography, Button, Tabs, Table, Tag, Space, Input, Select, Badge,
   Avatar, Empty, Tooltip, Modal, Form, Popconfirm, message, Spin,
-  DatePicker, Card, Progress, List, Timeline, Row, Col, Checkbox, Alert, Statistic,
+  DatePicker, Card, Progress, List, Timeline, Row, Col, Alert, Statistic,
 } from 'antd';
 import {
-  ArrowLeftOutlined, CheckSquareOutlined, TeamOutlined, ExclamationCircleOutlined,
+  CheckSquareOutlined, TeamOutlined, ExclamationCircleOutlined,
   UserOutlined, CommentOutlined, PaperClipOutlined, SearchOutlined, ReloadOutlined,
-  UserAddOutlined, DeleteOutlined, InboxOutlined, PlusOutlined, ArrowRightOutlined,
-  ThunderboltOutlined, FlagOutlined, AppstoreAddOutlined, HistoryOutlined,
+  UserAddOutlined, DeleteOutlined, PlusOutlined, InboxOutlined,
+  ThunderboltOutlined, AppstoreAddOutlined, HistoryOutlined,
   PlayCircleOutlined, CheckCircleOutlined, EditOutlined,
   DownloadOutlined, TableOutlined, AppstoreOutlined, UnorderedListOutlined,
 } from '@ant-design/icons';
@@ -19,22 +19,20 @@ import { useProjectStore } from '../stores/projectStore';
 import { useTaskStore } from '../stores/taskStore';
 import { useAdminStore } from '../stores/adminStore';
 import { projectService } from '../services/projectService';
-import { boardService } from '../services/boardService';
 import { sprintService } from '../services/sprintService';
 import { taskService } from '../services/taskService';
-import { versionService } from '../services/versionService';
 import { categoryService } from '../services/categoryService';
 import { activityService } from '../services/activityService';
 import { searchService } from '../services/searchService';
 import { useAuthStore } from '../stores/authStore';
 import type {
-  TaskSummary, ProjectMember, Board, Sprint, Version, IssueCategory, ActivityLog, GanttTask,
+  TaskSummary, ProjectMember, Sprint, IssueCategory, ActivityLog, GanttTask,
 } from '../types';
-import { TaskPriority, ProjectRole, TaskStatus, SprintStatus, VersionStatus } from '../types';
+import { TaskPriority, ProjectRole, TaskStatus, SprintStatus } from '../types';
 import StatusSelect from '../components/StatusSelect';
 import dayjs from 'dayjs';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const PRIORITY_COLOR: Record<string, string> = {
   [TaskPriority.LOW]: 'green', [TaskPriority.MEDIUM]: 'blue',
@@ -56,13 +54,6 @@ const SPRINT_STATUS_COLOR: Record<string, string> = {
 const SPRINT_STATUS_LABEL: Record<string, string> = {
   PLANNED: 'Kế hoạch', ACTIVE: 'Đang chạy', COMPLETED: 'Hoàn thành', CANCELLED: 'Đã hủy',
 };
-const VERSION_STATUS_COLOR: Record<string, string> = {
-  OPEN: 'blue', LOCKED: 'orange', CLOSED: 'green',
-};
-const VERSION_STATUS_LABEL: Record<string, string> = {
-  OPEN: 'Đang mở', LOCKED: 'Đã khóa', CLOSED: 'Đã đóng',
-};
-
 // ─── Task columns ────────────────────────────────────────────
 const buildTaskColumns = (onRowClick?: (r: TaskSummary) => void): ColumnsType<TaskSummary> => [
   {
@@ -123,12 +114,11 @@ const buildTaskColumns = (onRowClick?: (r: TaskSummary) => void): ColumnsType<Ta
 const ProjectDetailPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const { currentProject, members, fetchProjectById, fetchMembers, deleteProject } = useProjectStore();
   const {
     projectTasks, isLoading, fetchProjectTasks,
-    backlog, backlogLoading, fetchBacklog,
-    updateTaskStatus, moveTask, createTask,
   } = useTaskStore();
   const { isAdmin } = useAuthStore();
   const { roles: systemRoles, fetchRoles } = useAdminStore();
@@ -145,6 +135,7 @@ const ProjectDetailPage: React.FC = () => {
   const [filterOverdue, setFilterOverdue] = useState<boolean | undefined>(undefined);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 15;
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'tasks');
 
   // Members
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -158,21 +149,6 @@ const ProjectDetailPage: React.FC = () => {
   // Delete project
   const [deleting, setDeleting] = useState(false);
 
-  // Backlog
-  const [backlogTab, setBacklogTab] = useState(false);
-  const [boards, setBoards] = useState<Board[]>([]);
-  const [moveModalTask, setMoveModalTask] = useState<TaskSummary | null>(null);
-  const [selectedBoardId, setSelectedBoardId] = useState<string | undefined>();
-  const [selectedColumnId, setSelectedColumnId] = useState<string | undefined>();
-  const [moveLoading, setMoveLoading] = useState(false);
-  const [createBacklogModal, setCreateBacklogModal] = useState(false);
-  const [createForm] = Form.useForm();
-  const [createSaving, setCreateSaving] = useState(false);
-  // Backlog selection – thêm vào sprint
-  const [backlogSelected, setBacklogSelected] = useState<string[]>([]);
-  const [addToSprintModal, setAddToSprintModal] = useState(false);
-  const [addToSprintId, setAddToSprintId] = useState<string | undefined>();
-  const [addToSprintLoading, setAddToSprintLoading] = useState(false);
 
   // Sprints
   const [sprints, setSprints] = useState<Sprint[]>([]);
@@ -197,14 +173,6 @@ const ProjectDetailPage: React.FC = () => {
   const [completeSprintId, setCompleteSprintId] = useState<string | null>(null);
   const [incompleteTasksForSprint, setIncompleteTasksForSprint] = useState<TaskSummary[]>([]);
   const [completeSprintLoading, setCompleteSprintLoading] = useState(false);
-  // Versions
-  const [versions, setVersions] = useState<Version[]>([]);
-  const [versionsLoading, setVersionsLoading] = useState(false);
-  const [versionModal, setVersionModal] = useState(false);
-  const [editVersion, setEditVersion] = useState<Version | null>(null);
-  const [versionForm] = Form.useForm();
-  const [versionSaving, setVersionSaving] = useState(false);
-
   // Categories
   const [categories, setCategories] = useState<IssueCategory[]>([]);
   const [catsLoading, setCatsLoading] = useState(false);
@@ -228,9 +196,16 @@ const ProjectDetailPage: React.FC = () => {
     if (!projectId) return;
     fetchProjectById(projectId);
     fetchMembers(projectId);
-    boardService.getProjectBoards(projectId).then(setBoards).catch(() => {});
-    // Tải roles từ API để dùng cho dropdown chọn vai trò thành viên (silent nếu không có quyền)
     if (systemRoles.length === 0) fetchRoles().catch(() => {});
+  }, [projectId]);
+
+  // Sync currentProject vào store khi load trực tiếp qua URL
+  const { setCurrentProject } = useProjectStore();
+  useEffect(() => {
+    if (currentProject?.id === projectId) return;
+    if (currentProject && currentProject.id !== projectId) {
+      setCurrentProject(null);
+    }
   }, [projectId]);
 
   useEffect(() => {
@@ -242,10 +217,6 @@ const ProjectDetailPage: React.FC = () => {
     fetchProjectTasks(projectId, params);
   }, [projectId, page, keyword, filterPriority, filterOverdue]);
 
-  useEffect(() => {
-    if (backlogTab && projectId) fetchBacklog(projectId);
-  }, [backlogTab, projectId]);
-
   // Fetch sprints
   const fetchSprints = useCallback(async () => {
     if (!projectId) return;
@@ -255,18 +226,6 @@ const ProjectDetailPage: React.FC = () => {
       setSprints(data);
     } catch { /* ignore */ } finally {
       setSprintsLoading(false);
-    }
-  }, [projectId]);
-
-  // Fetch versions
-  const fetchVersions = useCallback(async () => {
-    if (!projectId) return;
-    setVersionsLoading(true);
-    try {
-      const data = await versionService.getVersions(projectId);
-      setVersions(data);
-    } catch { /* ignore */ } finally {
-      setVersionsLoading(false);
     }
   }, [projectId]);
 
@@ -302,7 +261,7 @@ const ProjectDetailPage: React.FC = () => {
     setGanttLoading(true);
     setGanttError(null);
     try {
-      const data = await versionService.getGantt(projectId);
+      const data = await taskService.getGantt(projectId);
       setGanttTasks(Array.isArray(data) ? data : []);
     } catch (e: any) {
       setGanttError(e.message || 'Không thể tải dữ liệu Gantt');
@@ -312,9 +271,9 @@ const ProjectDetailPage: React.FC = () => {
   }, [projectId]);
 
   const handleTabChange = (key: string) => {
-    setBacklogTab(key === 'backlog');
+    setActiveTab(key);
+    navigate(`?tab=${key}`, { replace: true });
     if (key === 'sprints') fetchSprints();
-    if (key === 'versions') fetchVersions();
     if (key === 'categories') fetchCategories();
     if (key === 'activity') fetchActivity(0);
     if (key === 'gantt') fetchGantt();
@@ -389,45 +348,6 @@ const ProjectDetailPage: React.FC = () => {
     }
   };
 
-  // ── Backlog ───────────────────────────────────────────────
-  const handleCreateBacklogTask = async (values: any) => {
-    if (!projectId) return;
-    setCreateSaving(true);
-    try {
-      await createTask(projectId, {
-        title: values.title,
-        description: values.description,
-        priority: values.priority,
-        dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
-      });
-      message.success('Đã tạo task vào Backlog');
-      setCreateBacklogModal(false);
-      createForm.resetFields();
-      fetchBacklog(projectId);
-    } catch (e: any) {
-      message.error(e.message || 'Tạo task thất bại');
-    } finally {
-      setCreateSaving(false);
-    }
-  };
-
-  const handleMoveToBoard = async () => {
-    if (!moveModalTask || !selectedColumnId) return;
-    setMoveLoading(true);
-    try {
-      await moveTask(moveModalTask.id, { targetColumnId: selectedColumnId, newPosition: 0 });
-      message.success('Đã đưa task vào Board');
-      setMoveModalTask(null);
-      setSelectedBoardId(undefined);
-      setSelectedColumnId(undefined);
-      if (projectId) fetchBacklog(projectId);
-    } catch (e: any) {
-      message.error(e.message || 'Di chuyển thất bại');
-    } finally {
-      setMoveLoading(false);
-    }
-  };
-
   // ── Sprints ───────────────────────────────────────────────
   const handleSaveSprint = async (values: any) => {
     if (!projectId) return;
@@ -454,27 +374,6 @@ const ProjectDetailPage: React.FC = () => {
       message.error(e.message || 'Thao tác thất bại');
     } finally {
       setSprintSaving(false);
-    }
-  };
-
-  // Thêm task đã chọn từ Backlog vào sprint
-  const handleAddBacklogToSprint = async () => {
-    if (!addToSprintId || backlogSelected.length === 0) return;
-    setAddToSprintLoading(true);
-    try {
-      await Promise.all(
-        backlogSelected.map((taskId) => sprintService.addTask(addToSprintId, { taskId }))
-      );
-      message.success(`Đã thêm ${backlogSelected.length} task vào sprint`);
-      setAddToSprintModal(false);
-      setBacklogSelected([]);
-      setAddToSprintId(undefined);
-      // Reload backlog
-      if (projectId) fetchBacklog(projectId);
-    } catch (e: any) {
-      message.error(e.message || 'Thêm task thất bại');
-    } finally {
-      setAddToSprintLoading(false);
     }
   };
 
@@ -611,46 +510,6 @@ const ProjectDetailPage: React.FC = () => {
     }
   };
 
-  // ── Versions ──────────────────────────────────────────────
-  const handleSaveVersion = async (values: any) => {
-    if (!projectId) return;
-    setVersionSaving(true);
-    try {
-      const payload = {
-        name: values.name,
-        description: values.description,
-        status: values.status,
-        dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
-        releaseDate: values.releaseDate ? values.releaseDate.format('YYYY-MM-DD') : undefined,
-      };
-      if (editVersion) {
-        await versionService.update(editVersion.id, payload);
-        message.success('Đã cập nhật version');
-      } else {
-        await versionService.create(projectId, payload);
-        message.success('Đã tạo version');
-      }
-      setVersionModal(false);
-      versionForm.resetFields();
-      setEditVersion(null);
-      fetchVersions();
-    } catch (e: any) {
-      message.error(e.message || 'Thao tác thất bại');
-    } finally {
-      setVersionSaving(false);
-    }
-  };
-
-  const handleDeleteVersion = async (id: string) => {
-    try {
-      await versionService.delete(id);
-      message.success('Đã xóa version');
-      fetchVersions();
-    } catch (e: any) {
-      message.error(e.message || 'Xóa thất bại');
-    }
-  };
-
   // ── Categories ────────────────────────────────────────────
   const handleSaveCategory = async (values: any) => {
     if (!projectId) return;
@@ -695,8 +554,14 @@ const ProjectDetailPage: React.FC = () => {
   const tasks = projectTasks?.content ?? [];
   const total = projectTasks?.totalElements ?? 0;
   const project = currentProject?.id === projectId ? currentProject : null;
-  const color = project?.color || '#1890ff';
   const canDelete = isAdmin || project?.currentUserRole === ProjectRole.OWNER;
+
+  // Set currentProject vào store sau khi fetch xong (hỗ trợ truy cập URL trực tiếp)
+  useEffect(() => {
+    if (currentProject && currentProject.id === projectId) {
+      setCurrentProject(currentProject);
+    }
+  }, [currentProject?.id, projectId]);
 
   // ── Member columns ────────────────────────────────────────
   const buildMemberColumns = (): ColumnsType<ProjectMember> => [
@@ -746,47 +611,27 @@ const ProjectDetailPage: React.FC = () => {
 
   return (
     <div>
-      {/* Header */}
+      {/* Sub-header */}
       <div style={{
-        background: color, borderRadius: 10, padding: '16px 20px', marginBottom: 20,
-        display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 16, flexWrap: 'wrap', gap: 8,
       }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/projects')}
-          style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff' }} />
-
-        <div style={{ flex: 1 }}>
-          <Space align="center" size={10}>
-            <Tag style={{ background: 'rgba(255,255,255,0.25)', border: 'none', color: '#fff', fontFamily: 'monospace', fontWeight: 700 }}>
-              {project?.key ?? '...'}
-            </Tag>
-            <Title level={4} style={{ margin: 0, color: '#fff' }}>
-              {project?.name ?? 'Đang tải...'}
-            </Title>
-          </Space>
+        <Space size={8}>
           {project?.description && (
-            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, display: 'block', marginTop: 4 }}>
-              {project.description}
-            </Text>
+            <Text type="secondary" style={{ fontSize: 13 }}>{project.description}</Text>
           )}
-        </div>
-
-        <Space size={8} wrap>
-          <Space size={4} style={{ color: 'rgba(255,255,255,0.9)' }}>
-            <CheckSquareOutlined />
-            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>{project?.taskCount ?? total} CV</Text>
-          </Space>
-          <Space size={4}>
-            <TeamOutlined style={{ color: 'rgba(255,255,255,0.9)' }} />
-            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>{project?.memberCount ?? members.length} TV</Text>
-          </Space>
+        </Space>
+        <Space size={8}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            <CheckSquareOutlined /> {project?.taskCount ?? total} task &nbsp;·&nbsp;
+            <TeamOutlined /> {project?.memberCount ?? members.length} thành viên
+          </Text>
           <Tooltip title="Xuất Excel">
-            <Button icon={<DownloadOutlined />} size="small"
-              style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff' }}
-              onClick={handleExport}>Export</Button>
+            <Button icon={<DownloadOutlined />} size="small" onClick={handleExport}>Export</Button>
           </Tooltip>
           {canDelete && (
             <Popconfirm
-              title="Xóa dự án này?" description="Hành động này không thể hoàn tác. Dự án cần phải không còn task."
+              title="Xóa dự án này?" description="Hành động này không thể hoàn tác."
               onConfirm={async () => {
                 setDeleting(true);
                 try {
@@ -800,11 +645,7 @@ const ProjectDetailPage: React.FC = () => {
               }}
               okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true, loading: deleting }}
             >
-              <Tooltip title="Xóa dự án">
-                <Button danger icon={<DeleteOutlined />} size="small"
-                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff' }}
-                  loading={deleting} />
-              </Tooltip>
+              <Button danger icon={<DeleteOutlined />} size="small" loading={deleting}>Xóa dự án</Button>
             </Popconfirm>
           )}
         </Space>
@@ -812,7 +653,7 @@ const ProjectDetailPage: React.FC = () => {
 
       {/* Tabs */}
       <Tabs
-        defaultActiveKey="tasks"
+        activeKey={activeTab}
         onChange={handleTabChange}
         items={[
           // ─────── CÔNG VIỆC ───────
@@ -883,85 +724,6 @@ const ProjectDetailPage: React.FC = () => {
                 </div>
                 <Table columns={buildMemberColumns()} dataSource={members} rowKey="id"
                   pagination={false} scroll={{ x: 'max-content' }} locale={{ emptyText: <Empty description="Không có thành viên" /> }} />
-              </>
-            ),
-          },
-
-          // ─────── BACKLOG ───────
-          {
-            key: 'backlog',
-            label: <Space><InboxOutlined />Backlog<Badge count={backlog.length} color="#fa8c16" /></Space>,
-            children: (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <Text type="secondary" style={{ fontSize: 13 }}>Task chưa được đưa vào bảng Kanban</Text>
-                  <Button type="primary" icon={<PlusOutlined />}
-                    onClick={() => { createForm.resetFields(); setCreateBacklogModal(true); }}>
-                    Thêm task vào Backlog
-                  </Button>
-                </div>
-                {/* Selection action bar */}
-                {backlogSelected.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: '#e6f4ff', borderRadius: 6, marginBottom: 8, border: '1px solid #91caff' }}>
-                    <Text strong style={{ color: '#1677ff' }}>{backlogSelected.length} task đã chọn</Text>
-                    <Button type="primary" size="small" icon={<ThunderboltOutlined />}
-                      onClick={() => setAddToSprintModal(true)}>
-                      Thêm vào Sprint
-                    </Button>
-                    <Button size="small" onClick={() => setBacklogSelected([])}>Bỏ chọn</Button>
-                  </div>
-                )}
-                {backlogLoading ? (
-                  <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
-                ) : backlog.length === 0 ? (
-                  <Empty image={<InboxOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />}
-                    description="Backlog trống — tất cả task đã được đưa vào bảng"
-                    style={{ padding: '40px 0' }} />
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '32px 110px 1fr 140px 120px 90px 80px', padding: '6px 12px', background: '#fafafa', borderRadius: 6, fontSize: 12, color: '#8c8c8c', fontWeight: 500 }}>
-                      <Checkbox
-                        checked={backlogSelected.length === backlog.length}
-                        indeterminate={backlogSelected.length > 0 && backlogSelected.length < backlog.length}
-                        onChange={(e) => setBacklogSelected(e.target.checked ? backlog.map(t => t.id) : [])}
-                      />
-                      <span>Mã</span><span>Tiêu đề</span><span>Trạng thái</span><span>Ưu tiên</span><span>Hạn chót</span><span></span>
-                    </div>
-                    {backlog.map((task) => (
-                      <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '32px 110px 1fr 140px 120px 90px 80px', padding: '8px 12px', background: backlogSelected.includes(task.id) ? '#f0f7ff' : '#fff', borderRadius: 6, border: `1px solid ${backlogSelected.includes(task.id) ? '#91caff' : '#f0f0f0'}`, alignItems: 'center', gap: 4 }}>
-                        <Checkbox
-                          checked={backlogSelected.includes(task.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) setBacklogSelected(prev => [...prev, task.id]);
-                            else setBacklogSelected(prev => prev.filter(id => id !== task.id));
-                          }}
-                        />
-                        <Tag style={{ fontFamily: 'monospace', margin: 0, width: 'fit-content' }}>{task.taskKey}</Tag>
-                        <Button type="link" style={{ padding: 0, textAlign: 'left', height: 'auto', fontWeight: 400, fontSize: 13 }}
-                          onClick={() => navigate(`/tasks/${task.taskKey}`)}>
-                          {task.title}
-                        </Button>
-                        <StatusSelect value={task.status} size="small"
-                          onChange={async (status) => {
-                            try {
-                              await updateTaskStatus(task.id, { status: status as TaskStatus });
-                            } catch (e: any) {
-                              message.error(e.message || 'Cập nhật thất bại');
-                            }
-                          }}
-                        />
-                        <Tag color={PRIORITY_COLOR[task.priority]}>{PRIORITY_LABEL[task.priority]}</Tag>
-                        <Text style={{ fontSize: 12, color: task.overdue ? '#f5222d' : '#8c8c8c' }}>
-                          {task.dueDate ? dayjs(task.dueDate).format('DD/MM/YY') : '—'}
-                        </Text>
-                        <Button size="small" icon={<ArrowRightOutlined />}
-                          onClick={() => { setMoveModalTask(task); setSelectedBoardId(boards[0]?.id); setSelectedColumnId(undefined); }}>
-                          Board
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </>
             ),
           },
@@ -1298,78 +1060,6 @@ const ProjectDetailPage: React.FC = () => {
             ),
           },
 
-          // ─────── VERSIONS ───────
-          {
-            key: 'versions',
-            label: <Space><FlagOutlined />Versions</Space>,
-            children: (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <Text type="secondary">{versions.length} versions/milestones</Text>
-                  <Button type="primary" icon={<PlusOutlined />}
-                    onClick={() => { versionForm.resetFields(); setEditVersion(null); setVersionModal(true); }}>
-                    Tạo Version
-                  </Button>
-                </div>
-                {versionsLoading ? (
-                  <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
-                ) : versions.length === 0 ? (
-                  <Empty description="Chưa có version nào" style={{ padding: '40px 0' }} />
-                ) : (
-                  <Row gutter={[12, 12]}>
-                    {versions.map((v) => (
-                      <Col key={v.id} xs={24} sm={12} lg={8}>
-                        <Card size="small"
-                          extra={
-                            <Space>
-                              <Button size="small" icon={<EditOutlined />}
-                                onClick={() => {
-                                  setEditVersion(v);
-                                  versionForm.setFieldsValue({
-                                    name: v.name, description: v.description, status: v.status,
-                                    dueDate: v.dueDate ? dayjs(v.dueDate) : null,
-                                    releaseDate: v.releaseDate ? dayjs(v.releaseDate) : null,
-                                  });
-                                  setVersionModal(true);
-                                }} />
-                              <Popconfirm title="Xóa version này?" onConfirm={() => handleDeleteVersion(v.id)}
-                                okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
-                                <Button size="small" danger icon={<DeleteOutlined />} />
-                              </Popconfirm>
-                            </Space>
-                          }
-                        >
-                          <Space direction="vertical" style={{ width: '100%' }} size={8}>
-                            <Space>
-                              <FlagOutlined style={{ color: '#722ed1' }} />
-                              <Text strong>{v.name}</Text>
-                              <Tag color={VERSION_STATUS_COLOR[v.status]}>{VERSION_STATUS_LABEL[v.status]}</Tag>
-                            </Space>
-                            {v.description && <Text type="secondary" style={{ fontSize: 12 }}>{v.description}</Text>}
-                            {v.dueDate && (
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                Hạn: {dayjs(v.dueDate).format('DD/MM/YYYY')}
-                              </Text>
-                            )}
-                            {(v.totalTasks ?? 0) > 0 && (
-                              <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                                  <Text type="secondary">{v.completedTasks}/{v.totalTasks} task</Text>
-                                  <Text type="secondary">{v.completionPercent ?? 0}%</Text>
-                                </div>
-                                <Progress percent={v.completionPercent ?? 0} size="small" showInfo={false} />
-                              </div>
-                            )}
-                          </Space>
-                        </Card>
-                      </Col>
-                    ))}
-                  </Row>
-                )}
-              </>
-            ),
-          },
-
           // ─────── CATEGORIES ───────
           {
             key: 'categories',
@@ -1573,61 +1263,6 @@ const ProjectDetailPage: React.FC = () => {
         </Form>
       </Modal>
 
-      {/* Modal tạo task Backlog */}
-      <Modal title={<Space><InboxOutlined />Thêm task vào Backlog</Space>}
-        open={createBacklogModal} onCancel={() => setCreateBacklogModal(false)} footer={null} destroyOnHidden>
-        <Form form={createForm} layout="vertical" onFinish={handleCreateBacklogTask}
-          style={{ marginTop: 8 }} initialValues={{ priority: TaskPriority.MEDIUM }}>
-          <Form.Item name="title" label="Tiêu đề" rules={[{ required: true, message: 'Vui lòng nhập tiêu đề!' }]}>
-            <Input placeholder="Tiêu đề task" maxLength={200} />
-          </Form.Item>
-          <Form.Item name="description" label="Mô tả">
-            <Input.TextArea rows={3} placeholder="Mô tả chi tiết..." maxLength={2000} />
-          </Form.Item>
-          <Form.Item name="priority" label="Mức ưu tiên">
-            <Select options={[
-              { label: <Tag color="green">Thấp</Tag>, value: TaskPriority.LOW },
-              { label: <Tag color="blue">Trung bình</Tag>, value: TaskPriority.MEDIUM },
-              { label: <Tag color="orange">Cao</Tag>, value: TaskPriority.HIGH },
-              { label: <Tag color="red">Khẩn cấp</Tag>, value: TaskPriority.URGENT },
-            ]} />
-          </Form.Item>
-          <Form.Item name="dueDate" label="Hạn chót">
-            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-          </Form.Item>
-          <Space>
-            <Button type="primary" htmlType="submit" loading={createSaving}>Tạo task</Button>
-            <Button onClick={() => setCreateBacklogModal(false)}>Hủy</Button>
-          </Space>
-        </Form>
-      </Modal>
-
-      {/* Modal đưa task vào Board */}
-      <Modal title={<Space><ArrowRightOutlined />Đưa vào Board</Space>}
-        open={!!moveModalTask}
-        onCancel={() => { setMoveModalTask(null); setSelectedBoardId(undefined); setSelectedColumnId(undefined); }}
-        onOk={handleMoveToBoard} okText="Đưa vào Board" cancelText="Hủy"
-        okButtonProps={{ disabled: !selectedColumnId, loading: moveLoading }} destroyOnHidden>
-        <div style={{ marginBottom: 12 }}>
-          <Text type="secondary">Task: </Text>
-          <Tag style={{ fontFamily: 'monospace' }}>{moveModalTask?.taskKey}</Tag>
-          <Text strong>{moveModalTask?.title}</Text>
-        </div>
-        <Form layout="vertical">
-          <Form.Item label="Bảng Kanban">
-            <Select value={selectedBoardId}
-              onChange={(v) => { setSelectedBoardId(v); setSelectedColumnId(undefined); }}
-              placeholder="Chọn bảng"
-              options={boards.map((b) => ({ label: b.name, value: b.id }))} />
-          </Form.Item>
-          <Form.Item label="Cột">
-            <Select value={selectedColumnId} onChange={setSelectedColumnId}
-              placeholder="Chọn cột" disabled={!selectedBoardId}
-              options={(boards.find((b) => b.id === selectedBoardId)?.columns ?? []).map((c) => ({ label: c.name, value: c.id }))} />
-          </Form.Item>
-        </Form>
-      </Modal>
-
       {/* Modal Sprint */}
       <Modal
         title={<Space><ThunderboltOutlined />{editSprint ? 'Sửa Sprint' : 'Tạo Sprint'}</Space>}
@@ -1651,74 +1286,6 @@ const ProjectDetailPage: React.FC = () => {
           <Space>
             <Button type="primary" htmlType="submit" loading={sprintSaving}>{editSprint ? 'Cập nhật' : 'Tạo Sprint'}</Button>
             <Button onClick={() => { setSprintModal(false); setEditSprint(null); }}>Hủy</Button>
-          </Space>
-        </Form>
-      </Modal>
-
-      {/* Modal Thêm Backlog vào Sprint */}
-      <Modal
-        title={<Space><ThunderboltOutlined />Thêm task vào Sprint</Space>}
-        open={addToSprintModal}
-        onCancel={() => { setAddToSprintModal(false); setAddToSprintId(undefined); }}
-        onOk={handleAddBacklogToSprint}
-        okText={`Thêm ${backlogSelected.length} task`}
-        cancelText="Hủy"
-        okButtonProps={{ disabled: !addToSprintId || backlogSelected.length === 0, loading: addToSprintLoading }}
-        destroyOnHidden>
-        <div style={{ marginBottom: 12 }}>
-          <Text type="secondary">Đã chọn <Text strong>{backlogSelected.length}</Text> task từ Backlog</Text>
-        </div>
-        <Form layout="vertical">
-          <Form.Item label="Chọn Sprint" required>
-            <Select
-              value={addToSprintId}
-              onChange={setAddToSprintId}
-              placeholder="Chọn sprint để thêm task vào"
-              options={sprints
-                .filter(s => s.status !== 'COMPLETED')
-                .map(s => ({
-                  label: <Space>
-                    <Tag color={s.status === 'ACTIVE' ? 'blue' : 'default'} style={{ margin: 0 }}>{s.status === 'ACTIVE' ? 'Đang chạy' : 'Kế hoạch'}</Tag>
-                    {s.name}
-                  </Space>,
-                  value: s.id,
-                }))}
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* Modal Version */}
-      <Modal
-        title={<Space><FlagOutlined />{editVersion ? 'Sửa Version' : 'Tạo Version'}</Space>}
-        open={versionModal} onCancel={() => { setVersionModal(false); setEditVersion(null); }}
-        footer={null} destroyOnHidden>
-        <Form form={versionForm} layout="vertical" onFinish={handleSaveVersion} style={{ marginTop: 8 }}
-          initialValues={{ status: VersionStatus.OPEN }}>
-          <Form.Item name="name" label="Tên Version" rules={[{ required: true }]}>
-            <Input placeholder="VD: v1.0.0" />
-          </Form.Item>
-          <Form.Item name="description" label="Mô tả">
-            <Input.TextArea rows={2} placeholder="Mô tả version..." />
-          </Form.Item>
-          <Form.Item name="status" label="Trạng thái">
-            <Select options={[
-              { label: 'Đang mở', value: VersionStatus.OPEN },
-              { label: 'Đã khóa', value: VersionStatus.LOCKED },
-              { label: 'Đã đóng', value: VersionStatus.CLOSED },
-            ]} />
-          </Form.Item>
-          <Space style={{ width: '100%' }}>
-            <Form.Item name="dueDate" label="Ngày dự kiến release" style={{ flex: 1 }}>
-              <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-            </Form.Item>
-            <Form.Item name="releaseDate" label="Ngày release thực tế" style={{ flex: 1 }}>
-              <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-            </Form.Item>
-          </Space>
-          <Space>
-            <Button type="primary" htmlType="submit" loading={versionSaving}>{editVersion ? 'Cập nhật' : 'Tạo Version'}</Button>
-            <Button onClick={() => { setVersionModal(false); setEditVersion(null); }}>Hủy</Button>
           </Space>
         </Form>
       </Modal>

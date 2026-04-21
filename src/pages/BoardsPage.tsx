@@ -407,12 +407,6 @@ const BoardsPage: React.FC = () => {
     try { await deleteColumn(colId); message.success('Đã xóa cột'); }
     catch (e: any) { message.error(e.message || 'Xóa cột thất bại'); }
   };
-  const handleMoveColumn = async (colId: string, fromIndex: number, direction: 'left' | 'right') => {
-    const newPosition = direction === 'left' ? fromIndex - 1 : fromIndex + 1;
-    try { await moveColumn(colId, newPosition); }
-    catch { message.error('Di chuyển cột thất bại'); }
-  };
-
   // ── Add Task ────────────────────────────────────────────────
   const openAddTask = (col: KanbanColumn) => { setTargetColumn(col); taskForm.resetFields(); setTaskModalOpen(true); };
   const handleTaskSubmit = async (values: any) => {

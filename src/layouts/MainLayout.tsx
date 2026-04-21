@@ -12,15 +12,18 @@ import {
   TeamOutlined,
   BellOutlined,
   SettingOutlined,
-  AppstoreOutlined,
   SunOutlined,
   MoonOutlined,
   SafetyCertificateOutlined,
+  PartitionOutlined,
+  ArrowLeftOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useThemeStore } from '../stores/themeStore';
+import { useProjectStore } from '../stores/projectStore';
 import { websocketService } from '../services/websocketService';
 import NotificationDropdown from '../components/NotificationDropdown';
 
@@ -40,9 +43,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const { user, logout, isAdmin, checkAdminAccess } = useAuthStore();
   const { fetchUnreadCount, fetchNotifications } = useNotificationStore();
   const { isDark, toggle: toggleTheme } = useThemeStore();
+  const { currentProject, setCurrentProject } = useProjectStore();
   const [notifApi, notifContextHolder] = notification.useNotification();
 
-  // Responsive: track mobile breakpoint
+  // Detect active project tab from URL
+  const searchParams = new URLSearchParams(location.search);
+  const activeProjectTab = searchParams.get('tab') || 'tasks';
+
+  const isInProject = !!currentProject;
+
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
@@ -53,7 +62,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Apply dark class to <html> for CSS variables
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
   }, [isDark]);
@@ -76,9 +84,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       },
     });
 
-    return () => {
-      websocketService.disconnect();
-    };
+    return () => { websocketService.disconnect(); };
   }, []);
 
   const handleLogout = async () => {
@@ -86,7 +92,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     navigate('/login');
   };
 
-  // Dynamic colors based on theme
   const siderBg = isDark ? '#141414' : '#ffffff';
   const siderBorder = isDark ? '#303030' : '#eef0f6';
   const headerBg = isDark ? '#1f1f1f' : '#ffffff';
@@ -95,44 +100,38 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const iconHoverBg = isDark ? 'rgba(67,97,238,0.15)' : '#f0f2ff';
   const userTextColor = isDark ? '#e0e0e0' : '#1a1a2e';
   const userBottomBorder = isDark ? '#2a2a2a' : '#eef0f6';
-  const contentBg = isDark ? '#1f1f1f' : '#ffffff';
-  const contentShadow = isDark ? '0 1px 3px rgba(0,0,0,0.4)' : '0 1px 3px rgba(0,0,0,0.06)';
+  const contentBg = isDark ? '#141414' : '#f5f6fa';
 
   const navTo = (path: string) => {
     navigate(path);
     if (isMobile) setMobileDrawerOpen(false);
   };
 
-  const navItems = [
+  // ── Global nav items ──
+  const globalNavItems = [
     {
       key: '/dashboard',
       icon: <BarChartOutlined />,
       label: 'Dashboard',
-      onClick: () => navTo('/dashboard'),
+      onClick: () => { navTo('/dashboard'); setCurrentProject(null); },
     },
     {
       key: '/projects',
       icon: <FolderOutlined />,
       label: 'Dự án',
-      onClick: () => navTo('/projects'),
+      onClick: () => { navTo('/projects'); setCurrentProject(null); },
     },
     {
       key: '/tasks',
       icon: <CheckSquareOutlined />,
-      label: 'Đầu việc',
-      onClick: () => navTo('/tasks'),
-    },
-    {
-      key: '/boards',
-      icon: <TableOutlined />,
-      label: 'Bảng Kanban',
-      onClick: () => navTo('/boards'),
+      label: 'Đầu việc của tôi',
+      onClick: () => { navTo('/tasks'); setCurrentProject(null); },
     },
     {
       key: '/time-report',
-      icon: <BarChartOutlined />,
+      icon: <ClockCircleOutlined />,
       label: 'Báo cáo giờ',
-      onClick: () => navTo('/time-report'),
+      onClick: () => { navTo('/time-report'); setCurrentProject(null); },
     },
     ...(isAdmin ? [
       { type: 'divider' as const },
@@ -150,6 +149,47 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       },
     ] : []),
   ];
+
+  // ── Project nav items ──
+  const projectNavItems = currentProject ? [
+    {
+      key: 'tasks',
+      icon: <CheckSquareOutlined />,
+      label: 'Đầu việc',
+      onClick: () => navTo(`/projects/${currentProject.id}?tab=tasks`),
+    },
+    {
+      key: 'sprints',
+      icon: <TableOutlined />,
+      label: 'Sprints',
+      onClick: () => navTo(`/projects/${currentProject.id}?tab=sprints`),
+    },
+    {
+      key: 'members',
+      icon: <TeamOutlined />,
+      label: 'Thành viên',
+      onClick: () => navTo(`/projects/${currentProject.id}?tab=members`),
+    },
+    {
+      key: 'gantt',
+      icon: <PartitionOutlined />,
+      label: 'Gantt Chart',
+      onClick: () => navTo(`/projects/${currentProject.id}?tab=gantt`),
+    },
+    {
+      key: 'activity',
+      icon: <ClockCircleOutlined />,
+      label: 'Hoạt động',
+      onClick: () => navTo(`/projects/${currentProject.id}?tab=activity`),
+    },
+    { type: 'divider' as const },
+    {
+      key: 'settings',
+      icon: <SettingOutlined />,
+      label: 'Cài đặt dự án',
+      onClick: () => navTo(`/projects/${currentProject.id}?tab=settings`),
+    },
+  ] : [];
 
   const userMenuItems = [
     {
@@ -169,44 +209,33 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   ];
 
   const initials = (user?.fullName || user?.username || 'U')
-    .split(' ')
-    .map(w => w[0])
-    .slice(-2)
-    .join('')
-    .toUpperCase();
+    .split(' ').map(w => w[0]).slice(-2).join('').toUpperCase();
 
   const iconBtnStyle: React.CSSProperties = {
-    width: 38,
-    height: 38,
+    width: 36,
+    height: 36,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
+    borderRadius: 8,
     cursor: 'pointer',
     color: iconColor,
-    fontSize: 17,
-    transition: 'background 0.2s, color 0.2s',
+    fontSize: 16,
+    transition: 'background 0.2s',
     flexShrink: 0,
   };
 
-  const sidebarVisible = isMobile ? mobileDrawerOpen : true;
   const sidebarLeft = isMobile ? (mobileDrawerOpen ? 0 : -240) : 0;
+  const projectColor = currentProject?.color || '#4361ee';
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
       {notifContextHolder}
 
-      {/* ─── Mobile overlay backdrop ─── */}
       {isMobile && mobileDrawerOpen && (
-        <div
-          onClick={() => setMobileDrawerOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.45)',
-            zIndex: 199,
-          }}
-        />
+        <div onClick={() => setMobileDrawerOpen(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 199,
+        }} />
       )}
 
       {/* ─── Sidebar ─── */}
@@ -214,12 +243,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         trigger={null}
         collapsible
         collapsed={isMobile ? false : collapsed}
-        width={240}
-        className="app-sider"
+        width={220}
         style={{
           background: siderBg,
           borderRight: `1px solid ${siderBorder}`,
-          boxShadow: '2px 0 8px rgba(0,0,0,0.06)',
           position: 'fixed',
           left: sidebarLeft,
           top: 0,
@@ -227,169 +254,195 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           zIndex: 200,
           overflow: 'hidden',
           transition: 'left 0.25s ease, background 0.3s',
-          display: sidebarVisible || !isMobile ? 'flex' : undefined,
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        {/* Logo */}
-        <div style={{
-          height: 64,
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 16px',
-          gap: 10,
-          borderBottom: `1px solid ${siderBorder}`,
-          overflow: 'hidden',
-        }}>
-          <img
-            src="/logo.png"
-            alt="logo"
-            style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, objectFit: 'cover' }}
-          />
-          {(isMobile || !collapsed) && (
-            <span style={{
-              fontSize: 18, fontWeight: 700, whiteSpace: 'nowrap',
-              background: 'linear-gradient(135deg, #4361ee, #7c3aed)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}>
-              Taskoryx
-            </span>
+        {/* ── Project mode: header dự án ── */}
+        {isInProject ? (
+          <div style={{
+            borderBottom: `1px solid ${siderBorder}`,
+            overflow: 'hidden',
+          }}>
+            {/* Back button */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '12px 16px 8px',
+                cursor: 'pointer',
+                color: iconColor,
+                fontSize: 12,
+              }}
+              onClick={() => { setCurrentProject(null); navTo('/projects'); }}
+            >
+              <ArrowLeftOutlined style={{ fontSize: 11 }} />
+              <span>Tất cả dự án</span>
+            </div>
+
+            {/* Project identity */}
+            <div style={{ padding: '8px 16px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                background: projectColor,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontWeight: 700, fontSize: 14,
+              }}>
+                {currentProject.name.charAt(0).toUpperCase()}
+              </div>
+              {!collapsed && (
+                <div style={{ minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 13, fontWeight: 600,
+                    color: isDark ? '#e0e0e0' : '#1a1a2e',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {currentProject.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: iconColor }}>{currentProject.key}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* ── Global mode: logo ── */
+          <div style={{
+            height: 56,
+            display: 'flex', alignItems: 'center',
+            padding: '0 16px', gap: 10,
+            borderBottom: `1px solid ${siderBorder}`,
+          }}>
+            <img src="/logo.png" alt="logo" style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, objectFit: 'cover' }} />
+            {(isMobile || !collapsed) && (
+              <span style={{
+                fontSize: 16, fontWeight: 700, whiteSpace: 'nowrap',
+                background: 'linear-gradient(135deg, #4361ee, #7c3aed)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+              }}>
+                Taskoryx
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* ── Nav menu ── */}
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+          {isInProject ? (
+            <Menu
+              mode="inline"
+              selectedKeys={[activeProjectTab]}
+              items={projectNavItems}
+              theme={isDark ? 'dark' : 'light'}
+              style={{ background: 'transparent', border: 'none', padding: '8px 6px' }}
+            />
+          ) : (
+            <Menu
+              mode="inline"
+              selectedKeys={[location.pathname]}
+              items={globalNavItems}
+              theme={isDark ? 'dark' : 'light'}
+              style={{ background: 'transparent', border: 'none', padding: '8px 6px' }}
+            />
           )}
         </div>
 
-        {/* Navigation – flex: 1 để đẩy user section xuống đáy */}
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-          <Menu
-            mode="inline"
-            selectedKeys={[location.pathname]}
-            items={navItems}
-            theme={isDark ? 'dark' : 'light'}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '12px 8px',
-            }}
-            className="app-menu"
-          />
-        </div>
-
-        {/* User section at bottom */}
+        {/* ── User section ── */}
         {(isMobile || !collapsed) ? (
           <div style={{
-            padding: '12px 16px',
+            padding: '10px 14px',
             borderTop: `1px solid ${userBottomBorder}`,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
+            display: 'flex', alignItems: 'center', gap: 8,
           }}>
-            <Avatar
-              src={user?.avatarUrl}
-              style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)', flexShrink: 0 }}
-              size={36}
-            >
+            <Avatar src={user?.avatarUrl} style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)', flexShrink: 0 }} size={32}>
               {initials}
             </Avatar>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <Text strong style={{ fontSize: 13, display: 'block' }} ellipsis>
+              <Text strong style={{ fontSize: 12, display: 'block' }} ellipsis>
                 {user?.fullName || user?.username}
               </Text>
-              <Text type="secondary" style={{ fontSize: 11 }} ellipsis>
-                {user?.email}
-              </Text>
+              <Text type="secondary" style={{ fontSize: 11 }} ellipsis>{user?.email}</Text>
             </div>
             <Tooltip title="Hồ sơ">
-              <SettingOutlined
-                style={{ color: iconColor, cursor: 'pointer', flexShrink: 0 }}
-                onClick={() => navigate('/profile')}
-              />
+              <SettingOutlined style={{ color: iconColor, cursor: 'pointer', fontSize: 14 }} onClick={() => navigate('/profile')} />
             </Tooltip>
           </div>
         ) : (
-          <div style={{
-            padding: '12px 0',
-            display: 'flex',
-            justifyContent: 'center',
-            borderTop: `1px solid ${userBottomBorder}`,
-          }}>
-            <Avatar
-              src={user?.avatarUrl}
-              style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)' }}
-              size={32}
-            >
-              {initials}
-            </Avatar>
+          <div style={{ padding: '10px 0', display: 'flex', justifyContent: 'center', borderTop: `1px solid ${userBottomBorder}` }}>
+            <Avatar src={user?.avatarUrl} style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)' }} size={28}>{initials}</Avatar>
           </div>
         )}
       </Sider>
 
       {/* ─── Main area ─── */}
       <Layout style={{
-        marginLeft: isMobile ? 0 : (collapsed ? 80 : 240),
+        marginLeft: isMobile ? 0 : (collapsed ? 80 : 220),
         transition: 'margin-left 0.2s',
+        background: contentBg,
+        minHeight: '100vh',
       }}>
         {/* Header */}
         <Header style={{
           background: headerBg,
           borderBottom: `1px solid ${headerBorder}`,
-          boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
           padding: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          height: 64,
+          height: 52,
           position: 'sticky',
           top: 0,
           zIndex: 100,
           transition: 'background 0.3s',
+          lineHeight: '52px',
         }}>
-          {/* Toggle */}
-          <div
-            onClick={() => isMobile ? setMobileDrawerOpen(!mobileDrawerOpen) : setCollapsed(!collapsed)}
-            style={{ ...iconBtnStyle, marginLeft: 16 }}
-            onMouseEnter={e => (e.currentTarget.style.background = iconHoverBg)}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            {(isMobile ? mobileDrawerOpen : !collapsed) ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 12 }}>
+            <div
+              onClick={() => isMobile ? setMobileDrawerOpen(!mobileDrawerOpen) : setCollapsed(!collapsed)}
+              style={iconBtnStyle}
+              onMouseEnter={e => (e.currentTarget.style.background = iconHoverBg)}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              {(isMobile ? mobileDrawerOpen : !collapsed) ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
+            </div>
+
+            {/* Breadcrumb */}
+            {isInProject && currentProject && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                <span
+                  style={{ color: iconColor, cursor: 'pointer' }}
+                  onClick={() => { setCurrentProject(null); navTo('/projects'); }}
+                >
+                  Dự án
+                </span>
+                <span style={{ color: isDark ? '#555' : '#ccc' }}>/</span>
+                <span style={{ fontWeight: 600, color: isDark ? '#e0e0e0' : '#1a1a2e' }}>
+                  {currentProject.name}
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Right actions */}
-          <div style={{ paddingRight: isMobile ? 8 : 20, display: 'flex', alignItems: 'center', gap: 4 }}>
-            {/* Dark / Light toggle */}
+          <div style={{ paddingRight: isMobile ? 8 : 16, display: 'flex', alignItems: 'center', gap: 2 }}>
             <Tooltip title={isDark ? 'Chế độ sáng' : 'Chế độ tối'}>
-              <div
-                onClick={toggleTheme}
-                style={iconBtnStyle}
+              <div onClick={toggleTheme} style={iconBtnStyle}
                 onMouseEnter={e => (e.currentTarget.style.background = iconHoverBg)}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                 {isDark ? <SunOutlined style={{ color: '#f59e0b' }} /> : <MoonOutlined />}
               </div>
             </Tooltip>
 
             <NotificationDropdown />
 
-            {/* User menu */}
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '5px 10px',
-                  borderRadius: 10,
-                  cursor: 'pointer',
-                  transition: 'background 0.2s',
-                  marginLeft: 4,
-                }}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                padding: '4px 10px', borderRadius: 8, cursor: 'pointer', transition: 'background 0.2s',
+              }}
                 onMouseEnter={e => (e.currentTarget.style.background = iconHoverBg)}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                <Avatar
-                  src={user?.avatarUrl}
-                  size={32}
-                  style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)', flexShrink: 0 }}
-                >
+                <Avatar src={user?.avatarUrl} size={28} style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)', flexShrink: 0 }}>
                   {initials}
                 </Avatar>
                 {!isMobile && (
@@ -404,15 +457,21 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
         {/* Content */}
         <Content style={{
-          margin: isMobile ? 8 : 20,
-          padding: isMobile ? 16 : 24,
+          flex: 1,
           background: contentBg,
-          borderRadius: isMobile ? 8 : 16,
-          boxShadow: contentShadow,
-          minHeight: 'calc(100vh - 104px)',
-          transition: 'background 0.3s',
+          minHeight: 'calc(100vh - 52px)',
+          overflow: 'auto',
         }}>
-          {children}
+          {/* Nếu đang trong project: bỏ padding để full-width như Jira */}
+          {isInProject ? (
+            <div style={{ padding: '16px 20px' }}>
+              {children}
+            </div>
+          ) : (
+            <div style={{ padding: isMobile ? 12 : '20px 24px' }}>
+              {children}
+            </div>
+          )}
         </Content>
       </Layout>
     </Layout>

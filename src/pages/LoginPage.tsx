@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Form, Input, Button, Typography, message, Alert, Steps } from 'antd';
 import {
   UserOutlined, LockOutlined, SafetyCertificateOutlined,
-  AppstoreOutlined, CheckCircleFilled,
+  CheckCircleFilled,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';

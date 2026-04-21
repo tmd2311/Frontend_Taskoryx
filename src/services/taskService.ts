@@ -12,6 +12,7 @@ import type {
   CreateCommentRequest,
   UpdateCommentRequest,
   Attachment,
+  GanttTask,
 } from '../types';
 
 export const taskService = {
@@ -145,5 +146,11 @@ export const taskService = {
   /** DELETE /attachments/:id */
   deleteAttachment: async (attachmentId: string): Promise<void> => {
     await api.delete(`/attachments/${attachmentId}`);
+  },
+
+  /** GET /projects/:projectId/gantt – Tasks có ngày để hiển thị Gantt */
+  getGantt: async (projectId: string): Promise<GanttTask[]> => {
+    const response: any = await api.get(`/projects/${projectId}/gantt`);
+    return response.data ?? response;
   },
 };

@@ -73,16 +73,22 @@ const ProjectCard: React.FC<{
   onDelete: (id: string) => void;
 }> = ({ project, isAdmin, currentUserId, onDelete }) => {
   const navigate = useNavigate();
+  const { setCurrentProject } = useProjectStore();
   const color = project.color || '#1890ff';
   const initial = project.name.charAt(0).toUpperCase();
   const canDelete = isAdmin || project.ownerId === currentUserId || project.currentUserRole === 'OWNER';
+
+  const handleProjectClick = () => {
+    setCurrentProject(project);
+    navigate(`/projects/${project.id}`);
+  };
 
   return (
     <Card
       hoverable
       styles={{ body: { padding: 0 } }}
       style={{ borderRadius: 8, overflow: 'hidden', height: '100%', cursor: 'pointer' }}
-      onClick={() => navigate(`/projects/${project.id}`)}
+      onClick={handleProjectClick}
     >
       {/* Color bar + icon */}
       <div

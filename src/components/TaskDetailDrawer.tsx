@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Drawer, Button, Tag, Space, Typography, Spin, Form, Input, Select,
   DatePicker, Popconfirm, Divider, Descriptions, message, Avatar, Badge,
@@ -22,8 +22,7 @@ import { checklistService } from '../services/checklistService';
 import { timeTrackingService } from '../services/timeTrackingService';
 import { dependencyService } from '../services/dependencyService';
 import { watcherService } from '../services/watcherService';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import RichTextEditor from './RichTextEditor';
 import AuthImage from './AuthImage';
 import { downloadAttachment } from '../utils/attachment';
 import type {
@@ -148,7 +147,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
 
           {editing ? (
             <div>
-              <ReactQuill
+              <RichTextEditor
                 value={editContent}
                 onChange={setEditContent}
                 modules={{ toolbar: [['bold', 'italic', 'underline'], [{ list: 'ordered' }, { list: 'bullet' }], ['link'], ['clean']] }}
@@ -1318,7 +1317,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                   <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setReplyTo(null)} />
                 </div>
               )}
-              <ReactQuill
+              <RichTextEditor
                 value={commentContent}
                 onChange={setCommentContent}
                 placeholder={replyTo

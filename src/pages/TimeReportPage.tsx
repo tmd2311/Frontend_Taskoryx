@@ -5,12 +5,12 @@ import {
 } from 'antd';
 import {
   ClockCircleOutlined, CalendarOutlined, ReloadOutlined, UserOutlined,
-  BarChartOutlined, LineChartOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line, CartesianGrid, PieChart, Pie, Cell, Legend,
+  LineChart, Line, CartesianGrid, PieChart, Pie, Cell,
 } from 'recharts';
 import { timeTrackingService } from '../services/timeTrackingService';
 import { projectService } from '../services/projectService';
@@ -41,7 +41,7 @@ const DailyBarChart: React.FC<{ data: DailyTimeStats[] }> = ({ data }) => {
         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
         <YAxis unit="h" tick={{ fontSize: 11 }} />
         <Tooltip
-          formatter={(v: number) => [`${v}h`, 'Giờ làm']}
+          formatter={(v: any) => [`${v}h`, 'Giờ làm']}
           labelFormatter={(label, payload) => payload?.[0]?.payload?.label || label}
         />
         <Bar dataKey="hours" fill="#4361ee" radius={[4, 4, 0, 0]} maxBarSize={40} />
@@ -62,7 +62,7 @@ const WeeklyBarChart: React.FC<{ data: WeeklyTimeStats[] }> = ({ data }) => {
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
         <YAxis unit="h" tick={{ fontSize: 11 }} />
-        <Tooltip formatter={(v: number) => [`${v}h`, 'Giờ làm']} />
+        <Tooltip formatter={(v: any) => [`${v}h`, 'Giờ làm']} />
         <Bar dataKey="hours" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
       </BarChart>
     </ResponsiveContainer>
@@ -81,7 +81,7 @@ const MonthlyLineChart: React.FC<{ data: MonthlyTimeStats[] }> = ({ data }) => {
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
         <YAxis unit="h" tick={{ fontSize: 11 }} />
-        <Tooltip formatter={(v: number) => [`${v}h`, 'Giờ làm']} />
+        <Tooltip formatter={(v: any) => [`${v}h`, 'Giờ làm']} />
         <Line type="monotone" dataKey="hours" stroke="#4361ee" strokeWidth={2} dot={{ r: 3 }} />
       </LineChart>
     </ResponsiveContainer>
@@ -94,12 +94,12 @@ const ProjectPieChart: React.FC<{ data: TimeStatsByProject[] }> = ({ data }) => 
   return (
     <ResponsiveContainer width="100%" height={220}>
       <PieChart>
-        <Pie data={chartData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+        <Pie data={chartData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={(props: any) => `${props.name} ${((props.percent ?? 0) * 100).toFixed(0)}%`}>
           {chartData.map((_, i) => (
             <Cell key={i} fill={COLORS[i % COLORS.length]} />
           ))}
         </Pie>
-        <Tooltip formatter={(v: number) => [`${v}h`, 'Giờ làm']} />
+        <Tooltip formatter={(v: any) => [`${v}h`, 'Giờ làm']} />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -189,9 +189,6 @@ const TimeReportPage: React.FC = () => {
     { title: 'Tổng giờ', dataIndex: 'formattedHours', width: 100 },
     { title: 'Số entry', dataIndex: 'entryCount', width: 80 },
   ];
-
-  const start = dateRange[0].format('YYYY-MM-DD');
-  const end = dateRange[1].format('YYYY-MM-DD');
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>

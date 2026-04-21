@@ -162,7 +162,7 @@ const TasksPage: React.FC = () => {
   } = useTaskStore();
 
   const { projects, fetchProjects } = useProjectStore();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const [view, setView] = useState<'list' | 'backlog'>('backlog');
