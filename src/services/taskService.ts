@@ -91,6 +91,14 @@ export const taskService = {
     return response.data ?? response;
   },
 
+  /** GET /projects/:projectId/tasks?sprintId= – Tất cả task trong sprint */
+  getTasksBySprint: async (projectId: string, sprintId: string): Promise<SpringPage<TaskSummary>> => {
+    const response: any = await api.get(`/projects/${projectId}/tasks`, {
+      params: { sprintId, size: 200, sortBy: 'position', sortDir: 'asc' },
+    });
+    return response.data ?? response;
+  },
+
   /** GET /projects/:projectId/backlog – Task chưa vào board */
   getBacklog: async (projectId: string): Promise<TaskSummary[]> => {
     const response: any = await api.get(`/projects/${projectId}/backlog`);
@@ -151,6 +159,14 @@ export const taskService = {
   /** GET /projects/:projectId/gantt – Tasks có ngày để hiển thị Gantt */
   getGantt: async (projectId: string): Promise<GanttTask[]> => {
     const response: any = await api.get(`/projects/${projectId}/gantt`);
+    return response.data ?? response;
+  },
+
+  /** GET /projects/:projectId/tasks/valid-parents – Danh sách task hợp lệ làm task cha */
+  getValidParentTasks: async (projectId: string, excludeTaskId?: string): Promise<TaskSummary[]> => {
+    const response: any = await api.get(`/projects/${projectId}/tasks/valid-parents`, {
+      params: excludeTaskId ? { excludeTaskId } : {},
+    });
     return response.data ?? response;
   },
 };

@@ -15,25 +15,22 @@ import {
   Badge,
   Tooltip,
   Avatar,
-  Collapse,
-  Empty,
-  Segmented,
 } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   ExclamationCircleOutlined,
-  UnorderedListOutlined,
-  AppstoreOutlined,
   UserOutlined,
-  CaretRightOutlined,
+  ApartmentOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useTaskStore } from '../stores/taskStore';
 import { useProjectStore } from '../stores/projectStore';
+import { taskService } from '../services/taskService';
+import { sprintService } from '../services/sprintService';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import type { TaskSummary, CreateTaskRequest, UpdateTaskRequest } from '../types';
+import type { Sprint, TaskSummary, CreateTaskRequest, UpdateTaskRequest } from '../types';
 import { TaskPriority } from '../types';
 import dayjs from 'dayjs';
 
@@ -53,99 +50,35 @@ const PRIORITY_LABEL: Record<string, string> = {
   [TaskPriority.URGENT]: 'Khẩn cấp',
 };
 
-// ─── Backlog row ──────────────────────────────────────────────
-const BacklogRow: React.FC<{
-  task: TaskSummary;
-  onOpen: (taskKey: string) => void;
-  onDelete: (id: string) => void;
-}> = ({ task, onOpen, onDelete }) => (
-  <div
-    onClick={() => onOpen(task.taskKey)}
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
-      padding: '7px 12px',
-      borderBottom: '1px solid #f5f5f5',
-      cursor: 'pointer',
-      transition: 'background .12s',
-    }}
-    onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = '#fafafa')}
-    onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.background = 'transparent')}
-  >
-    {/* Key */}
-    <Tag style={{ fontFamily: 'monospace', fontSize: 11, margin: 0, flexShrink: 0 }}>
-      {task.taskKey}
-    </Tag>
+const STATUS_COLOR: Record<string, string> = {
+  TODO: 'default',
+  IN_PROGRESS: 'processing',
+  IN_REVIEW: 'warning',
+  RESOLVED: 'cyan',
+  DONE: 'success',
+  CANCELLED: 'error',
+};
+const STATUS_LABEL: Record<string, string> = {
+  TODO: 'Chưa làm',
+  IN_PROGRESS: 'Đang làm',
+  IN_REVIEW: 'Đang review',
+  RESOLVED: 'Đã giải quyết',
+  DONE: 'Hoàn thành',
+  CANCELLED: 'Đã hủy',
+};
 
-    {/* Title */}
-    <span style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-      {task.title}
-    </span>
-
-    {/* Priority */}
-    <Tag color={PRIORITY_COLOR[task.priority]} style={{ margin: 0, fontSize: 11, flexShrink: 0 }}>
-      {PRIORITY_LABEL[task.priority]}
-    </Tag>
-
-    {/* Due date */}
-    {task.dueDate ? (
-      <Tooltip title={`Hạn: ${dayjs(task.dueDate).format('DD/MM/YYYY')}`}>
-        <span
-          style={{
-            fontSize: 11,
-            color: task.overdue ? '#f5222d' : '#8c8c8c',
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 3,
-          }}
-        >
-          {task.overdue && <ExclamationCircleOutlined />}
-          {dayjs(task.dueDate).format('DD/MM')}
-        </span>
-      </Tooltip>
-    ) : (
-      <span style={{ width: 40, flexShrink: 0 }} />
-    )}
-
-    {/* Assignee */}
-    <Tooltip title={task.assigneeName ?? 'Chưa giao'}>
-      <Avatar
-        size={22}
-        src={task.assigneeAvatar}
-        icon={<UserOutlined />}
-        style={{ flexShrink: 0, opacity: task.assigneeName ? 1 : 0.3 }}
-      />
-    </Tooltip>
-
-    {/* Counts */}
-    {(task.commentCount > 0 || task.attachmentCount > 0) && (
-      <Text type="secondary" style={{ fontSize: 11, flexShrink: 0 }}>
-        {task.commentCount > 0 && `💬${task.commentCount}`}
-        {task.attachmentCount > 0 && ` 📎${task.attachmentCount}`}
-      </Text>
-    )}
-
-    {/* Delete */}
-    <Popconfirm
-      title="Xóa task này?"
-      onConfirm={(e) => { e?.stopPropagation(); onDelete(task.id); }}
-      okText="Xóa"
-      cancelText="Hủy"
-      okButtonProps={{ danger: true }}
-    >
-      <Button
-        type="text"
-        size="small"
-        danger
-        icon={<DeleteOutlined />}
-        style={{ flexShrink: 0, opacity: 0.5 }}
-        onClick={(e) => e.stopPropagation()}
-      />
-    </Popconfirm>
-  </div>
-);
+// Flatten cây task (task cha + subTasks đệ quy) thành mảng phẳng giữ thứ tự
+function flattenTree(tasks: TaskSummary[]): TaskSummary[] {
+  const result: TaskSummary[] = [];
+  const walk = (nodes: TaskSummary[]) => {
+    nodes.forEach((t) => {
+      result.push(t);
+      if (t.subTasks?.length) walk(t.subTasks);
+    });
+  };
+  walk(tasks);
+  return result;
+}
 
 // ─── TasksPage ────────────────────────────────────────────────
 const TasksPage: React.FC = () => {
@@ -165,21 +98,25 @@ const TasksPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const [view, setView] = useState<'list' | 'backlog'>('backlog');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskSummary | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [form] = Form.useForm();
 
-  // Collapse state: mặc định mở tất cả nhóm
-  const [openGroups, setOpenGroups] = useState<string[]>([]);
+  // Parent task selector state
+  const [parentCandidates, setParentCandidates] = useState<TaskSummary[]>([]);
+  const [parentLoading, setParentLoading] = useState(false);
+
+  // Sprint selector state
+  const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [sprintsLoading, setSprintsLoading] = useState(false);
 
   useEffect(() => {
     fetchMyTasks();
     fetchProjects();
   }, []);
 
-  // Redirect từ URL param ?openTask=<taskId> (từ notification click) → /tasks/:taskKey
+  // Redirect từ URL param ?openTask=<taskId> → /tasks/:taskKey
   useEffect(() => {
     const taskId = searchParams.get('openTask');
     if (!taskId) return;
@@ -192,39 +129,71 @@ const TasksPage: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // Map projectKey → project để lấy màu & tên
-  const projectByKey = useMemo(() => {
-    const map: Record<string, { name: string; color: string; id: string }> = {};
-    projects.forEach((p) => {
-      map[p.key] = { name: p.name, color: p.color || '#1890ff', id: p.id };
-    });
-    return map;
-  }, [projects]);
+  // API /tasks/my trả về flat list (không có subTasks lồng)
+  // Dùng parentTaskId để tự build cây rồi flatten theo thứ tự cha → con
+  const flatTasks = useMemo(() => {
+    const byId: Record<string, TaskSummary> = {};
+    myTasks.forEach((t) => { byId[t.id] = t; });
 
-  // Group tasks theo project key prefix từ taskKey (VD: "PROJ-12" → "PROJ")
-  const grouped = useMemo(() => {
-    const map: Record<string, TaskSummary[]> = {};
+    // Nếu API đã trả về subTasks lồng sẵn trong task cha, dùng luôn
+    const hasTree = myTasks.some((t) => (t.subTasks?.length ?? 0) > 0);
+    if (hasTree) return flattenTree(myTasks);
+
+    // Ngược lại tự build từ parentTaskId
+    const childrenOf: Record<string, TaskSummary[]> = {};
     myTasks.forEach((t) => {
-      const key = t.taskKey?.split('-')[0] ?? 'KHÁC';
-      if (!map[key]) map[key] = [];
-      map[key].push(t);
+      if (t.parentTaskId && byId[t.parentTaskId]) {
+        if (!childrenOf[t.parentTaskId]) childrenOf[t.parentTaskId] = [];
+        childrenOf[t.parentTaskId].push(t);
+      }
     });
-    return map;
+    const roots = myTasks.filter((t) => !t.parentTaskId || !byId[t.parentTaskId]);
+    const walk = (node: TaskSummary): TaskSummary[] => [
+      node,
+      ...(childrenOf[node.id] ?? []).flatMap(walk),
+    ];
+    return roots.flatMap(walk);
   }, [myTasks]);
-
-  // Set mở tất cả nhóm khi data load xong
-  useEffect(() => {
-    setOpenGroups(Object.keys(grouped));
-  }, [Object.keys(grouped).join(',')]);
 
   // ── Handlers ────────────────────────────────────────────────
 
-  const handleOpenCreate = (projectId?: string) => {
+  const loadParentCandidates = async (projId: string, editingTaskId?: string) => {
+    if (!projId) { setParentCandidates([]); return; }
+    setParentLoading(true);
+    try {
+      const candidates = await taskService.getValidParentTasks(projId, editingTaskId);
+      setParentCandidates(Array.isArray(candidates) ? candidates : []);
+    } catch {
+      setParentCandidates([]);
+    } finally {
+      setParentLoading(false);
+    }
+  };
+
+  const loadSprints = async (projId: string) => {
+    if (!projId) { setSprints([]); return; }
+    setSprintsLoading(true);
+    try {
+      const data = await sprintService.getSprints(projId);
+      setSprints(Array.isArray(data) ? data : []);
+    } catch {
+      setSprints([]);
+    } finally {
+      setSprintsLoading(false);
+    }
+  };
+
+  const handleOpenCreate = async (projectId?: string) => {
     setEditingTask(null);
     setCurrentTask(null);
     form.resetFields();
+    const pid = projectId || selectedProjectId;
     if (projectId) setSelectedProjectId(projectId);
     setIsModalOpen(true);
+    if (pid) {
+      loadParentCandidates(pid);
+      loadSprints(pid);
+    }
   };
 
   const handleEdit = async (record: TaskSummary) => {
@@ -241,7 +210,11 @@ const TasksPage: React.FC = () => {
         priority: currentTask.priority,
         assigneeId: currentTask.assigneeId,
         dueDate: currentTask.dueDate ? dayjs(currentTask.dueDate) : null,
+        parentTaskId: currentTask.parentTaskId ?? null,
       });
+      if (currentTask.projectId) {
+        loadParentCandidates(currentTask.projectId, currentTask.id);
+      }
     }
   }, [currentTask]);
 
@@ -249,36 +222,52 @@ const TasksPage: React.FC = () => {
     try {
       const dueDate = values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined;
       if (editingTask) {
-        await updateTask(editingTask.id, {
+        const updatePayload: UpdateTaskRequest = {
           title: values.title,
           description: values.description,
           priority: values.priority,
           assigneeId: values.assigneeId,
           dueDate,
-        } as UpdateTaskRequest);
+        };
+        if (values.parentTaskId) {
+          updatePayload.parentTaskId = values.parentTaskId;
+        } else {
+          updatePayload.clearParent = !!currentTask?.parentTaskId;
+        }
+        await updateTask(editingTask.id, updatePayload);
         message.success('Cập nhật task thành công!');
       } else {
-        await createTask(selectedProjectId, {
+        const createPayload: CreateTaskRequest = {
           title: values.title,
           description: values.description,
           priority: values.priority,
+          sprintId: values.sprintId,
           dueDate,
-        } as CreateTaskRequest);
+        };
+        if (values.parentTaskId) createPayload.parentTaskId = values.parentTaskId;
+        await createTask(selectedProjectId, createPayload);
         message.success('Tạo task thành công!');
         await fetchMyTasks();
       }
       setIsModalOpen(false);
       form.resetFields();
       setEditingTask(null);
+      setParentCandidates([]);
     } catch (error: any) {
-      message.error(error.message || 'Thao tác thất bại');
+      const msg = error?.response?.data?.message || error.message || 'Thao tác thất bại';
+      message.error(msg);
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (record: TaskSummary) => {
     try {
-      await deleteTask(id);
-      message.success('Đã xóa task');
+      await deleteTask(record.id);
+      message.success(
+        record.subTasks?.length
+          ? `Đã xóa task và ${record.subTasks.length} subtask`
+          : 'Đã xóa task'
+      );
+      await fetchMyTasks();
     } catch (error: any) {
       message.error(error.message || 'Xóa thất bại');
     }
@@ -289,33 +278,59 @@ const TasksPage: React.FC = () => {
     form.resetFields();
     setEditingTask(null);
     setCurrentTask(null);
+    setParentCandidates([]);
   };
 
-  // ── Cột bảng danh sách ────────────────────────────────────
+  // ── Cột bảng ─────────────────────────────────────────────────
   const columns: ColumnsType<TaskSummary> = [
     {
       title: 'Mã',
       dataIndex: 'taskKey',
       key: 'taskKey',
-      width: 100,
-      render: (key: string) => <Tag style={{ fontFamily: 'monospace' }}>{key}</Tag>,
+      width: 110,
+      render: (key: string, record) => (
+        <Space size={4}>
+          {(record.depth ?? 1) > 1 && (
+            <span style={{ color: '#bfbfbf', fontSize: 11 }}>{'  ↳'.repeat((record.depth ?? 1) - 1)}</span>
+          )}
+          <Tag style={{ fontFamily: 'monospace', fontSize: 11, margin: 0 }}>{key}</Tag>
+        </Space>
+      ),
     },
     {
       title: 'Tiêu đề',
       dataIndex: 'title',
       key: 'title',
-      width: '35%',
+      width: '30%',
+      render: (title: string, record) => (
+        <span style={{ paddingLeft: ((record.depth ?? 1) - 1) * 16 }}>
+          {title}
+        </span>
+      ),
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 130,
+      render: (s: string) => (
+        <Tag color={STATUS_COLOR[s] as any} style={{ fontSize: 11 }}>
+          {STATUS_LABEL[s] ?? s}
+        </Tag>
+      ),
     },
     {
       title: 'Ưu tiên',
       dataIndex: 'priority',
       key: 'priority',
+      width: 100,
       render: (p: string) => <Tag color={PRIORITY_COLOR[p]}>{PRIORITY_LABEL[p] ?? p}</Tag>,
     },
     {
       title: 'Hạn chót',
       dataIndex: 'dueDate',
       key: 'dueDate',
+      width: 120,
       render: (date: string, record) => {
         if (!date) return <Text type="secondary">—</Text>;
         return (
@@ -332,8 +347,12 @@ const TasksPage: React.FC = () => {
       title: 'Người thực hiện',
       dataIndex: 'assigneeName',
       key: 'assigneeName',
-      render: (name?: string) => name ? (
-        <Space size={6}><Avatar size={20} icon={<UserOutlined />} />{name}</Space>
+      width: 150,
+      render: (name?: string, record?: TaskSummary) => name ? (
+        <Space size={6}>
+          <Avatar size={20} src={record?.assigneeAvatar} icon={<UserOutlined />} />
+          {name}
+        </Space>
       ) : <Text type="secondary">—</Text>,
     },
     {
@@ -356,101 +375,28 @@ const TasksPage: React.FC = () => {
       width: 90,
       render: (_, record) => (
         <Space>
-          <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+          <Tooltip title="Chỉnh sửa">
+            <Button type="link" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); handleEdit(record); }} />
+          </Tooltip>
           <Popconfirm
-            title="Xóa task này?"
-            onConfirm={() => handleDelete(record.id)}
+            title={
+              record.subTasks?.length
+                ? `Task này có ${record.subTasks.length} subtask. Xóa sẽ xóa luôn tất cả subtask!`
+                : 'Xóa task này?'
+            }
+            onConfirm={(e) => { e?.stopPropagation(); handleDelete(record); }}
             okText="Xóa"
             cancelText="Hủy"
             okButtonProps={{ danger: true }}
           >
-            <Button type="link" danger icon={<DeleteOutlined />} />
+            <Button type="link" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()} />
           </Popconfirm>
         </Space>
       ),
     },
   ];
 
-  // ── Backlog collapse items ────────────────────────────────
-  const collapseItems = Object.entries(grouped).map(([projKey, tasks]) => {
-    const proj = projectByKey[projKey];
-    const overdueCnt = tasks.filter((t) => t.overdue).length;
-
-    return {
-      key: projKey,
-      label: (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {/* Thanh màu dự án */}
-          <span
-            style={{
-              width: 12,
-              height: 12,
-              borderRadius: 3,
-              background: proj?.color ?? '#1890ff',
-              flexShrink: 0,
-              display: 'inline-block',
-            }}
-          />
-          <Text strong style={{ fontSize: 14 }}>
-            {proj?.name ?? projKey}
-          </Text>
-          <Tag style={{ fontFamily: 'monospace', fontSize: 11 }}>{projKey}</Tag>
-          <Badge count={tasks.length} color={proj?.color ?? '#1890ff'} />
-          {overdueCnt > 0 && (
-            <Badge count={`${overdueCnt} quá hạn`} color="#f5222d" />
-          )}
-        </div>
-      ),
-      children: (
-        <div style={{ background: '#fff', borderRadius: 6, overflow: 'hidden', border: '1px solid #f0f0f0' }}>
-          {/* Header hàng */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '5px 12px',
-              background: '#fafafa',
-              borderBottom: '1px solid #f0f0f0',
-            }}
-          >
-            <Text type="secondary" style={{ fontSize: 11, width: 70 }}>Mã</Text>
-            <Text type="secondary" style={{ fontSize: 11, flex: 1 }}>Tiêu đề</Text>
-            <Text type="secondary" style={{ fontSize: 11, width: 80 }}>Ưu tiên</Text>
-            <Text type="secondary" style={{ fontSize: 11, width: 50 }}>Hạn</Text>
-            <Text type="secondary" style={{ fontSize: 11, width: 30 }}>Giao</Text>
-            <span style={{ width: 80 }} />
-          </div>
-
-          {/* Task rows */}
-          {tasks.map((t) => (
-            <BacklogRow
-              key={t.id}
-              task={t}
-              onOpen={(taskKey) => navigate(`/tasks/${taskKey}`)}
-              onDelete={handleDelete}
-            />
-          ))}
-
-          {/* Nút thêm task */}
-          <div style={{ padding: '6px 12px' }}>
-            <Button
-              type="text"
-              size="small"
-              icon={<PlusOutlined />}
-              style={{ color: '#8c8c8c', fontSize: 13 }}
-              onClick={() => proj && handleOpenCreate(proj.id)}
-              disabled={!proj}
-            >
-              Thêm task vào {proj?.name ?? projKey}
-            </Button>
-          </div>
-        </div>
-      ),
-    };
-  });
-
-  const totalOverdue = myTasks.filter((t) => t.overdue).length;
+  const totalOverdue = flatTasks.filter((t) => t.overdue).length;
 
   return (
     <div>
@@ -459,7 +405,7 @@ const TasksPage: React.FC = () => {
         <div>
           <Title level={3} style={{ margin: 0 }}>Đầu việc của tôi</Title>
           <Space size={8} style={{ marginTop: 4 }}>
-            <Text type="secondary">{myTasks.length} task</Text>
+            <Text type="secondary">{flatTasks.length} task</Text>
             {totalOverdue > 0 && (
               <Tag color="red" icon={<ExclamationCircleOutlined />}>
                 {totalOverdue} quá hạn
@@ -468,62 +414,39 @@ const TasksPage: React.FC = () => {
           </Space>
         </div>
 
-        <Space wrap>
-          <Segmented
-            value={view}
-            onChange={(v) => setView(v as 'list' | 'backlog')}
-            options={[
-              { label: 'Danh sách', value: 'list', icon: <UnorderedListOutlined /> },
-              { label: 'Backlog', value: 'backlog', icon: <AppstoreOutlined /> },
-            ]}
-          />
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => handleOpenCreate()}
-            disabled={projects.length === 0}
-          >
-            Tạo task
-          </Button>
-        </Space>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => handleOpenCreate()}
+          disabled={projects.length === 0}
+        >
+          Tạo task
+        </Button>
       </div>
 
-      {/* ── Backlog view ────────────────────────────────────── */}
-      {view === 'backlog' ? (
-        myTasks.length === 0 && !isLoading ? (
-          <Empty description="Không có task nào được giao cho bạn" />
-        ) : (
-          <Collapse
-            activeKey={openGroups}
-            onChange={(keys) => setOpenGroups(keys as string[])}
-            expandIcon={({ isActive }) => (
-              <CaretRightOutlined rotate={isActive ? 90 : 0} />
-            )}
-            style={{ background: 'transparent' }}
-            items={collapseItems}
-          />
-        )
-      ) : (
-        /* ── List view ─────────────────────────────────────── */
-        <Table
-          columns={columns}
-          dataSource={myTasks}
-          rowKey="id"
-          loading={isLoading}
-          pagination={{ pageSize: 15, showSizeChanger: false }}
-          locale={{ emptyText: 'Không có task nào được giao cho bạn' }}
-          scroll={{ x: 'max-content' }}
-          rowClassName={(r) => r.overdue ? 'row-overdue' : ''}
-          onRow={(record) => ({
-            onClick: (e) => {
-              const target = e.target as HTMLElement;
-              if (target.closest('button') || target.closest('.ant-btn') || target.closest('.ant-popconfirm')) return;
-              navigate(`/tasks/${record.taskKey}`);
-            },
-            style: { cursor: 'pointer' },
-          })}
-        />
-      )}
+      <Table
+        columns={columns}
+        dataSource={flatTasks}
+        rowKey="id"
+        loading={isLoading}
+        pagination={{ pageSize: 20, showSizeChanger: false }}
+        locale={{ emptyText: 'Không có task nào được giao cho bạn' }}
+        scroll={{ x: 'max-content' }}
+        rowClassName={(r) => {
+          const classes = [];
+          if (r.overdue) classes.push('row-overdue');
+          if ((r.depth ?? 1) > 1) classes.push('row-subtask');
+          return classes.join(' ');
+        }}
+        onRow={(record) => ({
+          onClick: (e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('button') || target.closest('.ant-btn') || target.closest('.ant-popconfirm')) return;
+            navigate(`/tasks/${record.taskKey}`);
+          },
+          style: { cursor: 'pointer' },
+        })}
+      />
 
       {/* Modal tạo/sửa task */}
       <Modal
@@ -540,21 +463,34 @@ const TasksPage: React.FC = () => {
               <Select
                 placeholder="Chọn dự án"
                 value={selectedProjectId || undefined}
-                onChange={setSelectedProjectId}
+                onChange={(id) => {
+                  setSelectedProjectId(id);
+                  form.setFieldValue('parentTaskId', null);
+                  form.setFieldValue('sprintId', null);
+                  loadParentCandidates(id);
+                  loadSprints(id);
+                }}
                 options={projects.map((p) => ({ label: `[${p.key}] ${p.name}`, value: p.id }))}
               />
             </Form.Item>
           )}
+
           <Form.Item
             name="title"
             label="Tiêu đề"
-            rules={[{ required: true, message: 'Vui lòng nhập tiêu đề task!' }]}
+            rules={[
+              { required: true, message: 'Vui lòng nhập tiêu đề task!' },
+              { max: 500, message: 'Tiêu đề không vượt quá 500 ký tự' },
+              { whitespace: true, message: 'Tiêu đề không được chỉ có khoảng trắng' },
+            ]}
           >
-            <Input placeholder="Tiêu đề task" autoFocus />
+            <Input placeholder="Tiêu đề task" autoFocus maxLength={500} />
           </Form.Item>
+
           <Form.Item name="description" label="Mô tả">
-            <TextArea rows={3} placeholder="Mô tả chi tiết (tùy chọn)" />
+            <TextArea rows={3} placeholder="Mô tả chi tiết (tùy chọn)" maxLength={5000} />
           </Form.Item>
+
           <Form.Item name="priority" label="Mức ưu tiên" initialValue={TaskPriority.MEDIUM}>
             <Select
               options={[
@@ -565,9 +501,55 @@ const TasksPage: React.FC = () => {
               ]}
             />
           </Form.Item>
+
           <Form.Item name="dueDate" label="Hạn chót">
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
+
+          {/* Sprint – bắt buộc khi tạo task mới */}
+          {!editingTask && selectedProjectId && (
+            <Form.Item
+              name="sprintId"
+              label="Sprint"
+              rules={[{ required: true, message: 'Vui lòng chọn sprint!' }]}
+            >
+              <Select
+                loading={sprintsLoading}
+                placeholder={sprintsLoading ? 'Đang tải...' : 'Chọn sprint'}
+                options={sprints.map((s) => ({ label: s.name, value: s.id }))}
+              />
+            </Form.Item>
+          )}
+
+          {/* Task cha */}
+          {(selectedProjectId || editingTask) && (
+            <Form.Item
+              name="parentTaskId"
+              label={
+                <Space size={4}>
+                  <ApartmentOutlined />
+                  Task cha
+                </Space>
+              }
+              extra="Để trống = task gốc (cấp 1)"
+            >
+              <Select
+                allowClear
+                showSearch
+                loading={parentLoading}
+                placeholder={parentLoading ? 'Đang tải...' : 'Không chọn = task gốc'}
+                optionFilterProp="label"
+                filterOption={(input, option) =>
+                  String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                options={parentCandidates.map((t) => ({
+                  label: `[${t.taskKey}] ${t.title}`,
+                  value: t.id,
+                }))}
+              />
+            </Form.Item>
+          )}
+
           <Form.Item style={{ marginBottom: 0 }}>
             <Space>
               <Button
@@ -584,9 +566,10 @@ const TasksPage: React.FC = () => {
         </Form>
       </Modal>
 
-
       <style>{`
         .row-overdue td { background: #fff2f0 !important; }
+        .row-subtask td { background: #fafcff !important; }
+        .row-subtask:hover td { background: #f0f5ff !important; }
       `}</style>
     </div>
   );

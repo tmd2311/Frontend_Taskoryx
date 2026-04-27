@@ -8,12 +8,11 @@ import {
 import {
   CheckSquareOutlined, TeamOutlined, ExclamationCircleOutlined,
   UserOutlined, CommentOutlined, PaperClipOutlined, SearchOutlined, ReloadOutlined,
-  UserAddOutlined, DeleteOutlined, PlusOutlined, InboxOutlined,
+  UserAddOutlined, DeleteOutlined, PlusOutlined,
   ThunderboltOutlined, AppstoreAddOutlined, HistoryOutlined,
   PlayCircleOutlined, CheckCircleOutlined, EditOutlined,
-  DownloadOutlined, TableOutlined, AppstoreOutlined, UnorderedListOutlined,
+  DownloadOutlined, TableOutlined,
 } from '@ant-design/icons';
-import SprintKanbanView from '../components/SprintKanbanView';
 import type { ColumnsType } from 'antd/es/table';
 import { useProjectStore } from '../stores/projectStore';
 import { useTaskStore } from '../stores/taskStore';
@@ -27,10 +26,14 @@ import { searchService } from '../services/searchService';
 import { useAuthStore } from '../stores/authStore';
 import type {
   TaskSummary, ProjectMember, Sprint, IssueCategory, ActivityLog, GanttTask,
+  CreateTaskRequest,
 } from '../types';
 import { TaskPriority, ProjectRole, TaskStatus, SprintStatus } from '../types';
 import StatusSelect from '../components/StatusSelect';
+import SprintKanbanView from '../components/SprintKanbanView';
 import dayjs from 'dayjs';
+
+const { TextArea } = Input;
 
 const { Text } = Typography;
 
@@ -48,6 +51,15 @@ const DEFAULT_ROLE_OPTIONS = [
   { label: 'Lập trình viên', value: ProjectRole.DEVELOPER },
   { label: 'Người xem', value: ProjectRole.VIEWER },
 ];
+const TASK_STATUS_COLUMNS: { status: TaskStatus; label: string; color: string }[] = [
+  { status: TaskStatus.TODO,        label: 'Cần làm',        color: '#8c8c8c' },
+  { status: TaskStatus.IN_PROGRESS, label: 'Đang làm',       color: '#1890ff' },
+  { status: TaskStatus.IN_REVIEW,   label: 'Đang review',    color: '#fa8c16' },
+  { status: TaskStatus.RESOLVED,    label: 'Đã giải quyết',  color: '#722ed1' },
+  { status: TaskStatus.DONE,        label: 'Hoàn thành',     color: '#52c41a' },
+  { status: TaskStatus.CANCELLED,   label: 'Đã hủy',         color: '#f5222d' },
+];
+
 const SPRINT_STATUS_COLOR: Record<string, string> = {
   PLANNED: 'default', ACTIVE: 'blue', COMPLETED: 'green', CANCELLED: 'red',
 };
@@ -157,18 +169,13 @@ const ProjectDetailPage: React.FC = () => {
   const [editSprint, setEditSprint] = useState<Sprint | null>(null);
   const [sprintForm] = Form.useForm();
   const [sprintSaving, setSprintSaving] = useState(false);
-  // Sprint tasks
-  const [sprintBacklogs, setSprintBacklogs] = useState<Record<string, TaskSummary[]>>({});
-  const [sprintBacklogLoading, setSprintBacklogLoading] = useState<Record<string, boolean>>({});
   const [expandedSprints, setExpandedSprints] = useState<Record<string, boolean>>({});
-  // Sprint view mode: 'list' | 'kanban'
-  const [sprintViewMode, setSprintViewMode] = useState<Record<string, 'list' | 'kanban'>>({});
-  // Add task to sprint
-  const [addTaskSprintId, setAddTaskSprintId] = useState<string | null>(null);
-  const [backlogForSprint, setBacklogForSprint] = useState<TaskSummary[]>([]);
-  const [backlogForSprintLoading, setBacklogForSprintLoading] = useState(false);
-  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
-  const [addingTasks, setAddingTasks] = useState(false);
+  // key để force remount SprintKanbanView khi cần reload
+  const [kanbanKeys, setKanbanKeys] = useState<Record<string, number>>({});
+  // Create task in sprint modal
+  const [createTaskSprintId, setCreateTaskSprintId] = useState<string | null>(null);
+  const [createTaskForm] = Form.useForm();
+  const [creatingTask, setCreatingTask] = useState(false);
   // Complete sprint flow
   const [completeSprintId, setCompleteSprintId] = useState<string | null>(null);
   const [incompleteTasksForSprint, setIncompleteTasksForSprint] = useState<TaskSummary[]>([]);
@@ -397,83 +404,55 @@ const ProjectDetailPage: React.FC = () => {
     }
   };
 
-  // Tải task đang trong sprint (sprint backlog)
-  const fetchSprintBacklog = async (sprintId: string) => {
-    setSprintBacklogLoading((prev) => ({ ...prev, [sprintId]: true }));
-    try {
-      const tasks = await sprintService.getBacklog(sprintId);
-      setSprintBacklogs((prev) => ({ ...prev, [sprintId]: tasks }));
-    } catch { /* im lặng */ } finally {
-      setSprintBacklogLoading((prev) => ({ ...prev, [sprintId]: false }));
-    }
+  // Reload kanban của sprint bằng cách tăng key
+  const refreshKanban = (sprintId: string) => {
+    setKanbanKeys(prev => ({ ...prev, [sprintId]: (prev[sprintId] ?? 0) + 1 }));
   };
 
-  // Toggle mở/đóng danh sách task của sprint
-  const toggleSprintExpand = (sprintId: string) => {
-    const next = !expandedSprints[sprintId];
-    setExpandedSprints((prev) => ({ ...prev, [sprintId]: next }));
-    if (next && !sprintBacklogs[sprintId]) {
-      fetchSprintBacklog(sprintId);
-    }
-  };
-
-  // Mở modal thêm task vào sprint
-  const openAddTaskToSprint = async (sprintId: string) => {
-    setAddTaskSprintId(sprintId);
-    setSelectedTaskIds([]);
-    setBacklogForSprintLoading(true);
+  // Tạo task mới trực tiếp vào sprint
+  const handleCreateTaskInSprint = async (values: any) => {
+    if (!createTaskSprintId || !projectId) return;
+    setCreatingTask(true);
     try {
-      // Lấy Product Backlog để chọn task
-      const tasks = await taskService.getBacklog(projectId!);
-      setBacklogForSprint(Array.isArray(tasks) ? tasks : (tasks as any).content ?? []);
-    } catch { setBacklogForSprint([]); } finally {
-      setBacklogForSprintLoading(false);
-    }
-  };
-
-  // Thêm các task đã chọn vào sprint
-  const handleAddTasksToSprint = async () => {
-    if (!addTaskSprintId || selectedTaskIds.length === 0) return;
-    setAddingTasks(true);
-    try {
-      await Promise.all(
-        selectedTaskIds.map((taskId) =>
-          sprintService.addTask(addTaskSprintId, { taskId })
-        )
-      );
-      message.success(`Đã thêm ${selectedTaskIds.length} task vào sprint`);
-      setAddTaskSprintId(null);
-      setSelectedTaskIds([]);
-      fetchSprintBacklog(addTaskSprintId);
+      const payload: CreateTaskRequest = {
+        title: values.title,
+        description: values.description,
+        priority: values.priority ?? TaskPriority.MEDIUM,
+        status: values.status ?? TaskStatus.TODO,
+        sprintId: createTaskSprintId,
+        dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
+      };
+      await taskService.createTask(projectId, payload);
+      message.success('Đã tạo task và thêm vào sprint');
+      createTaskForm.resetFields();
+      const sid = createTaskSprintId;
+      setCreateTaskSprintId(null);
+      refreshKanban(sid);
+      fetchSprints();
     } catch (e: any) {
-      message.error(e.message || 'Thêm task thất bại');
+      message.error(e.message || 'Tạo task thất bại');
     } finally {
-      setAddingTasks(false);
+      setCreatingTask(false);
     }
   };
 
-  // Gỡ task khỏi sprint
-  const handleRemoveTaskFromSprint = async (sprintId: string, taskId: string) => {
-    try {
-      await sprintService.removeTask(sprintId, taskId);
-      message.success('Đã gỡ task khỏi sprint');
-      fetchSprintBacklog(sprintId);
-    } catch (e: any) {
-      message.error(e.message || 'Gỡ task thất bại');
-    }
-  };
-
-  // Hoàn thành sprint – kiểm tra task chưa xong
+  // Hoàn thành sprint – kiểm tra task chưa xong (load từ API)
   const handleCompleteSprint = async (sprint: Sprint) => {
-    const tasks = sprintBacklogs[sprint.id] || [];
-    const incomplete = tasks.filter(
-      (t) => !['DONE', 'RESOLVED', 'CANCELLED'].includes(t.status)
-    );
-    if (incomplete.length > 0) {
-      setCompleteSprintId(sprint.id);
-      setIncompleteTasksForSprint(incomplete);
-      return; // mở modal xử lý task chưa xong
-    }
+    if (!projectId) return;
+    try {
+      const page = await taskService.getTasksBySprint(projectId, sprint.id);
+      const flatten = (tasks: TaskSummary[]): TaskSummary[] =>
+        tasks.flatMap(t => [t, ...flatten(t.subTasks ?? [])]);
+      const all = flatten(page.content ?? []);
+      const incomplete = all.filter(
+        (t) => !['DONE', 'RESOLVED', 'CANCELLED'].includes(t.status)
+      );
+      if (incomplete.length > 0) {
+        setCompleteSprintId(sprint.id);
+        setIncompleteTasksForSprint(incomplete);
+        return;
+      }
+    } catch { /* ignore */ }
     // Không có task chưa xong → complete luôn
     await doCompleteSprint(sprint.id);
   };
@@ -493,8 +472,8 @@ const ProjectDetailPage: React.FC = () => {
     }
   };
 
-  // Đưa tất cả task chưa xong về backlog rồi complete sprint
-  const handleCompleteAndMoveToBacklog = async () => {
+  // Gỡ tất cả task chưa xong khỏi sprint rồi complete
+  const handleCompleteAndMoveTasks = async () => {
     if (!completeSprintId) return;
     setCompleteSprintLoading(true);
     try {
@@ -751,13 +730,8 @@ const ProjectDetailPage: React.FC = () => {
                       const isActive = sprint.status === SprintStatus.ACTIVE;
                       const isCompleted = sprint.status === SprintStatus.COMPLETED;
                       const expanded = expandedSprints[sprint.id];
-                      const sprintTasks = sprintBacklogs[sprint.id] || [];
-                      const backlogLoading = sprintBacklogLoading[sprint.id];
-                      const done = sprintTasks.filter(t => ['DONE','RESOLVED','CANCELLED'].includes(t.status)).length;
-                      const inProgress = sprintTasks.filter(t => t.status === 'IN_PROGRESS').length;
-                      const todo = sprintTasks.filter(t => ['TODO','OPEN'].includes(t.status)).length;
-                      const total = sprint.taskCount ?? sprintTasks.length;
-                      const completed = sprint.completedTaskCount ?? done;
+                      const total = sprint.taskCount ?? 0;
+                      const completed = sprint.completedTaskCount ?? 0;
                       const pct = total > 0 ? Math.round(completed / total * 100) : 0;
                       const isOverdue = isActive && sprint.endDate && dayjs().isAfter(dayjs(sprint.endDate));
 
@@ -801,7 +775,10 @@ const ProjectDetailPage: React.FC = () => {
                                   <Button size="small" icon={<CheckCircleOutlined />} onClick={() => handleCompleteSprint(sprint)}>Hoàn thành Sprint</Button>
                                 )}
                                 {!isCompleted && (
-                                  <Button size="small" icon={<PlusOutlined />} onClick={() => openAddTaskToSprint(sprint.id)}>Thêm task</Button>
+                                  <Button size="small" icon={<PlusOutlined />} type="primary" ghost
+                                    onClick={() => { createTaskForm.resetFields(); setCreateTaskSprintId(sprint.id); }}>
+                                    Thêm task
+                                  </Button>
                                 )}
                                 <Button size="small" icon={<EditOutlined />}
                                   onClick={() => {
@@ -839,10 +816,10 @@ const ProjectDetailPage: React.FC = () => {
                                     <Statistic title="Tổng" value={total} valueStyle={{ fontSize: 18 }} />
                                   </Col>
                                   <Col span={6}>
-                                    <Statistic title="Cần làm" value={todo} valueStyle={{ fontSize: 18, color: '#8c8c8c' }} />
+                                    <Statistic title="Chưa xong" value={total - completed} valueStyle={{ fontSize: 18, color: '#8c8c8c' }} />
                                   </Col>
                                   <Col span={6}>
-                                    <Statistic title="Đang làm" value={inProgress} valueStyle={{ fontSize: 18, color: '#1890ff' }} />
+                                    <Statistic title="Tiến độ" value={`${pct}%`} valueStyle={{ fontSize: 18, color: '#1890ff' }} />
                                   </Col>
                                   <Col span={6}>
                                     <Statistic title="Hoàn thành" value={completed} valueStyle={{ fontSize: 18, color: '#52c41a' }} />
@@ -869,99 +846,22 @@ const ProjectDetailPage: React.FC = () => {
                               </div>
                             )}
 
-                            {/* Toggle Sprint Backlog + chuyển view */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }}
-                                onClick={() => toggleSprintExpand(sprint.id)}>
-                                {expanded ? '▲ Ẩn Sprint Backlog' : `▼ Sprint Backlog${total > 0 ? ` (${total} task)` : ''}`}
-                              </Button>
-                              {expanded && (
-                                <Space size={4}>
-                                  <Tooltip title="Xem dạng danh sách">
-                                    <Button
-                                      size="small"
-                                      type={(sprintViewMode[sprint.id] ?? 'list') === 'list' ? 'primary' : 'default'}
-                                      icon={<UnorderedListOutlined />}
-                                      onClick={() => setSprintViewMode(p => ({ ...p, [sprint.id]: 'list' }))}
-                                    />
-                                  </Tooltip>
-                                  <Tooltip title="Xem dạng Kanban">
-                                    <Button
-                                      size="small"
-                                      type={(sprintViewMode[sprint.id] ?? 'list') === 'kanban' ? 'primary' : 'default'}
-                                      icon={<AppstoreOutlined />}
-                                      onClick={() => setSprintViewMode(p => ({ ...p, [sprint.id]: 'kanban' }))}
-                                    />
-                                  </Tooltip>
-                                </Space>
-                              )}
-                            </div>
+                            {/* Toggle danh sách task */}
+                            <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }}
+                              onClick={() => setExpandedSprints(prev => ({ ...prev, [sprint.id]: !prev[sprint.id] }))}>
+                              {expanded ? '▲ Ẩn task' : `▼ Xem task${total > 0 ? ` (${total})` : ''}`}
+                            </Button>
 
-                            {/* Sprint Backlog task list / Kanban */}
+                            {/* Kanban board với kéo thả */}
                             {expanded && (
-                              <div style={{ marginTop: 10 }}>
-                                {(sprintViewMode[sprint.id] ?? 'list') === 'kanban' ? (
-                                  /* ─── Kanban view ─── */
-                                  <SprintKanbanView
-                                    sprintId={sprint.id}
-                                    onOpenTask={(taskKey) => navigate(`/tasks/${taskKey}`)}
-                                    onRefreshStats={() => fetchSprints()}
-                                  />
-                                ) : (
-                                  /* ─── List view ─── */
-                                  backlogLoading ? (
-                                    <div style={{ textAlign: 'center', padding: 16 }}><Spin size="small" /></div>
-                                  ) : sprintTasks.length === 0 ? (
-                                    <div style={{ textAlign: 'center', padding: '16px 0', color: '#8c8c8c', fontSize: 12, border: '1px dashed #d9d9d9', borderRadius: 6 }}>
-                                      Sprint Backlog trống — nhấn "Thêm task" để thêm từ Product Backlog
-                                    </div>
-                                  ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                      {/* Header row */}
-                                      <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 90px 160px 28px 28px', gap: 8, padding: '4px 10px', fontSize: 11, color: '#8c8c8c', fontWeight: 600, background: '#fafafa', borderRadius: 4 }}>
-                                        <span>Mã</span><span>Tiêu đề</span><span>Ưu tiên</span><span>Trạng thái</span><span></span><span></span>
-                                      </div>
-                                      {sprintTasks.map((t) => (
-                                        <div key={t.id} style={{
-                                          display: 'grid',
-                                          gridTemplateColumns: '90px 1fr 90px 160px 28px 28px',
-                                          gap: 8,
-                                          padding: '6px 10px',
-                                          background: '#fff',
-                                          borderRadius: 4,
-                                          border: '1px solid #f0f0f0',
-                                          alignItems: 'center',
-                                          borderLeft: `3px solid ${t.status === 'DONE' || t.status === 'RESOLVED' ? '#52c41a' : t.status === 'IN_PROGRESS' ? '#1890ff' : '#d9d9d9'}`,
-                                        }}>
-                                          <Tag style={{ fontFamily: 'monospace', margin: 0, fontSize: 11 }}>{t.taskKey}</Tag>
-                                          <Button type="link" style={{ padding: 0, textAlign: 'left', height: 'auto', fontWeight: 400, fontSize: 13, overflow: 'hidden' }}
-                                            onClick={() => navigate(`/tasks/${t.taskKey}`)}>
-                                            <Text ellipsis={{ tooltip: t.title }} style={{ maxWidth: '100%' }}>{t.title}</Text>
-                                          </Button>
-                                          <Tag color={PRIORITY_COLOR[t.priority]} style={{ margin: 0, fontSize: 11 }}>{PRIORITY_LABEL[t.priority]}</Tag>
-                                          <StatusSelect value={t.status} size="small"
-                                            onChange={async (s) => {
-                                              try {
-                                                await taskService.updateStatus(t.id, { status: s as TaskStatus });
-                                                fetchSprintBacklog(sprint.id);
-                                              } catch { /* ignore */ }
-                                            }} />
-                                          {t.assigneeName ? (
-                                            <Tooltip title={t.assigneeName}>
-                                              <Avatar size={20} icon={<UserOutlined />} />
-                                            </Tooltip>
-                                          ) : <span />}
-                                          <Popconfirm title="Gỡ task khỏi sprint?"
-                                            onConfirm={() => handleRemoveTaskFromSprint(sprint.id, t.id)}
-                                            okText="Gỡ" cancelText="Hủy" okButtonProps={{ danger: true }}>
-                                            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                                          </Popconfirm>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )
-                                )}
-                              </div>
+                              <SprintKanbanView
+                                key={`${sprint.id}-${kanbanKeys[sprint.id] ?? 0}`}
+                                projectId={projectId!}
+                                sprintId={sprint.id}
+                                allSprints={sprints}
+                                onOpenTask={(taskKey) => navigate(`/tasks/${taskKey}`)}
+                                onRefreshStats={() => fetchSprints()}
+                              />
                             )}
                           </div>
                         </Card>
@@ -970,51 +870,57 @@ const ProjectDetailPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Modal thêm task vào sprint */}
+                {/* Modal tạo task mới trong sprint */}
                 <Modal
-                  title={<Space><InboxOutlined />Thêm task vào Sprint từ Product Backlog</Space>}
-                  open={!!addTaskSprintId}
-                  onCancel={() => { setAddTaskSprintId(null); setSelectedTaskIds([]); }}
-                  onOk={handleAddTasksToSprint}
-                  okText={`Thêm (${selectedTaskIds.length})`}
+                  title={<Space><PlusOutlined />Tạo task trong Sprint: <Text strong>{sprints.find(s => s.id === createTaskSprintId)?.name}</Text></Space>}
+                  open={!!createTaskSprintId}
+                  onCancel={() => { setCreateTaskSprintId(null); createTaskForm.resetFields(); }}
+                  onOk={() => createTaskForm.submit()}
+                  okText="Tạo task"
                   cancelText="Hủy"
-                  okButtonProps={{ disabled: selectedTaskIds.length === 0, loading: addingTasks }}
-                  width={600}
+                  okButtonProps={{ loading: creatingTask }}
+                  width={520}
                   destroyOnHidden
                 >
-                  {backlogForSprintLoading ? (
-                    <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-                  ) : backlogForSprint.length === 0 ? (
-                    <Empty description="Product Backlog trống – tạo task mới trước" />
-                  ) : (
-                    <div>
-                      <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                        Chọn task từ Product Backlog để thêm vào sprint:
-                      </Text>
-                      <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {backlogForSprint.map((t) => {
-                          const checked = selectedTaskIds.includes(t.id);
-                          return (
-                            <div key={t.id}
-                              onClick={() => setSelectedTaskIds(prev =>
-                                checked ? prev.filter(id => id !== t.id) : [...prev, t.id]
-                              )}
-                              style={{
-                                display: 'flex', alignItems: 'center', gap: 8,
-                                padding: '8px 12px', borderRadius: 6, cursor: 'pointer',
-                                background: checked ? '#e6f7ff' : '#fafafa',
-                                border: `1px solid ${checked ? '#1890ff' : '#f0f0f0'}`,
-                              }}>
-                              <input type="checkbox" checked={checked} readOnly style={{ cursor: 'pointer' }} />
-                              <Tag style={{ fontFamily: 'monospace', margin: 0, fontSize: 11 }}>{t.taskKey}</Tag>
-                              <Text style={{ flex: 1, fontSize: 13 }}>{t.title}</Text>
-                              <Tag color={PRIORITY_COLOR[t.priority]} style={{ margin: 0, fontSize: 11 }}>{PRIORITY_LABEL[t.priority]}</Tag>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  <Form form={createTaskForm} layout="vertical" onFinish={handleCreateTaskInSprint} style={{ marginTop: 8 }}>
+                    <Form.Item
+                      name="title"
+                      label="Tiêu đề"
+                      rules={[
+                        { required: true, message: 'Vui lòng nhập tiêu đề!' },
+                        { max: 500, message: 'Tối đa 500 ký tự' },
+                        { whitespace: true, message: 'Tiêu đề không được chỉ có khoảng trắng' },
+                      ]}
+                    >
+                      <Input placeholder="Tiêu đề task" autoFocus maxLength={500} />
+                    </Form.Item>
+                    <Form.Item name="description" label="Mô tả">
+                      <TextArea rows={2} placeholder="Mô tả chi tiết (tùy chọn)" maxLength={5000} />
+                    </Form.Item>
+                    <Row gutter={12}>
+                      <Col span={12}>
+                        <Form.Item name="status" label="Trạng thái / Cột" initialValue={TaskStatus.TODO}>
+                          <Select options={TASK_STATUS_COLUMNS.map(c => ({
+                            label: <Space size={6}><span style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, display: 'inline-block' }} />{c.label}</Space>,
+                            value: c.status,
+                          }))} />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item name="priority" label="Ưu tiên" initialValue={TaskPriority.MEDIUM}>
+                          <Select options={[
+                            { label: <Tag color="green">Thấp</Tag>, value: TaskPriority.LOW },
+                            { label: <Tag color="blue">Trung bình</Tag>, value: TaskPriority.MEDIUM },
+                            { label: <Tag color="orange">Cao</Tag>, value: TaskPriority.HIGH },
+                            { label: <Tag color="red">Khẩn cấp</Tag>, value: TaskPriority.URGENT },
+                          ]} />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Form.Item name="dueDate" label="Hạn chót">
+                      <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+                    </Form.Item>
+                  </Form>
                 </Modal>
 
                 {/* Modal xử lý task chưa xong khi complete sprint */}
@@ -1025,8 +931,8 @@ const ProjectDetailPage: React.FC = () => {
                   footer={
                     <Space>
                       <Button onClick={() => { setCompleteSprintId(null); setIncompleteTasksForSprint([]); }}>Hủy</Button>
-                      <Button danger loading={completeSprintLoading} onClick={handleCompleteAndMoveToBacklog}>
-                        Đưa về Backlog & Hoàn thành
+                      <Button danger loading={completeSprintLoading} onClick={handleCompleteAndMoveTasks}>
+                        Gỡ task & Hoàn thành
                       </Button>
                       <Button type="primary" loading={completeSprintLoading}
                         onClick={() => completeSprintId && doCompleteSprint(completeSprintId)}>
@@ -1052,7 +958,7 @@ const ProjectDetailPage: React.FC = () => {
                     ))}
                   </div>
                   <div style={{ marginTop: 16, color: '#8c8c8c', fontSize: 13 }}>
-                    <b>Đưa về Backlog & Hoàn thành</b>: Các task chưa xong sẽ trở về Product Backlog.<br/>
+                    <b>Gỡ task & Hoàn thành</b>: Các task chưa xong sẽ bị gỡ khỏi sprint.<br/>
                     <b>Hoàn thành (giữ)</b>: Các task vẫn nằm trong sprint đã hoàn thành.
                   </div>
                 </Modal>

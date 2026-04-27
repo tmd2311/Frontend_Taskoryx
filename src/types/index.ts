@@ -271,6 +271,11 @@ export interface TaskSummary {
   overdue: boolean;
   commentCount: number;
   attachmentCount: number;
+  parentTaskId?: string;
+  depth?: number;
+  subTasks?: TaskSummary[];
+  sprintId?: string;
+  sprintName?: string;
 }
 
 /** Task detail – dùng khi xem chi tiết một task */
@@ -301,6 +306,7 @@ export interface Task extends TaskSummary {
 export interface CreateTaskRequest {
   title: string;
   description?: string;
+  status?: TaskStatus;
   priority?: TaskPriority;
   boardId?: string;
   columnId?: string;
@@ -312,6 +318,7 @@ export interface CreateTaskRequest {
   parentTaskId?: string;
   versionId?: string;
   categoryId?: string;
+  sprintId?: string;
 }
 
 export interface UpdateTaskRequest {
@@ -326,6 +333,8 @@ export interface UpdateTaskRequest {
   actualHours?: number;
   parentTaskId?: string;
   clearParent?: boolean;
+  sprintId?: string;
+  clearSprint?: boolean;
 }
 
 export interface MoveTaskRequest {
@@ -339,6 +348,7 @@ export interface UpdateStatusRequest {
 
 export interface TaskFilterParams extends PageParams {
   keyword?: string;
+  sprintId?: string;
   columnId?: string;
   assigneeId?: string;
   priorities?: string;  // comma-separated: "MEDIUM,HIGH"
