@@ -136,7 +136,7 @@ export const useTaskStore = create<TaskState>((set) => ({
           ? {
               ...state.projectTasks,
               content: state.projectTasks.content.map((t) =>
-                t.id === id ? { ...t, ...updated } : t
+                t.id === id ? ({ ...t, ...updated } as TaskSummary) : t
               ),
             }
           : null,
@@ -163,8 +163,8 @@ export const useTaskStore = create<TaskState>((set) => ({
       const updated = await taskService.updateStatus(id, data);
       set((state) => ({
         currentTask: state.currentTask?.id === id ? updated : state.currentTask,
-        myTasks: state.myTasks.map((t) => t.id === id ? { ...t, ...updated } : t),
-        backlog: state.backlog.map((t) => t.id === id ? { ...t, ...updated } : t),
+        myTasks: state.myTasks.map((t) => t.id === id ? ({ ...t, ...updated } as TaskSummary) : t),
+        backlog: state.backlog.map((t) => t.id === id ? ({ ...t, ...updated } as TaskSummary) : t),
       }));
       return updated;
     } catch (error: any) {

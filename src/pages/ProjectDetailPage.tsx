@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Typography, Button, Table, Tag, Space, Input, Select, Badge,
+  Typography, Button, Table, Tag, Space, Input, Select,
   Avatar, Empty, Tooltip, Modal, Form, Popconfirm, message, Spin,
   DatePicker, Card, Progress, List, Timeline, Row, Col, Alert, Statistic,
 } from 'antd';
@@ -9,9 +9,9 @@ import {
   CheckSquareOutlined, TeamOutlined, ExclamationCircleOutlined,
   UserOutlined, CommentOutlined, PaperClipOutlined, SearchOutlined, ReloadOutlined,
   UserAddOutlined, DeleteOutlined, PlusOutlined,
-  ThunderboltOutlined, AppstoreAddOutlined, HistoryOutlined,
+  ThunderboltOutlined, AppstoreAddOutlined,
   PlayCircleOutlined, CheckCircleOutlined, EditOutlined,
-  DownloadOutlined, TableOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useProjectStore } from '../stores/projectStore';
@@ -29,7 +29,6 @@ import type {
   CreateTaskRequest,
 } from '../types';
 import { TaskPriority, ProjectRole, TaskStatus, SprintStatus } from '../types';
-import StatusSelect from '../components/StatusSelect';
 import SprintKanbanView from '../components/SprintKanbanView';
 import dayjs from 'dayjs';
 
@@ -107,12 +106,12 @@ const buildTaskColumns = (onRowClick?: (r: TaskSummary) => void): ColumnsType<Ta
     title: '', key: 'meta', width: 80,
     render: (_: any, record) => (
       <Space size={8}>
-        {record.commentCount > 0 && (
+        {(record.commentCount ?? 0) > 0 && (
           <Tooltip title={`${record.commentCount} bình luận`}>
             <span style={{ color: '#8c8c8c', fontSize: 12 }}><CommentOutlined /> {record.commentCount}</span>
           </Tooltip>
         )}
-        {record.attachmentCount > 0 && (
+        {(record.attachmentCount ?? 0) > 0 && (
           <Tooltip title={`${record.attachmentCount} tệp đính kèm`}>
             <span style={{ color: '#8c8c8c', fontSize: 12 }}><PaperClipOutlined /> {record.attachmentCount}</span>
           </Tooltip>

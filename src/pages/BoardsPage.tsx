@@ -128,12 +128,12 @@ const TaskCard: React.FC<TaskCardProps> = ({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
           <Text type="secondary" style={{ fontSize: 11 }}>{task.assigneeName ?? '—'}</Text>
           <Space size={8}>
-            {task.commentCount > 0 && (
+            {(task.commentCount ?? 0) > 0 && (
               <span style={{ fontSize: 11, color: '#8c8c8c' }}>
                 <CommentOutlined /> {task.commentCount}
               </span>
             )}
-            {task.attachmentCount > 0 && (
+            {(task.attachmentCount ?? 0) > 0 && (
               <span style={{ fontSize: 11, color: '#8c8c8c' }}>
                 <PaperClipOutlined /> {task.attachmentCount}
               </span>

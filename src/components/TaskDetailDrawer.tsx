@@ -670,7 +670,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
         <Space size={4}>
           <CommentOutlined />
           Bình luận
-          {task && task.commentCount > 0 && (
+          {task && (task.commentCount ?? 0) > 0 && (
             <Badge count={task.commentCount} size="small" color="#1890ff" />
           )}
         </Space>
@@ -683,7 +683,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
         <Space size={4}>
           <PaperClipOutlined />
           Tệp đính kèm
-          {task && task.attachmentCount > 0 && (
+          {task && (task.attachmentCount ?? 0) > 0 && (
             <Badge count={task.attachmentCount} size="small" color="#52c41a" />
           )}
         </Space>

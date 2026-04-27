@@ -251,6 +251,14 @@ export interface SubTaskSummary {
   priority: TaskPriority;
   assigneeId?: string;
   assigneeName?: string;
+  assigneeAvatar?: string;
+  position?: number;
+  overdue?: boolean;
+  commentCount?: number;
+  attachmentCount?: number;
+  dueDate?: string;
+  parentTaskId?: string;
+  depth?: number;
 }
 
 /** Task summary – dùng trong list, kanban, my-tasks */
@@ -260,7 +268,7 @@ export interface TaskSummary {
   title: string;
   status: TaskStatus;
   priority: TaskPriority;
-  position: number;
+  position?: number;
   columnId?: string;
   boardId?: string;
   assigneeId?: string;
@@ -268,12 +276,12 @@ export interface TaskSummary {
   assigneeAvatar?: string;
   dueDate?: string;
   completedAt?: string;
-  overdue: boolean;
-  commentCount: number;
-  attachmentCount: number;
+  overdue?: boolean;
+  commentCount?: number;
+  attachmentCount?: number;
   parentTaskId?: string;
   depth?: number;
-  subTasks?: TaskSummary[];
+  subTasks?: SubTaskSummary[];
   sprintId?: string;
   sprintName?: string;
 }
@@ -293,11 +301,8 @@ export interface Task extends TaskSummary {
   startDate?: string;
   estimatedHours?: number;
   actualHours?: number;
-  // Subtask / Parent task
-  parentTaskId?: string;
   parentTaskKey?: string;
   parentTaskTitle?: string;
-  subTasks?: SubTaskSummary[];
   watcherCount?: number;
   createdAt: string;
   updatedAt: string;

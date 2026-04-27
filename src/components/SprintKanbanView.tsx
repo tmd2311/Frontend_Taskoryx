@@ -265,12 +265,12 @@ const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
                                   ) : <span />}
 
                                   <Space size={4}>
-                                    {task.commentCount > 0 && (
+                                    {(task.commentCount ?? 0) > 0 && (
                                       <span style={{ fontSize: 10, color: '#8c8c8c' }}>
                                         <CommentOutlined /> {task.commentCount}
                                       </span>
                                     )}
-                                    {task.attachmentCount > 0 && (
+                                    {(task.attachmentCount ?? 0) > 0 && (
                                       <span style={{ fontSize: 10, color: '#8c8c8c' }}>
                                         <PaperClipOutlined /> {task.attachmentCount}
                                       </span>

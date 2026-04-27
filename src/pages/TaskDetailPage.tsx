@@ -1100,7 +1100,7 @@ const TaskDetailPage: React.FC = () => {
                   <Space size={6}>
                     <CommentOutlined style={{ color: '#4361ee', fontSize: 14 }} />
                     <Text strong style={{ fontSize: 13 }}>Bình luận</Text>
-                    {task.commentCount > 0 && (
+                    {(task.commentCount ?? 0) > 0 && (
                       <Badge count={task.commentCount} size="small" color="#4361ee" />
                     )}
                   </Space>
@@ -1317,7 +1317,7 @@ const TaskDetailPage: React.FC = () => {
                   <Space size={6}>
                     <PaperClipOutlined />
                     Tệp đính kèm
-                    {task.attachmentCount > 0 && <Badge count={task.attachmentCount} size="small" color="#52c41a" />}
+                    {(task.attachmentCount ?? 0) > 0 && <Badge count={task.attachmentCount} size="small" color="#52c41a" />}
                   </Space>
                 }
                 extra={
