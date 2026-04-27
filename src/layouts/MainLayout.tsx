@@ -18,6 +18,7 @@ import {
   PartitionOutlined,
   ArrowLeftOutlined,
   ClockCircleOutlined,
+  AppstoreAddOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
@@ -171,6 +172,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       onClick: () => navTo(`/projects/${currentProject.id}?tab=members`),
     },
     {
+      key: 'categories',
+      icon: <AppstoreAddOutlined />,
+      label: 'Danh mục',
+      onClick: () => navTo(`/projects/${currentProject.id}?tab=categories`),
+    },
+    {
       key: 'gantt',
       icon: <PartitionOutlined />,
       label: 'Gantt Chart',
@@ -181,13 +188,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       icon: <ClockCircleOutlined />,
       label: 'Hoạt động',
       onClick: () => navTo(`/projects/${currentProject.id}?tab=activity`),
-    },
-    { type: 'divider' as const },
-    {
-      key: 'settings',
-      icon: <SettingOutlined />,
-      label: 'Cài đặt dự án',
-      onClick: () => navTo(`/projects/${currentProject.id}?tab=settings`),
     },
   ] : [];
 

@@ -18,6 +18,8 @@ import {
   Select,
   Avatar,
   message,
+  Steps,
+  Divider,
 } from 'antd';
 import {
   PlusOutlined,
@@ -29,14 +31,89 @@ import {
   DeleteOutlined,
   ReloadOutlined,
   CrownOutlined,
+  AppstoreOutlined,
+  RocketOutlined,
+  CodeOutlined,
+  BugOutlined,
+  StarOutlined,
 } from '@ant-design/icons';
 import { useProjectStore } from '../stores/projectStore';
 import { adminService } from '../services/adminService';
-import { templateService } from '../services/templateService';
+import { sprintService } from '../services/sprintService';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
-import type { Project, CreateProjectRequest, ProjectTemplate } from '../types';
+import type { Project, CreateProjectRequest } from '../types';
+
+interface FrontendTemplate {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.ReactNode;
+  color: string;
+  sprints: { name: string; goal?: string }[];
+}
+
+const FRONTEND_TEMPLATES: FrontendTemplate[] = [
+  {
+    id: 'blank',
+    name: 'Trống',
+    description: 'Bắt đầu từ đầu với 1 sprint trống',
+    icon: <AppstoreOutlined />,
+    color: '#8c8c8c',
+    sprints: [{ name: 'Sprint 1' }],
+  },
+  {
+    id: 'scrum',
+    name: 'Scrum Cơ bản',
+    description: '3 sprint theo quy trình Scrum tiêu chuẩn',
+    icon: <RocketOutlined />,
+    color: '#1890ff',
+    sprints: [
+      { name: 'Sprint 1 – Khởi động', goal: 'Thiết lập nền tảng dự án' },
+      { name: 'Sprint 2 – Phát triển', goal: 'Xây dựng tính năng chính' },
+      { name: 'Sprint 3 – Hoàn thiện', goal: 'Kiểm thử và ra mắt' },
+    ],
+  },
+  {
+    id: 'software',
+    name: 'Phát triển Phần mềm',
+    description: '4 sprint: Phân tích → Thiết kế → Dev → QA',
+    icon: <CodeOutlined />,
+    color: '#722ed1',
+    sprints: [
+      { name: 'Sprint 1 – Phân tích', goal: 'Thu thập yêu cầu và phân tích hệ thống' },
+      { name: 'Sprint 2 – Thiết kế', goal: 'Thiết kế kiến trúc và UI/UX' },
+      { name: 'Sprint 3 – Phát triển', goal: 'Lập trình các tính năng chính' },
+      { name: 'Sprint 4 – QA & Deploy', goal: 'Kiểm thử và triển khai' },
+    ],
+  },
+  {
+    id: 'bugfix',
+    name: 'Sửa lỗi & Cải tiến',
+    description: '2 sprint: Bug triage → Fix & Release',
+    icon: <BugOutlined />,
+    color: '#f5222d',
+    sprints: [
+      { name: 'Sprint 1 – Phân loại lỗi', goal: 'Liệt kê và ưu tiên các lỗi cần sửa' },
+      { name: 'Sprint 2 – Sửa & Phát hành', goal: 'Sửa lỗi và phát hành phiên bản mới' },
+    ],
+  },
+  {
+    id: 'launch',
+    name: 'Ra mắt Sản phẩm',
+    description: '5 sprint từ ý tưởng đến ra mắt',
+    icon: <StarOutlined />,
+    color: '#fa8c16',
+    sprints: [
+      { name: 'Sprint 1 – Khám phá', goal: 'Nghiên cứu thị trường và xác định MVP' },
+      { name: 'Sprint 2 – Prototype', goal: 'Xây dựng nguyên mẫu sản phẩm' },
+      { name: 'Sprint 3 – Alpha', goal: 'Phát triển phiên bản Alpha nội bộ' },
+      { name: 'Sprint 4 – Beta', goal: 'Kiểm thử với người dùng Beta' },
+      { name: 'Sprint 5 – Ra mắt', goal: 'Phát hành chính thức và theo dõi' },
+    ],
+  },
+];
 
 const { Title, Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -215,8 +292,8 @@ const ProjectsPage: React.FC = () => {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm<CreateProjectRequest>();
-  const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [createStep, setCreateStep] = useState<0 | 1>(0);
+  const [selectedTemplate, setSelectedTemplate] = useState<FrontendTemplate>(FRONTEND_TEMPLATES[0]);
 
   // Phát hiện admin & tải projects
   useEffect(() => {
@@ -293,37 +370,33 @@ const ProjectsPage: React.FC = () => {
     }
   };
 
-  const openCreateModal = async () => {
+  const openCreateModal = () => {
     form.resetFields();
-    setSelectedTemplate(null);
+    setCreateStep(0);
+    setSelectedTemplate(FRONTEND_TEMPLATES[0]);
     setCreateModalOpen(true);
-    try {
-      const tmplList = await templateService.getPublic();
-      setTemplates(tmplList);
-    } catch { /* ignore */ }
   };
 
-  const handleCreate = async (values: CreateProjectRequest) => {
+  const handleCreate = async (values: any) => {
     setSubmitting(true);
     try {
-      let newProject;
-      if (selectedTemplate) {
-        newProject = await templateService.useTemplate(selectedTemplate, {
-          name: values.name,
-          key: values.key,
-          description: values.description,
-          color: values.color,
-          isPublic: values.isPublic,
-        });
-      } else {
-        newProject = await createProject(values);
+      const newProject = await createProject({
+        name: values.name,
+        key: values.key,
+        description: values.description,
+        color: values.color,
+        isPublic: values.isPublic,
+      });
+      // Tạo các sprint theo template đã chọn
+      for (const sprint of selectedTemplate.sprints) {
+        await sprintService.create(newProject.id, { name: sprint.name, goal: sprint.goal });
       }
       if (isAdmin) {
         setAdminProjects((prev) => [newProject, ...prev]);
       }
-      message.success('Đã tạo dự án');
+      const sprintCount = selectedTemplate.sprints.length;
+      message.success(`Đã tạo dự án với ${sprintCount} sprint từ template "${selectedTemplate.name}"`);
       form.resetFields();
-      setSelectedTemplate(null);
       setCreateModalOpen(false);
     } catch (e: any) {
       message.error(e.message || 'Tạo dự án thất bại');
@@ -460,141 +533,157 @@ const ProjectsPage: React.FC = () => {
         open={createModalOpen}
         onCancel={() => {
           form.resetFields();
-          setSelectedTemplate(null);
           setCreateModalOpen(false);
         }}
         footer={null}
         destroyOnClose
-        width={560}
+        width={620}
       >
-        {templates.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: '#595959' }}>
-              Chọn template (tùy chọn):
+        <Steps
+          current={createStep}
+          size="small"
+          style={{ marginBottom: 20, marginTop: 8 }}
+          items={[
+            { title: 'Chọn template' },
+            { title: 'Thông tin dự án' },
+          ]}
+        />
+
+        {/* Step 0: Template selection */}
+        {createStep === 0 && (
+          <div>
+            <Row gutter={[10, 10]}>
+              {FRONTEND_TEMPLATES.map(tpl => (
+                <Col key={tpl.id} span={12}>
+                  <div
+                    onClick={() => setSelectedTemplate(tpl)}
+                    style={{
+                      border: `2px solid ${selectedTemplate.id === tpl.id ? tpl.color : '#f0f0f0'}`,
+                      borderRadius: 8,
+                      padding: '12px 14px',
+                      cursor: 'pointer',
+                      background: selectedTemplate.id === tpl.id ? `${tpl.color}08` : '#fff',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <Space align="start">
+                      <span style={{ fontSize: 20, color: tpl.color }}>{tpl.icon}</span>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{tpl.name}</div>
+                        <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>{tpl.description}</div>
+                      </div>
+                    </Space>
+                  </div>
+                </Col>
+              ))}
+            </Row>
+
+            {/* Sprint preview */}
+            <Divider style={{ margin: '16px 0 10px' }} />
+            <div style={{ fontSize: 12, color: '#595959', marginBottom: 6, fontWeight: 500 }}>
+              Sprint sẽ được tạo ({selectedTemplate.sprints.length}):
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <div
-                onClick={() => setSelectedTemplate(null)}
-                style={{
-                  padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
-                  border: `2px solid ${selectedTemplate === null ? '#1890ff' : '#d9d9d9'}`,
-                  background: selectedTemplate === null ? '#e6f4ff' : '#fff',
-                  color: selectedTemplate === null ? '#1890ff' : '#595959',
-                }}
-              >
-                Trống
-              </div>
-              {templates.map((t) => (
-                <div key={t.id}
-                  onClick={() => setSelectedTemplate(t.id)}
-                  style={{
-                    padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
-                    border: `2px solid ${selectedTemplate === t.id ? '#1890ff' : '#d9d9d9'}`,
-                    background: selectedTemplate === t.id ? '#e6f4ff' : '#fff',
-                    color: selectedTemplate === t.id ? '#1890ff' : '#595959',
-                  }}
-                >
-                  {t.icon && <span style={{ marginRight: 4 }}>{t.icon}</span>}
-                  {t.name}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {selectedTemplate.sprints.map((s, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12 }}>
+                  <Tag style={{ margin: 0, minWidth: 28, textAlign: 'center', flexShrink: 0 }}>{i + 1}</Tag>
+                  <div>
+                    <span style={{ fontWeight: 500 }}>{s.name}</span>
+                    {s.goal && <span style={{ color: '#8c8c8c', marginLeft: 6 }}>– {s.goal}</span>}
+                  </div>
                 </div>
               ))}
             </div>
-            {selectedTemplate && (
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>
-                ✅ Sử dụng template: {templates.find(t => t.id === selectedTemplate)?.name}
-                {' '}(board + columns sẽ được tạo tự động)
-              </div>
-            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+              <Button onClick={() => setCreateModalOpen(false)}>Hủy</Button>
+              <Button type="primary" onClick={() => setCreateStep(1)}>
+                Tiếp theo →
+              </Button>
+            </div>
           </div>
         )}
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleCreate}
-          style={{ marginTop: 8 }}
-        >
-          <Form.Item
-            name="key"
-            label="Mã dự án"
-            rules={[
-              { required: true, message: 'Nhập mã dự án' },
-              { pattern: /^[A-Z0-9]{2,10}$/, message: 'Mã gồm 2-10 ký tự IN HOA hoặc số, ví dụ: PSBS' },
-            ]}
-            extra="Mã viết hoa, ví dụ: PSBS, DEV, WEB"
+
+        {/* Step 1: Project details */}
+        {createStep === 1 && (
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleCreate}
           >
-            <Input
-              placeholder="PSBS"
-              style={{ textTransform: 'uppercase' }}
-              onChange={(e) =>
-                form.setFieldValue('key', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))
-              }
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="name"
-            label="Tên Dự án"
-            rules={[{ required: true, message: 'Nhập tên dự án' }]}
-          >
-            <Input placeholder="Tên dự án của bạn" />
-          </Form.Item>
-
-          <Form.Item name="description" label="Mô tả">
-            <Input.TextArea rows={3} placeholder="Mô tả ngắn về dự án..." />
-          </Form.Item>
-
-          <Form.Item name="color" label="Màu sắc">
-            <Select placeholder="Chọn màu">
-              {PROJECT_COLORS.map((c) => (
-                <Select.Option key={c} value={c}>
-                  <Space>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        width: 16,
-                        height: 16,
-                        borderRadius: 4,
-                        background: c,
-                      }}
-                    />
-                    {c}
-                  </Space>
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item name="isPublic" label="Phạm vi" initialValue={false}>
-            <Select>
-              <Select.Option value={false}>
-                <Space>
-                  <LockOutlined />
-                  Private – chỉ thành viên được mời
-                </Space>
-              </Select.Option>
-              <Select.Option value={true}>
-                <Space>
-                  <GlobalOutlined />
-                  Public – mọi người có thể xem
-                </Space>
-              </Select.Option>
-            </Select>
-          </Form.Item>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <Button
-              onClick={() => {
-                form.resetFields();
-                setCreateModalOpen(false);
-              }}
+            <Form.Item
+              name="key"
+              label="Mã dự án"
+              rules={[
+                { required: true, message: 'Nhập mã dự án' },
+                { pattern: /^[A-Z0-9]{2,10}$/, message: 'Mã gồm 2-10 ký tự IN HOA hoặc số, ví dụ: PSBS' },
+              ]}
+              extra="Mã viết hoa, ví dụ: PSBS, DEV, WEB"
             >
-              Hủy
-            </Button>
-            <Button type="primary" htmlType="submit" loading={submitting}>
-              Tạo dự án
-            </Button>
-          </div>
-        </Form>
+              <Input
+                placeholder="PSBS"
+                style={{ textTransform: 'uppercase' }}
+                onChange={(e) =>
+                  form.setFieldValue('key', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))
+                }
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="name"
+              label="Tên Dự án"
+              rules={[{ required: true, message: 'Nhập tên dự án' }]}
+            >
+              <Input placeholder="Tên dự án của bạn" />
+            </Form.Item>
+
+            <Form.Item name="description" label="Mô tả">
+              <Input.TextArea rows={3} placeholder="Mô tả ngắn về dự án..." />
+            </Form.Item>
+
+            <Form.Item name="color" label="Màu sắc">
+              <Select placeholder="Chọn màu">
+                {PROJECT_COLORS.map((c) => (
+                  <Select.Option key={c} value={c}>
+                    <Space>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          width: 16,
+                          height: 16,
+                          borderRadius: 4,
+                          background: c,
+                        }}
+                      />
+                      {c}
+                    </Space>
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            <Form.Item name="isPublic" label="Phạm vi" initialValue={false}>
+              <Select>
+                <Select.Option value={false}>
+                  <Space><LockOutlined />Private – chỉ thành viên được mời</Space>
+                </Select.Option>
+                <Select.Option value={true}>
+                  <Space><GlobalOutlined />Public – mọi người có thể xem</Space>
+                </Select.Option>
+              </Select>
+            </Form.Item>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+              <Button onClick={() => setCreateStep(0)}>← Quay lại</Button>
+              <Space>
+                <Button onClick={() => setCreateModalOpen(false)}>Hủy</Button>
+                <Button type="primary" htmlType="submit" loading={submitting}>
+                  Tạo dự án
+                </Button>
+              </Space>
+            </div>
+          </Form>
+        )}
       </Modal>
     </div>
   );

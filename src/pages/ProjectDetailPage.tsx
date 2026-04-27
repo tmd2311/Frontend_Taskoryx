@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Typography, Button, Tabs, Table, Tag, Space, Input, Select, Badge,
+  Typography, Button, Table, Tag, Space, Input, Select, Badge,
   Avatar, Empty, Tooltip, Modal, Form, Popconfirm, message, Spin,
   DatePicker, Card, Progress, List, Timeline, Row, Col, Alert, Statistic,
 } from 'antd';
@@ -147,7 +147,7 @@ const ProjectDetailPage: React.FC = () => {
   const [filterOverdue, setFilterOverdue] = useState<boolean | undefined>(undefined);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 15;
-  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'tasks');
+  const activeTab = searchParams.get('tab') || 'tasks';
 
   // Members
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -277,14 +277,12 @@ const ProjectDetailPage: React.FC = () => {
     }
   }, [projectId]);
 
-  const handleTabChange = (key: string) => {
-    setActiveTab(key);
-    navigate(`?tab=${key}`, { replace: true });
-    if (key === 'sprints') fetchSprints();
-    if (key === 'categories') fetchCategories();
-    if (key === 'activity') fetchActivity(0);
-    if (key === 'gantt') fetchGantt();
-  };
+  useEffect(() => {
+    if (activeTab === 'sprints') fetchSprints();
+    if (activeTab === 'categories') fetchCategories();
+    if (activeTab === 'activity') fetchActivity(0);
+    if (activeTab === 'gantt') fetchGantt();
+  }, [activeTab]);
 
   // ── Members ──────────────────────────────────────────────
   const handleMemberSearch = (keyword: string) => {
@@ -630,88 +628,71 @@ const ProjectDetailPage: React.FC = () => {
         </Space>
       </div>
 
-      {/* Tabs */}
-      <Tabs
-        activeKey={activeTab}
-        onChange={handleTabChange}
-        items={[
-          // ─────── CÔNG VIỆC ───────
-          {
-            key: 'tasks',
-            label: <Space><CheckSquareOutlined />Công việc<Badge count={total} color="#1890ff" /></Space>,
-            children: (
-              <>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                  <Input prefix={<SearchOutlined />} placeholder="Tìm kiếm task..." allowClear
-                    style={{ flex: '1 1 160px', minWidth: 140 }}
-                    onPressEnter={(e) => { setKeyword((e.target as HTMLInputElement).value); setPage(1); }}
-                    onChange={(e) => !e.target.value && (setKeyword(''), setPage(1))}
-                    onBlur={(e) => { setKeyword(e.target.value); setPage(1); }}
-                  />
-                  <Select mode="multiple" placeholder="Lọc ưu tiên" allowClear
-                    style={{ flex: '1 1 160px', minWidth: 140 }} value={filterPriority}
-                    onChange={(v) => { setFilterPriority(v); setPage(1); }}
-                    options={[
-                      { label: 'Thấp', value: TaskPriority.LOW },
-                      { label: 'Trung bình', value: TaskPriority.MEDIUM },
-                      { label: 'Cao', value: TaskPriority.HIGH },
-                      { label: 'Khẩn cấp', value: TaskPriority.URGENT },
-                    ]}
-                  />
-                  <Select placeholder="Trạng thái hạn" allowClear style={{ flex: '1 1 130px', minWidth: 120 }}
-                    value={filterOverdue}
-                    onChange={(v) => { setFilterOverdue(v); setPage(1); }}
-                    options={[{ label: 'Quá hạn', value: true }, { label: 'Còn hạn', value: false }]}
-                  />
-                  <Tooltip title="Làm mới">
-                    <Button icon={<ReloadOutlined />} onClick={() => {
-                      setPage(1);
-                      fetchProjectTasks(projectId!, { page: 0, size: PAGE_SIZE });
-                    }} loading={isLoading} />
-                  </Tooltip>
-                </div>
-                <Table
-                  columns={buildTaskColumns((r) => navigate(`/tasks/${r.taskKey}`))}
-                  dataSource={tasks}
-                  rowKey="id"
-                  loading={isLoading}
-                  pagination={{
-                    current: page, pageSize: PAGE_SIZE, total,
-                    onChange: (p) => setPage(p),
-                    showTotal: (t) => `Tổng ${t} task`,
-                    showSizeChanger: false,
-                  }}
-                  locale={{ emptyText: <Empty description="Không có task nào" /> }}
-                  rowClassName={(record) => record.overdue ? 'row-overdue' : ''}
-                  scroll={{ x: 700 }}
-                />
-              </>
-            ),
-          },
+      {/* Nội dung tab — điều hướng qua sidebar trái */}
 
-          // ─────── THÀNH VIÊN ───────
-          {
-            key: 'members',
-            label: <Space><TeamOutlined />Thành viên<Badge count={members.length} color="#52c41a" /></Space>,
-            children: (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-                  <Button type="primary" icon={<UserAddOutlined />}
-                    onClick={() => { addForm.resetFields(); setAddModalOpen(true); }}>
-                    Thêm thành viên
-                  </Button>
-                </div>
-                <Table columns={buildMemberColumns()} dataSource={members} rowKey="id"
-                  pagination={false} scroll={{ x: 'max-content' }} locale={{ emptyText: <Empty description="Không có thành viên" /> }} />
-              </>
-            ),
-          },
+      {activeTab === 'tasks' && (
+        <>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            <Input prefix={<SearchOutlined />} placeholder="Tìm kiếm task..." allowClear
+              style={{ flex: '1 1 160px', minWidth: 140 }}
+              onPressEnter={(e) => { setKeyword((e.target as HTMLInputElement).value); setPage(1); }}
+              onChange={(e) => !e.target.value && (setKeyword(''), setPage(1))}
+              onBlur={(e) => { setKeyword(e.target.value); setPage(1); }}
+            />
+            <Select mode="multiple" placeholder="Lọc ưu tiên" allowClear
+              style={{ flex: '1 1 160px', minWidth: 140 }} value={filterPriority}
+              onChange={(v) => { setFilterPriority(v); setPage(1); }}
+              options={[
+                { label: 'Thấp', value: TaskPriority.LOW },
+                { label: 'Trung bình', value: TaskPriority.MEDIUM },
+                { label: 'Cao', value: TaskPriority.HIGH },
+                { label: 'Khẩn cấp', value: TaskPriority.URGENT },
+              ]}
+            />
+            <Select placeholder="Trạng thái hạn" allowClear style={{ flex: '1 1 130px', minWidth: 120 }}
+              value={filterOverdue}
+              onChange={(v) => { setFilterOverdue(v); setPage(1); }}
+              options={[{ label: 'Quá hạn', value: true }, { label: 'Còn hạn', value: false }]}
+            />
+            <Tooltip title="Làm mới">
+              <Button icon={<ReloadOutlined />} onClick={() => {
+                setPage(1);
+                fetchProjectTasks(projectId!, { page: 0, size: PAGE_SIZE });
+              }} loading={isLoading} />
+            </Tooltip>
+          </div>
+          <Table
+            columns={buildTaskColumns((r) => navigate(`/tasks/${r.taskKey}`))}
+            dataSource={tasks}
+            rowKey="id"
+            loading={isLoading}
+            pagination={{
+              current: page, pageSize: PAGE_SIZE, total,
+              onChange: (p) => setPage(p),
+              showTotal: (t) => `Tổng ${t} task`,
+              showSizeChanger: false,
+            }}
+            locale={{ emptyText: <Empty description="Không có task nào" /> }}
+            rowClassName={(record) => record.overdue ? 'row-overdue' : ''}
+            scroll={{ x: 700 }}
+          />
+        </>
+      )}
 
-          // ─────── SPRINTS ───────
-          {
-            key: 'sprints',
-            label: <Space><ThunderboltOutlined />Sprints<Badge count={sprints.filter(s => s.status === SprintStatus.ACTIVE).length} color="blue" /></Space>,
-            children: (
+      {activeTab === 'members' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            <Button type="primary" icon={<UserAddOutlined />}
+              onClick={() => { addForm.resetFields(); setAddModalOpen(true); }}>
+              Thêm thành viên
+            </Button>
+          </div>
+          <Table columns={buildMemberColumns()} dataSource={members} rowKey="id"
+            pagination={false} scroll={{ x: 'max-content' }} locale={{ emptyText: <Empty description="Không có thành viên" /> }} />
+        </>
+      )}
+
+      {activeTab === 'sprints' && (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                   <Text type="secondary">{sprints.length} sprint</Text>
@@ -962,180 +943,134 @@ const ProjectDetailPage: React.FC = () => {
                     <b>Hoàn thành (giữ)</b>: Các task vẫn nằm trong sprint đã hoàn thành.
                   </div>
                 </Modal>
-              </>
-            ),
-          },
+      </>
+      )}
 
-          // ─────── CATEGORIES ───────
-          {
-            key: 'categories',
-            label: <Space><AppstoreAddOutlined />Danh mục</Space>,
-            children: (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <Text type="secondary">{categories.length} danh mục</Text>
-                  <Button type="primary" icon={<PlusOutlined />}
-                    onClick={() => { catForm.resetFields(); setEditCat(null); setCatModal(true); }}>
-                    Thêm danh mục
-                  </Button>
-                </div>
-                {catsLoading ? (
-                  <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
-                ) : categories.length === 0 ? (
-                  <Empty description="Chưa có danh mục nào" style={{ padding: '40px 0' }} />
-                ) : (
-                  <List
-                    dataSource={categories}
-                    renderItem={(cat) => (
-                      <List.Item
-                        actions={[
-                          <Button key="edit" size="small" icon={<EditOutlined />}
-                            onClick={() => {
-                              setEditCat(cat);
-                              catForm.setFieldsValue({ name: cat.name });
-                              setCatModal(true);
-                            }} />,
-                          <Popconfirm key="del" title="Xóa danh mục này?"
-                            onConfirm={() => handleDeleteCategory(cat.id)}
-                            okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
-                            <Button size="small" danger icon={<DeleteOutlined />} />
-                          </Popconfirm>,
-                        ]}
-                      >
-                        <List.Item.Meta
-                          avatar={<Avatar icon={<AppstoreAddOutlined />} style={{ background: '#722ed1' }} />}
-                          title={<Text strong>{cat.name}</Text>}
-                          description={cat.defaultAssigneeName && `Mặc định: ${cat.defaultAssigneeName}`}
-                        />
-                      </List.Item>
-                    )}
+      {activeTab === 'categories' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text type="secondary">{categories.length} danh mục</Text>
+            <Button type="primary" icon={<PlusOutlined />}
+              onClick={() => { catForm.resetFields(); setEditCat(null); setCatModal(true); }}>
+              Thêm danh mục
+            </Button>
+          </div>
+          {catsLoading ? (
+            <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
+          ) : categories.length === 0 ? (
+            <Empty description="Chưa có danh mục nào" style={{ padding: '40px 0' }} />
+          ) : (
+            <List
+              dataSource={categories}
+              renderItem={(cat) => (
+                <List.Item
+                  actions={[
+                    <Button key="edit" size="small" icon={<EditOutlined />}
+                      onClick={() => {
+                        setEditCat(cat);
+                        catForm.setFieldsValue({ name: cat.name });
+                        setCatModal(true);
+                      }} />,
+                    <Popconfirm key="del" title="Xóa danh mục này?"
+                      onConfirm={() => handleDeleteCategory(cat.id)}
+                      okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
+                      <Button size="small" danger icon={<DeleteOutlined />} />
+                    </Popconfirm>,
+                  ]}
+                >
+                  <List.Item.Meta
+                    avatar={<Avatar icon={<AppstoreAddOutlined />} style={{ background: '#722ed1' }} />}
+                    title={<Text strong>{cat.name}</Text>}
+                    description={cat.defaultAssigneeName && `Mặc định: ${cat.defaultAssigneeName}`}
                   />
-                )}
-              </>
-            ),
-          },
+                </List.Item>
+              )}
+            />
+          )}
+        </>
+      )}
 
-          // ─────── ACTIVITY ───────
-          {
-            key: 'activity',
-            label: <Space><HistoryOutlined />Hoạt động</Space>,
-            children: (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <Text type="secondary">Lịch sử hoạt động dự án</Text>
-                  <Button size="small" icon={<ReloadOutlined />} onClick={() => fetchActivity(0)} loading={activityLoading}>
-                    Làm mới
-                  </Button>
-                </div>
-                {activityLoading && activity.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-                ) : activity.length === 0 ? (
-                  <Empty description="Chưa có hoạt động nào" style={{ padding: '40px 0' }} />
-                ) : (
-                  <Timeline
-                    items={activity.map((a) => ({
-                      key: a.id,
-                      dot: <Avatar size={24} src={a.userAvatar} icon={<UserOutlined />} />,
-                      children: (
-                        <div style={{ paddingBottom: 8 }}>
-                          <Space size={6}>
-                            <Text strong style={{ fontSize: 13 }}>{a.userFullName || a.username}</Text>
-                            <Text type="secondary" style={{ fontSize: 11 }}>{dayjs(a.createdAt).fromNow()}</Text>
-                          </Space>
-                          <div style={{ fontSize: 13, color: '#555', marginTop: 2 }}>{a.description}</div>
-                        </div>
-                      ),
-                    }))}
-                  />
-                )}
-                {activityTotal > activity.length && (
-                  <div style={{ textAlign: 'center', marginTop: 16 }}>
-                    <Button onClick={() => fetchActivity(activityPage + 1)}>Xem thêm</Button>
+      {activeTab === 'activity' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+            <Text type="secondary">Lịch sử hoạt động dự án</Text>
+            <Button size="small" icon={<ReloadOutlined />} onClick={() => fetchActivity(0)} loading={activityLoading}>
+              Làm mới
+            </Button>
+          </div>
+          {activityLoading && activity.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+          ) : activity.length === 0 ? (
+            <Empty description="Chưa có hoạt động nào" style={{ padding: '40px 0' }} />
+          ) : (
+            <Timeline
+              items={activity.map((a) => ({
+                key: a.id,
+                dot: <Avatar size={24} src={a.userAvatar} icon={<UserOutlined />} />,
+                children: (
+                  <div style={{ paddingBottom: 8 }}>
+                    <Space size={6}>
+                      <Text strong style={{ fontSize: 13 }}>{a.userFullName || a.username}</Text>
+                      <Text type="secondary" style={{ fontSize: 11 }}>{dayjs(a.createdAt).fromNow()}</Text>
+                    </Space>
+                    <div style={{ fontSize: 13, color: '#555', marginTop: 2 }}>{a.description}</div>
                   </div>
-                )}
-              </>
-            ),
-          },
+                ),
+              }))}
+            />
+          )}
+          {activityTotal > activity.length && (
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <Button onClick={() => fetchActivity(activityPage + 1)}>Xem thêm</Button>
+            </div>
+          )}
+        </>
+      )}
 
-          // ─────── GANTT ───────
-          {
-            key: 'gantt',
-            label: <Space><TableOutlined />Gantt</Space>,
-            children: (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <Text type="secondary">Tasks có ngày bắt đầu hoặc deadline</Text>
-                  <Button size="small" icon={<ReloadOutlined />} onClick={fetchGantt} loading={ganttLoading}>
-                    Làm mới
-                  </Button>
-                </div>
-                {ganttLoading ? (
-                  <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-                ) : ganttError ? (
-                  <Empty description={<span style={{ color: '#f5222d' }}>{ganttError}</span>} style={{ padding: '40px 0' }} />
-                ) : ganttTasks.length === 0 ? (
-                  <Empty description="Không có task nào có ngày bắt đầu hoặc deadline" style={{ padding: '40px 0' }} />
-                ) : (
-                  <Table
-                    dataSource={ganttTasks}
-                    rowKey="id"
-                    pagination={false}
-                    scroll={{ x: 800 }}
-                    columns={[
-                      {
-                        title: 'Mã', dataIndex: 'taskKey', width: 110,
-                        render: (k) => <Tag style={{ fontFamily: 'monospace' }}>{k}</Tag>,
-                      },
-                      {
-                        title: 'Tiêu đề', dataIndex: 'title',
-                        render: (t, r) => (
-                          <Button type="link" style={{ padding: 0, height: 'auto', textAlign: 'left' }}
-                            onClick={() => navigate(`/tasks/${r.taskKey}`)}>{t}</Button>
-                        ),
-                      },
-                      {
-                        title: 'Ưu tiên', dataIndex: 'priority', width: 110,
-                        render: (p) => <Tag color={PRIORITY_COLOR[p]}>{PRIORITY_LABEL[p]}</Tag>,
-                      },
-                      {
-                        title: 'Assignee', dataIndex: 'assigneeName', width: 140,
-                        render: (n) => n ? <Space size={6}><Avatar size={20} icon={<UserOutlined />} />{n}</Space> : <Text type="secondary">—</Text>,
-                      },
-                      {
-                        title: 'Bắt đầu', dataIndex: 'startDate', width: 120,
-                        render: (d) => d ? dayjs(d).format('DD/MM/YYYY') : <Text type="secondary">—</Text>,
-                      },
-                      {
-                        title: 'Deadline', dataIndex: 'dueDate', width: 120,
-                        render: (d, r) => d
-                          ? <Text style={{ color: r.completedAt ? undefined : (dayjs(d).isBefore(dayjs()) ? '#f5222d' : undefined) }}>
-                              {dayjs(d).format('DD/MM/YYYY')}
-                            </Text>
-                          : <Text type="secondary">—</Text>,
-                      },
-                      {
-                        title: 'Tiến độ', key: 'timeline', width: 200,
-                        render: (_, r) => {
-                          if (!r.startDate && !r.dueDate) return null;
-                          const start = r.startDate ? dayjs(r.startDate) : dayjs();
-                          const end = r.dueDate ? dayjs(r.dueDate) : dayjs();
-                          const total = end.diff(start, 'day') || 1;
-                          const elapsed = dayjs().diff(start, 'day');
-                          const pct = Math.min(Math.max(Math.round((elapsed / total) * 100), 0), 100);
-                          return (
-                            <Progress percent={pct} size="small"
-                              strokeColor={r.completedAt ? '#52c41a' : (pct > 100 ? '#f5222d' : '#1890ff')} />
-                          );
-                        },
-                      },
-                    ]}
-                  />
-                )}
-              </>
-            ),
-          },
-        ]}
-      />
+      {activeTab === 'gantt' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+            <Text type="secondary">Tasks có ngày bắt đầu hoặc deadline</Text>
+            <Button size="small" icon={<ReloadOutlined />} onClick={fetchGantt} loading={ganttLoading}>
+              Làm mới
+            </Button>
+          </div>
+          {ganttLoading ? (
+            <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+          ) : ganttError ? (
+            <Empty description={<span style={{ color: '#f5222d' }}>{ganttError}</span>} style={{ padding: '40px 0' }} />
+          ) : ganttTasks.length === 0 ? (
+            <Empty description="Không có task nào có ngày bắt đầu hoặc deadline" style={{ padding: '40px 0' }} />
+          ) : (
+            <Table
+              dataSource={ganttTasks}
+              rowKey="id"
+              pagination={false}
+              scroll={{ x: 800 }}
+              columns={[
+                { title: 'Mã', dataIndex: 'taskKey', width: 110, render: (k) => <Tag style={{ fontFamily: 'monospace' }}>{k}</Tag> },
+                { title: 'Tiêu đề', dataIndex: 'title', render: (t, r) => <Button type="link" style={{ padding: 0, height: 'auto', textAlign: 'left' }} onClick={() => navigate(`/tasks/${r.taskKey}`)}>{t}</Button> },
+                { title: 'Ưu tiên', dataIndex: 'priority', width: 110, render: (p) => <Tag color={PRIORITY_COLOR[p]}>{PRIORITY_LABEL[p]}</Tag> },
+                { title: 'Assignee', dataIndex: 'assigneeName', width: 140, render: (n) => n ? <Space size={6}><Avatar size={20} icon={<UserOutlined />} />{n}</Space> : <Text type="secondary">—</Text> },
+                { title: 'Bắt đầu', dataIndex: 'startDate', width: 120, render: (d) => d ? dayjs(d).format('DD/MM/YYYY') : <Text type="secondary">—</Text> },
+                { title: 'Deadline', dataIndex: 'dueDate', width: 120, render: (d, r) => d ? <Text style={{ color: r.completedAt ? undefined : (dayjs(d).isBefore(dayjs()) ? '#f5222d' : undefined) }}>{dayjs(d).format('DD/MM/YYYY')}</Text> : <Text type="secondary">—</Text> },
+                {
+                  title: 'Tiến độ', key: 'timeline', width: 200,
+                  render: (_, r) => {
+                    if (!r.startDate && !r.dueDate) return null;
+                    const start = r.startDate ? dayjs(r.startDate) : dayjs();
+                    const end = r.dueDate ? dayjs(r.dueDate) : dayjs();
+                    const tot = end.diff(start, 'day') || 1;
+                    const elapsed = dayjs().diff(start, 'day');
+                    const pct = Math.min(Math.max(Math.round((elapsed / tot) * 100), 0), 100);
+                    return <Progress percent={pct} size="small" strokeColor={r.completedAt ? '#52c41a' : (pct > 100 ? '#f5222d' : '#1890ff')} />;
+                  },
+                },
+              ]}
+            />
+          )}
+        </>
+      )}
 
 
       {/* Modal thêm thành viên */}
