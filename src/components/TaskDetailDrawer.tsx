@@ -3,7 +3,7 @@ import {
   Drawer, Button, Tag, Space, Typography, Spin, Form, Input, Select,
   DatePicker, Popconfirm, Divider, Descriptions, message, Avatar, Badge,
   Tabs, List, Upload, Tooltip, Checkbox, Progress, InputNumber,
-  Modal,
+  Modal, Mentions,
 } from 'antd';
 import {
   EditOutlined, DeleteOutlined, CloseOutlined, SaveOutlined, UserOutlined,
@@ -27,7 +27,7 @@ import AuthImage from './AuthImage';
 import { downloadAttachment } from '../utils/attachment';
 import type {
   ProjectMember, Comment, Attachment, ChecklistItem, ChecklistSummary,
-  TimeEntry, TaskDependency,
+  TimeEntry, TaskDependency, MentionedUser,
 } from '../types';
 import { TaskPriority, TaskStatus, DependencyType } from '../types';
 import StatusSelect, { StatusTag } from './StatusSelect';
@@ -238,6 +238,8 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const [commentContent, setCommentContent] = useState('');
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [commentSending, setCommentSending] = useState(false);
+  const [mentionSuggestions, setMentionSuggestions] = useState<MentionedUser[]>([]);
+  const [mentionLoading, setMentionLoading] = useState(false);
 
   // Upload
   const [uploading, setUploading] = useState(false);
@@ -280,6 +282,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
       setMembers([]);
       setCommentContent('');
       setReplyTo(null);
+      setMentionSuggestions([]);
       setChecklist(null);
       setTimeEntries([]);
       setDependencies([]);
@@ -405,18 +408,20 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     setMembers([]);
     setCommentContent('');
     setReplyTo(null);
+    setMentionSuggestions([]);
     setCurrentTask(null);
     onClose();
   };
 
   // ── Comments ──────────────────────────────────────────────
   const handleSendComment = async () => {
-    if (!taskId || isQuillEmpty(commentContent)) return;
+    if (!taskId || !commentContent.trim()) return;
     setCommentSending(true);
     try {
       await addComment(taskId, { content: commentContent, parentId: replyTo?.id });
       setCommentContent('');
       setReplyTo(null);
+      setMentionSuggestions([]);
     } catch (e: any) {
       message.error(e.message || 'Gửi bình luận thất bại');
     } finally {
@@ -443,6 +448,19 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const handleReply = (comment: Comment) => {
     setReplyTo(comment);
   };
+
+  const handleMentionSearch = useCallback(async (keyword: string) => {
+    if (!task?.projectId) return;
+    setMentionLoading(true);
+    try {
+      const results = await projectService.searchMembers(task.projectId, keyword);
+      setMentionSuggestions(results ?? []);
+    } catch {
+      setMentionSuggestions([]);
+    } finally {
+      setMentionLoading(false);
+    }
+  }, [task?.projectId]);
 
   // ── Attachments ───────────────────────────────────────────
   const uploadProps: UploadProps = {
@@ -1317,28 +1335,34 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                   <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setReplyTo(null)} />
                 </div>
               )}
-              <RichTextEditor
+              <Mentions
                 value={commentContent}
                 onChange={setCommentContent}
+                onSearch={handleMentionSearch}
+                loading={mentionLoading}
                 placeholder={replyTo
-                  ? `Trả lời ${replyTo.userFullName || replyTo.username}...`
-                  : 'Viết bình luận...'}
-                modules={{
-                  toolbar: [
-                    ['bold', 'italic', 'underline', 'strike'],
-                    [{ list: 'ordered' }, { list: 'bullet' }],
-                    ['link', 'blockquote', 'code-block'],
-                    ['clean'],
-                  ],
-                }}
-                style={{ marginBottom: 8 }}
+                  ? `Trả lời ${replyTo.userFullName || replyTo.username}... (dùng @ để mention)`
+                  : 'Viết bình luận... (dùng @ để mention người khác)'}
+                autoSize={{ minRows: 3, maxRows: 8 }}
+                style={{ marginBottom: 4, width: '100%' }}
+                options={mentionSuggestions.map((u) => ({
+                  value: u.username,
+                  label: (
+                    <Space size={6}>
+                      <Avatar size={18} src={u.avatarUrl} icon={<UserOutlined />} />
+                      <span>{u.fullName || u.username}</span>
+                      <Text type="secondary" style={{ fontSize: 11 }}>@{u.username}</Text>
+                    </Space>
+                  ),
+                }))}
               />
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text type="secondary" style={{ fontSize: 11 }}>Gõ @ để tag người khác</Text>
                 <Button
                   type="primary"
                   icon={<SendOutlined />}
                   loading={commentSending}
-                  disabled={isQuillEmpty(commentContent)}
+                  disabled={!commentContent.trim()}
                   onClick={handleSendComment}
                 >
                   Gửi

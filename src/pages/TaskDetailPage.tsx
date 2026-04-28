@@ -262,6 +262,7 @@ const TaskDetailPage: React.FC = () => {
   }, []);
 
   const mention = useMentionInput(task?.projectId ?? undefined);
+  const [notifyUserIds, setNotifyUserIds] = useState<string[]>([]);
 
   // Fetch task by key on mount / key change
   useEffect(() => {
@@ -406,9 +407,21 @@ const TaskDetailPage: React.FC = () => {
     if (!task?.id || !mention.content.trim()) return;
     setCommentSending(true);
     try {
-      await addComment(task?.id, { content: mention.content.trim(), parentId: replyTo?.id });
+      let content = mention.content.trim();
+      if (notifyUserIds.length > 0) {
+        const toAdd = notifyUserIds
+          .map((uid) => {
+            const m = members.find((mb) => mb.userId === uid);
+            return m && !content.includes(`@${m.username}`) ? `@${m.username}` : null;
+          })
+          .filter(Boolean)
+          .join(' ');
+        if (toAdd) content = `${toAdd} ${content}`;
+      }
+      await addComment(task?.id, { content, parentId: replyTo?.id });
       mention.reset();
       setReplyTo(null);
+      setNotifyUserIds([]);
     } catch (e: any) {
       message.error(e.message || 'Gửi bình luận thất bại');
     } finally { setCommentSending(false); }
@@ -614,7 +627,6 @@ const TaskDetailPage: React.FC = () => {
   // State for collapsible sections and comment UI
   const [checklistOpen, setChecklistOpen] = useState(true);
   const [timeOpen, setTimeOpen] = useState(false);
-  const [notifyTo, setNotifyTo] = useState('');
   const [commentPreview, setCommentPreview] = useState(false);
 
   // Insert formatting around textarea selection
@@ -1273,13 +1285,33 @@ const TaskDetailPage: React.FC = () => {
 
                       {/* Notify + action row */}
                       <div style={{ marginTop: 8 }}>
-                        <Input
-                          prefix={<Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Thông báo tới:</Text>}
-                          placeholder="Nhập tên hoặc email..."
+                        <Select
+                          mode="multiple"
                           size="small"
-                          value={notifyTo}
-                          onChange={(e) => setNotifyTo(e.target.value)}
-                          style={{ fontSize: 12, marginBottom: 8 }}
+                          style={{ width: '100%', marginBottom: 8 }}
+                          placeholder={<><BellOutlined style={{ marginRight: 4 }} />Thông báo tới...</>}
+                          value={notifyUserIds}
+                          onChange={setNotifyUserIds}
+                          allowClear
+                          showSearch
+                          optionFilterProp="label"
+                          options={members
+                            .filter((m) => m.userId !== user?.id)
+                            .map((m) => ({
+                              label: `${m.fullName || m.username} (@${m.username})`,
+                              value: m.userId,
+                              member: m,
+                            }))}
+                          optionRender={(opt) => {
+                            const m = (opt.data as any).member as ProjectMember;
+                            return (
+                              <Space size={6}>
+                                <Avatar size={18} src={m.avatarUrl} icon={<UserOutlined />} />
+                                <span>{m.fullName || m.username}</span>
+                                <Text type="secondary" style={{ fontSize: 11 }}>@{m.username}</Text>
+                              </Space>
+                            );
+                          }}
                         />
                         <Space size={6}>
                           <Button size="small" onClick={() => setReplyTo(null)}>Hủy</Button>
