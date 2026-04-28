@@ -2,34 +2,29 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   Button, Tag, Space, Typography, Spin, Form, Input, Select,
   DatePicker, Popconfirm, Divider, message, Avatar, Badge,
-  List, Upload, Tooltip, Checkbox, Progress, InputNumber,
+  List, Tooltip, Progress, InputNumber,
   Modal, Card, Result,
 } from 'antd';
 import {
   EditOutlined, DeleteOutlined, SaveOutlined, UserOutlined,
   CalendarOutlined, ExclamationCircleOutlined, CommentOutlined,
-  PaperClipOutlined, FolderOutlined, AppstoreOutlined, SendOutlined,
-  FileOutlined, FileImageOutlined, FilePdfOutlined, FileExcelOutlined,
-  FileWordOutlined, FileZipOutlined, ReloadOutlined, DownloadOutlined,
-  MessageOutlined, CheckSquareOutlined, ClockCircleOutlined, LinkOutlined,
+  FolderOutlined, AppstoreOutlined, SendOutlined,
+  ReloadOutlined,
+  MessageOutlined, ClockCircleOutlined, LinkOutlined,
   PlusOutlined, BellOutlined, BellFilled, ArrowLeftOutlined,
   CloseOutlined, RightOutlined,
 } from '@ant-design/icons';
-import type { UploadProps } from 'antd';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useTaskStore } from '../stores/taskStore';
 import { useAuthStore } from '../stores/authStore';
 import { taskService } from '../services/taskService';
 import { projectService } from '../services/projectService';
-import { checklistService } from '../services/checklistService';
 import { timeTrackingService } from '../services/timeTrackingService';
 import { dependencyService } from '../services/dependencyService';
 import { watcherService } from '../services/watcherService';
 import TinyCommentEditor from '../components/TinyCommentEditor';
-import AuthImage from '../components/AuthImage';
-import { downloadAttachment } from '../utils/attachment';
 import type {
-  Task, ProjectMember, Comment, Attachment, ChecklistItem, ChecklistSummary,
+  Task, ProjectMember, Comment,
   TimeEntry, TaskDependency, MentionedUser,
 } from '../types';
 import { TaskPriority, TaskStatus, DependencyType } from '../types';
@@ -57,20 +52,6 @@ const DEP_TYPE_LABEL: Record<string, string> = {
   RELATES_TO: 'Liên quan đến',
 };
 
-function getFileIcon(fileType: string, fileName: string) {
-  const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
-  if (fileType.startsWith('image/'))
-    return <FileImageOutlined style={{ color: '#52c41a', fontSize: 22 }} />;
-  if (fileType === 'application/pdf' || ext === 'pdf')
-    return <FilePdfOutlined style={{ color: '#f5222d', fontSize: 22 }} />;
-  if (['xls', 'xlsx', 'csv'].includes(ext))
-    return <FileExcelOutlined style={{ color: '#237804', fontSize: 22 }} />;
-  if (['doc', 'docx'].includes(ext))
-    return <FileWordOutlined style={{ color: '#1890ff', fontSize: 22 }} />;
-  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext))
-    return <FileZipOutlined style={{ color: '#fa8c16', fontSize: 22 }} />;
-  return <FileOutlined style={{ color: '#8c8c8c', fontSize: 22 }} />;
-}
 
 // ─── CommentContent ──────────────────────────────────────────
 const CommentContent: React.FC<{ content: string; mentionedUsers?: MentionedUser[] }> = ({
@@ -197,7 +178,6 @@ const TaskDetailPage: React.FC = () => {
   const {
     updateTask, updateTaskStatus, deleteTask,
     comments, commentsLoading, fetchComments, addComment, updateComment, deleteComment,
-    attachments, attachmentsLoading, fetchAttachments, uploadAttachment, deleteAttachment, // attachments used by TinyMCE upload handler indirectly
   } = useTaskStore();
 
   const [loading, setLoading] = useState(true);
@@ -213,12 +193,7 @@ const TaskDetailPage: React.FC = () => {
 
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [commentSending, setCommentSending] = useState(false);
-  const [uploading, setUploading] = useState(false);
 
-  const [checklist, setChecklist] = useState<ChecklistSummary | null>(null);
-  const [checklistLoading, setChecklistLoading] = useState(false);
-  const [newCheckItem, setNewCheckItem] = useState('');
-  const [addingCheckItem, setAddingCheckItem] = useState(false);
 
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [timeLoading, setTimeLoading] = useState(false);
@@ -258,7 +233,6 @@ const TaskDetailPage: React.FC = () => {
     setEditMode(false);
     setMembers([]);
     setReplyTo(null);
-    setChecklist(null);
     setTimeEntries([]);
     setDependencies([]);
 
@@ -281,12 +255,6 @@ const TaskDetailPage: React.FC = () => {
     fetchDependencies(task.id);
   }, [task?.id]);
 
-  // Fetch attachments and checklist on task load (always visible in new layout)
-  useEffect(() => {
-    if (!task?.id) return;
-    fetchAttachments(task.id);
-    fetchChecklist(task.id);
-  }, [task?.id]);
 
   // Load members khi task có projectId
   useEffect(() => {
@@ -304,13 +272,6 @@ const TaskDetailPage: React.FC = () => {
     } catch { /* ignore */ }
   };
 
-  const fetchChecklist = useCallback(async (id: string) => {
-    setChecklistLoading(true);
-    try {
-      const data = await checklistService.getChecklist(id);
-      setChecklist(data);
-    } catch { /* ignore */ } finally { setChecklistLoading(false); }
-  }, []);
 
   const fetchTimeEntries = useCallback(async (id: string) => {
     setTimeLoading(true);
@@ -434,62 +395,6 @@ const TaskDetailPage: React.FC = () => {
     setReplyTo(comment);
   };
 
-  const uploadProps: UploadProps = {
-    showUploadList: false,
-    beforeUpload: async (file) => {
-      if (!task?.id) return false;
-      if (file.size > 10 * 1024 * 1024) { message.error('File không được vượt quá 10MB'); return false; }
-      setUploading(true);
-      try {
-        await uploadAttachment(task?.id, file);
-        message.success(`Đã tải lên "${file.name}"`);
-      } catch (e: any) {
-        message.error(e.message || 'Tải lên thất bại');
-      } finally { setUploading(false); }
-      return false;
-    },
-  };
-
-  const handleDeleteAttachment = async (id: string) => {
-    try {
-      await deleteAttachment(id);
-      message.success('Đã xóa tệp');
-    } catch (e: any) {
-      message.error(e.message || 'Xóa tệp thất bại');
-    }
-  };
-
-  const handleAddCheckItem = async () => {
-    if (!task?.id || !newCheckItem.trim()) return;
-    setAddingCheckItem(true);
-    try {
-      await checklistService.addItem(task?.id, { content: newCheckItem.trim() });
-      setNewCheckItem('');
-      fetchChecklist(task?.id);
-    } catch (e: any) {
-      message.error(e.message || 'Thêm item thất bại');
-    } finally { setAddingCheckItem(false); }
-  };
-
-  const handleToggleCheckItem = async (item: ChecklistItem) => {
-    if (!task?.id) return;
-    try {
-      await checklistService.updateItem(item.id, { isChecked: !item.isChecked });
-      fetchChecklist(task?.id);
-    } catch (e: any) {
-      message.error(e.message || 'Cập nhật thất bại');
-    }
-  };
-
-  const handleDeleteCheckItem = async (id: string) => {
-    if (!task?.id) return;
-    try {
-      await checklistService.deleteItem(id);
-      fetchChecklist(task?.id);
-    } catch (e: any) {
-      message.error(e.message || 'Xóa thất bại');
-    }
-  };
 
   const handleAddTime = async (values: any) => {
     if (!task?.id) return;
@@ -610,8 +515,6 @@ const TaskDetailPage: React.FC = () => {
 
   const rootComments = comments.filter((c) => !c.parentId);
 
-  // State for collapsible sections and comment UI
-  const [checklistOpen, setChecklistOpen] = useState(true);
   const [timeOpen, setTimeOpen] = useState(false);
 
 
