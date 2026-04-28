@@ -13,9 +13,7 @@ import {
   FileWordOutlined, FileZipOutlined, ReloadOutlined, DownloadOutlined,
   MessageOutlined, CheckSquareOutlined, ClockCircleOutlined, LinkOutlined,
   PlusOutlined, BellOutlined, BellFilled, ArrowLeftOutlined,
-  CloseOutlined, BoldOutlined, ItalicOutlined, StrikethroughOutlined,
-  OrderedListOutlined, UnorderedListOutlined, CodeOutlined,
-  RightOutlined,
+  CloseOutlined, RightOutlined,
 } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import { useNavigate, useParams, Link } from 'react-router-dom';
@@ -27,7 +25,7 @@ import { checklistService } from '../services/checklistService';
 import { timeTrackingService } from '../services/timeTrackingService';
 import { dependencyService } from '../services/dependencyService';
 import { watcherService } from '../services/watcherService';
-import { useMentionInput } from '../hooks/useMentionInput';
+import TinyCommentEditor from '../components/TinyCommentEditor';
 import AuthImage from '../components/AuthImage';
 import { downloadAttachment } from '../utils/attachment';
 import type {
@@ -44,7 +42,7 @@ dayjs.extend(relativeTime);
 dayjs.locale('vi');
 
 const { Title, Text, Paragraph } = Typography;
-const { TextArea } = Input;
+const { TextArea } = Input; // dùng cho edit comment inline và form fields
 
 const PRIORITY_COLOR: Record<string, string> = {
   [TaskPriority.LOW]: 'green', [TaskPriority.MEDIUM]: 'blue',
@@ -76,41 +74,19 @@ function getFileIcon(fileType: string, fileName: string) {
 
 // ─── CommentContent ──────────────────────────────────────────
 const CommentContent: React.FC<{ content: string; mentionedUsers?: MentionedUser[] }> = ({
-  content, mentionedUsers = [],
+  content,
 }) => {
   if (!content) return null;
-  if (mentionedUsers.length === 0) return <span>{content}</span>;
-
-  const parts: Array<{ type: 'text'; value: string } | { type: 'mention'; user: MentionedUser }> = [];
-  let remaining = content;
-  const sorted = [...mentionedUsers].sort((a, b) =>
-    content.indexOf(`@${a.username}`) - content.indexOf(`@${b.username}`)
-  );
-  sorted.forEach((user) => {
-    const tag = `@${user.username}`;
-    const idx = remaining.indexOf(tag);
-    if (idx === -1) return;
-    if (idx > 0) parts.push({ type: 'text', value: remaining.slice(0, idx) });
-    parts.push({ type: 'mention', user });
-    remaining = remaining.slice(idx + tag.length);
-  });
-  if (remaining) parts.push({ type: 'text', value: remaining });
-
-  return (
-    <span>
-      {parts.map((part, i) =>
-        part.type === 'text' ? (
-          <span key={i}>{part.value}</span>
-        ) : (
-          <Tooltip key={i} title={part.user.fullName}>
-            <Tag color="blue" style={{ margin: '0 2px', cursor: 'default', fontSize: 12, padding: '0 5px' }}>
-              @{part.user.username}
-            </Tag>
-          </Tooltip>
-        ),
-      )}
-    </span>
-  );
+  const isHtml = /<[a-z][\s\S]*>/i.test(content);
+  if (isHtml) {
+    return (
+      <div
+        className="tiny-comment-display"
+        dangerouslySetInnerHTML={{ __html: content }}
+      />
+    );
+  }
+  return <span style={{ whiteSpace: 'pre-wrap' }}>{content}</span>;
 };
 
 // ─── CommentItem ─────────────────────────────────────────────
@@ -261,7 +237,7 @@ const TaskDetailPage: React.FC = () => {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const mention = useMentionInput(task?.projectId ?? undefined);
+  const [commentHtml, setCommentHtml] = useState('');
   const [notifyUserIds, setNotifyUserIds] = useState<string[]>([]);
 
   // Fetch task by key on mount / key change
@@ -403,23 +379,26 @@ const TaskDetailPage: React.FC = () => {
     }
   };
 
+  const isCommentEmpty = (html: string) =>
+    !html || html.replace(/<[^>]*>/g, '').trim() === '';
+
   const handleSendComment = async () => {
-    if (!task?.id || !mention.content.trim()) return;
+    if (!task?.id || isCommentEmpty(commentHtml)) return;
     setCommentSending(true);
     try {
-      let content = mention.content.trim();
+      let content = commentHtml;
       if (notifyUserIds.length > 0) {
-        const toAdd = notifyUserIds
+        const mentions = notifyUserIds
           .map((uid) => {
             const m = members.find((mb) => mb.userId === uid);
             return m && !content.includes(`@${m.username}`) ? `@${m.username}` : null;
           })
           .filter(Boolean)
           .join(' ');
-        if (toAdd) content = `${toAdd} ${content}`;
+        if (mentions) content = `<p>${mentions}</p>${content}`;
       }
       await addComment(task?.id, { content, parentId: replyTo?.id });
-      mention.reset();
+      setCommentHtml('');
       setReplyTo(null);
       setNotifyUserIds([]);
     } catch (e: any) {
@@ -445,7 +424,6 @@ const TaskDetailPage: React.FC = () => {
 
   const handleReply = (comment: Comment) => {
     setReplyTo(comment);
-    setTimeout(() => mention.textareaRef.current?.focus(), 100);
   };
 
   const uploadProps: UploadProps = {
@@ -627,41 +605,7 @@ const TaskDetailPage: React.FC = () => {
   // State for collapsible sections and comment UI
   const [checklistOpen, setChecklistOpen] = useState(true);
   const [timeOpen, setTimeOpen] = useState(false);
-  const [commentPreview, setCommentPreview] = useState(false);
 
-  // Insert formatting around textarea selection
-  const insertFormat = (before: string, after: string = before) => {
-    const textarea = mention.textareaRef.current as HTMLTextAreaElement | null;
-    if (!textarea) return;
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? 0;
-    const val = mention.content;
-    const selected = val.slice(start, end);
-    const newVal = val.slice(0, start) + before + selected + after + val.slice(end);
-    // Trigger onChange via synthetic event
-    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-    if (nativeInputValueSetter) {
-      nativeInputValueSetter.call(textarea, newVal);
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    // Move cursor inside formatting marks
-    setTimeout(() => {
-      const pos = start + before.length + selected.length;
-      textarea.focus();
-      textarea.setSelectionRange(pos, pos);
-    }, 0);
-  };
-
-  const toolbarButtons = [
-    { icon: <BoldOutlined />, title: 'Bold', before: '**', after: '**' },
-    { icon: <ItalicOutlined />, title: 'Italic', before: '_', after: '_' },
-    { icon: <StrikethroughOutlined />, title: 'Strikethrough', before: '~~', after: '~~' },
-    { icon: <UnorderedListOutlined />, title: 'Bullet list', before: '- ', after: '' },
-    { icon: <OrderedListOutlined />, title: 'Numbered list', before: '1. ', after: '' },
-    { icon: <CodeOutlined />, title: 'Code', before: '`', after: '`' },
-    { icon: <span style={{ fontWeight: 700, fontSize: 12 }}>"</span>, title: 'Quote', before: '> ', after: '' },
-    { icon: <LinkOutlined />, title: 'Link', before: '[', after: '](url)' },
-  ];
 
   if (loading) {
     return (
@@ -1138,7 +1082,7 @@ const TaskDetailPage: React.FC = () => {
                 )}
 
                 {/* ════════════════════════════════
-                    COMMENT COMPOSER (Redmine style)
+                    COMMENT COMPOSER – TinyMCE
                 ════════════════════════════════ */}
                 <div>
                   {replyTo && (
@@ -1154,186 +1098,61 @@ const TaskDetailPage: React.FC = () => {
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    {/* Attachment trigger on the left */}
-                    <Upload {...uploadProps} showUploadList={false}>
-                      <Tooltip title="Đính kèm tệp">
-                        <Button
-                          type="text"
-                          icon={<PaperClipOutlined style={{ fontSize: 18 }} />}
-                          loading={uploading}
-                          style={{ color: '#8c9ab0', marginTop: 6, padding: '4px 6px' }}
-                        />
-                      </Tooltip>
-                    </Upload>
+                  {task?.id && (
+                    <TinyCommentEditor
+                      value={commentHtml}
+                      onChange={setCommentHtml}
+                      taskId={task.id}
+                      placeholder={replyTo
+                        ? `Trả lời ${replyTo.userFullName || replyTo.username}...`
+                        : 'Viết bình luận... (hỗ trợ ảnh, định dạng văn bản)'}
+                    />
+                  )}
 
-                    {/* Textarea + toolbar container */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      {/* Mention dropdown */}
-                      <div style={{ position: 'relative' }}>
-                        {mention.showDropdown && mention.suggestions.length > 0 && (
-                          <div style={{
-                            position: 'absolute', bottom: '100%', left: 0,
-                            background: '#fff', border: '1px solid #e5e7eb',
-                            borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,.12)',
-                            padding: 4, zIndex: 1000,
-                            minWidth: 200, maxHeight: 180, overflowY: 'auto', marginBottom: 4,
-                          }}>
-                            {mention.suggestions.map((u) => (
-                              <div key={u.userId}
-                                onMouseDown={(e) => { e.preventDefault(); mention.selectMention(u); }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: 8,
-                                  padding: '5px 8px', cursor: 'pointer', borderRadius: 6,
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = '#f3f4f6')}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                              >
-                                <Avatar size={22} src={u.avatarUrl} icon={<UserOutlined />} style={{ flexShrink: 0 }} />
-                                <div>
-                                  <div style={{ fontWeight: 600, fontSize: 12 }}>{u.fullName}</div>
-                                  <div style={{ color: '#6b7280', fontSize: 11 }}>@{u.username}</div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Comment box */}
-                        <div style={{
-                          border: '1px solid #e2e8f0',
-                          borderRadius: 8,
-                          overflow: 'hidden',
-                          background: '#fffef5',
-                          transition: 'border-color 0.2s, box-shadow 0.2s',
-                        }}
-                          onFocusCapture={(e) => {
-                            (e.currentTarget as HTMLDivElement).style.borderColor = '#4361ee';
-                            (e.currentTarget as HTMLDivElement).style.boxShadow = '0 0 0 3px rgba(67,97,238,0.1)';
-                          }}
-                          onBlurCapture={(e) => {
-                            (e.currentTarget as HTMLDivElement).style.borderColor = '#e2e8f0';
-                            (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
-                          }}
-                        >
-                          {commentPreview ? (
-                            <div style={{ padding: '10px 14px', minHeight: 80, fontSize: 13, whiteSpace: 'pre-wrap', color: '#555' }}>
-                              {mention.content || <Text type="secondary" style={{ fontStyle: 'italic' }}>Không có nội dung</Text>}
-                            </div>
-                          ) : (
-                            <TextArea
-                              ref={mention.textareaRef as any}
-                              value={mention.content}
-                              onChange={mention.handleChange}
-                              placeholder={replyTo
-                                ? `Trả lời ${replyTo.userFullName || replyTo.username}... (@mention)`
-                                : 'Viết bình luận... (dùng @ để mention)'}
-                              autoSize={{ minRows: 3, maxRows: 8 }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Escape') mention.setShowDropdown(false);
-                                else if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); handleSendComment(); }
-                              }}
-                              variant="borderless"
-                              style={{
-                                resize: 'none',
-                                padding: '10px 14px 6px',
-                                fontSize: 13,
-                                background: 'transparent',
-                              }}
-                            />
-                          )}
-
-                          {/* Formatting toolbar */}
-                          <div style={{
-                            display: 'flex', alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '4px 8px 6px',
-                            borderTop: '1px solid #f0f0f0',
-                            background: 'rgba(0,0,0,0.02)',
-                          }}>
-                            <Space size={2}>
-                              {toolbarButtons.map((btn, idx) => (
-                                <Tooltip title={btn.title} key={idx}>
-                                  <Button
-                                    type="text"
-                                    size="small"
-                                    icon={btn.icon}
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      insertFormat(btn.before, btn.after);
-                                    }}
-                                    style={{ color: '#8c9ab0', padding: '2px 5px', fontSize: 13 }}
-                                  />
-                                </Tooltip>
-                              ))}
-                            </Space>
-                            <Tooltip title="Gửi (Ctrl+Enter)">
-                              <Button
-                                type="primary"
-                                size="small"
-                                icon={<SendOutlined />}
-                                loading={commentSending}
-                                disabled={!mention.content.trim()}
-                                onClick={handleSendComment}
-                              >
-                                Gửi
-                              </Button>
-                            </Tooltip>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Notify + action row */}
-                      <div style={{ marginTop: 8 }}>
-                        <Select
-                          mode="multiple"
-                          size="small"
-                          style={{ width: '100%', marginBottom: 8 }}
-                          placeholder={<><BellOutlined style={{ marginRight: 4 }} />Thông báo tới...</>}
-                          value={notifyUserIds}
-                          onChange={setNotifyUserIds}
-                          allowClear
-                          showSearch
-                          optionFilterProp="label"
-                          options={members
-                            .filter((m) => m.userId !== user?.id)
-                            .map((m) => ({
-                              label: `${m.fullName || m.username} (@${m.username})`,
-                              value: m.userId,
-                              member: m,
-                            }))}
-                          optionRender={(opt) => {
-                            const m = (opt.data as any).member as ProjectMember;
-                            return (
-                              <Space size={6}>
-                                <Avatar size={18} src={m.avatarUrl} icon={<UserOutlined />} />
-                                <span>{m.fullName || m.username}</span>
-                                <Text type="secondary" style={{ fontSize: 11 }}>@{m.username}</Text>
-                              </Space>
-                            );
-                          }}
-                        />
-                        <Space size={6}>
-                          <Button size="small" onClick={() => setReplyTo(null)}>Hủy</Button>
-                          <Button
-                            size="small"
-                            type={commentPreview ? 'default' : 'dashed'}
-                            onClick={() => setCommentPreview(!commentPreview)}
-                          >
-                            {commentPreview ? 'Chỉnh sửa' : 'Xem trước'}
-                          </Button>
-                          <Button
-                            size="small"
-                            type="primary"
-                            icon={<SendOutlined />}
-                            loading={commentSending}
-                            disabled={!mention.content.trim()}
-                            onClick={handleSendComment}
-                          >
-                            Gửi bình luận
-                          </Button>
-                        </Space>
-                      </div>
+                  {/* Notify + action row */}
+                  <div style={{ marginTop: 8 }}>
+                    <Select
+                      mode="multiple"
+                      size="small"
+                      style={{ width: '100%', marginBottom: 8 }}
+                      placeholder={<><BellOutlined style={{ marginRight: 4 }} />Thông báo tới...</>}
+                      value={notifyUserIds}
+                      onChange={setNotifyUserIds}
+                      allowClear
+                      showSearch
+                      optionFilterProp="label"
+                      options={members
+                        .filter((m) => m.userId !== user?.id)
+                        .map((m) => ({
+                          label: `${m.fullName || m.username} (@${m.username})`,
+                          value: m.userId,
+                          member: m,
+                        }))}
+                      optionRender={(opt) => {
+                        const m = (opt.data as any).member as ProjectMember;
+                        return (
+                          <Space size={6}>
+                            <Avatar size={18} src={m.avatarUrl} icon={<UserOutlined />} />
+                            <span>{m.fullName || m.username}</span>
+                            <Text type="secondary" style={{ fontSize: 11 }}>@{m.username}</Text>
+                          </Space>
+                        );
+                      }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                      {replyTo && (
+                        <Button size="small" onClick={() => setReplyTo(null)}>Hủy</Button>
+                      )}
+                      <Button
+                        size="small"
+                        type="primary"
+                        icon={<SendOutlined />}
+                        loading={commentSending}
+                        disabled={isCommentEmpty(commentHtml)}
+                        onClick={handleSendComment}
+                      >
+                        Gửi bình luận
+                      </Button>
                     </div>
                   </div>
                 </div>
