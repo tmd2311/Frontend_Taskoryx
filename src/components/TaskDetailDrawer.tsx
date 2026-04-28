@@ -1163,9 +1163,9 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                                 fileName={att.fileName}
                                 style={{ width: 40, height: 40, borderRadius: 4, cursor: 'pointer' }}
                                 onClick={() => {
-                                  const token = localStorage.getItem('accessToken');
+                                  const token = localStorage.getItem('access_token');
                                   const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
-                                  window.open(`${base}/attachments/${att.id}/inline?token=${token}`, '_blank');
+                                  window.open(`${base}/attachments/${att.id}/inline?token=${encodeURIComponent(token ?? '')}`, '_blank');
                                 }}
                               />
                             ) : (

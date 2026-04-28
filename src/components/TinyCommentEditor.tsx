@@ -58,10 +58,11 @@ const TinyCommentEditor: React.FC<TinyCommentEditorProps> = ({
           }
           a { color: #4361ee; }
         `,
-        // Upload ảnh inline – gửi lên API attachments của task
+        // Upload ảnh inline – gửi lên API attachments của task, trả về URL inline có token
+        // để browser có thể load ảnh trực tiếp trong <img src> mà không cần Authorization header
         images_upload_handler: (blobInfo) =>
           new Promise((resolve, reject) => {
-            const token = localStorage.getItem('accessToken');
+            const token = localStorage.getItem('access_token');
             const formData = new FormData();
             formData.append('file', blobInfo.blob(), blobInfo.filename());
             fetch(`${API_BASE}/tasks/${taskId}/attachments`, {
@@ -69,13 +70,21 @@ const TinyCommentEditor: React.FC<TinyCommentEditorProps> = ({
               headers: { Authorization: `Bearer ${token}` },
               body: formData,
             })
-              .then((res) => res.json())
-              .then((json) => {
-                const url = json?.data?.fileUrl ?? json?.fileUrl;
-                if (url) resolve(url);
-                else reject('Upload thất bại');
+              .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
               })
-              .catch(() => reject('Upload thất bại'));
+              .then((json) => {
+                const attachment = json?.data ?? json;
+                const id = attachment?.id;
+                if (id) {
+                  // Dùng inline endpoint với token trong query param vì <img src> không gửi được header
+                  resolve(`${API_BASE}/attachments/${id}/inline?token=${encodeURIComponent(token ?? '')}`);
+                } else {
+                  reject('Upload thất bại: không nhận được attachment id');
+                }
+              })
+              .catch((err) => reject(`Upload thất bại: ${err.message ?? err}`));
           }),
         file_picker_types: 'image',
         automatic_uploads: true,

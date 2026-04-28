@@ -523,8 +523,8 @@ const ProjectDetailPage: React.FC = () => {
   const handleExport = () => {
     if (!projectId) return;
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
-    const token = localStorage.getItem('accessToken');
-    window.open(`${baseUrl}/export/projects/${projectId}/tasks/excel?token=${token}`, '_blank');
+    const token = localStorage.getItem('access_token');
+    window.open(`${baseUrl}/export/projects/${projectId}/tasks/excel?token=${encodeURIComponent(token ?? '')}`, '_blank');
   };
 
   const tasks = projectTasks?.content ?? [];

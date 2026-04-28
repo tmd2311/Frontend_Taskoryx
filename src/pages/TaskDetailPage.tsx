@@ -197,7 +197,7 @@ const TaskDetailPage: React.FC = () => {
   const {
     updateTask, updateTaskStatus, deleteTask,
     comments, commentsLoading, fetchComments, addComment, updateComment, deleteComment,
-    attachments, attachmentsLoading, fetchAttachments, uploadAttachment, deleteAttachment,
+    attachments, attachmentsLoading, fetchAttachments, uploadAttachment, deleteAttachment, // attachments used by TinyMCE upload handler indirectly
   } = useTaskStore();
 
   const [loading, setLoading] = useState(true);
@@ -1075,92 +1075,6 @@ const TaskDetailPage: React.FC = () => {
 
               {/* Spacing before cards */}
               <div style={{ height: 16 }} />
-
-              {/* ── Tệp đính kèm ── */}
-              <Card
-                size="small"
-                title={
-                  <Space size={6}>
-                    <PaperClipOutlined />
-                    Tệp đính kèm
-                    {(task.attachmentCount ?? 0) > 0 && <Badge count={task.attachmentCount} size="small" color="#52c41a" />}
-                  </Space>
-                }
-                extra={
-                  <Space size={6}>
-                    <Button size="small" icon={<ReloadOutlined />}
-                      onClick={() => task?.id && fetchAttachments(task.id)} loading={attachmentsLoading} />
-                    <Upload {...uploadProps} showUploadList={false}>
-                      <Button size="small" type="primary" icon={<PaperClipOutlined />} loading={uploading}>
-                        Tải lên
-                      </Button>
-                    </Upload>
-                  </Space>
-                }
-                style={{ borderRadius: 12 }}
-              >
-                {attachmentsLoading && attachments.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-                ) : attachments.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '20px 0', color: '#bfbfbf', fontSize: 13 }}>
-                    <PaperClipOutlined style={{ fontSize: 28, display: 'block', marginBottom: 6 }} />
-                    Chưa có tệp đính kèm nào
-                  </div>
-                ) : (
-                  <List
-                    dataSource={attachments}
-                    renderItem={(att: Attachment) => (
-                      <List.Item
-                        style={{ padding: '8px 0' }}
-                        actions={[
-                          <Tooltip title="Tải xuống" key="dl">
-                            <Button type="text" size="small" icon={<DownloadOutlined />}
-                              onClick={() => downloadAttachment(att.id, att.fileName).catch(() => message.error('Tải xuống thất bại'))} />
-                          </Tooltip>,
-                          user?.id === att.uploadedById ? (
-                            <Popconfirm key="del" title="Xóa tệp này?"
-                              onConfirm={() => handleDeleteAttachment(att.id)}
-                              okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
-                              <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                            </Popconfirm>
-                          ) : null,
-                        ]}
-                      >
-                        <List.Item.Meta
-                          avatar={
-                            (att.isImage || att.image) ? (
-                              <AuthImage attachmentId={att.id} fileName={att.fileName}
-                                style={{ width: 36, height: 36, borderRadius: 4, cursor: 'pointer' }}
-                                onClick={() => {
-                                  const token = localStorage.getItem('accessToken');
-                                  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
-                                  window.open(`${base}/attachments/${att.id}/inline?token=${token}`, '_blank');
-                                }} />
-                            ) : (
-                              <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                {getFileIcon(att.fileType, att.fileName)}
-                              </div>
-                            )
-                          }
-                          title={
-                            <Text style={{ fontSize: 13, cursor: 'pointer' }}
-                              onClick={() => downloadAttachment(att.id, att.fileName).catch(() => message.error('Tải xuống thất bại'))}>
-                              {att.fileName}
-                            </Text>
-                          }
-                          description={
-                            <Space size={6} style={{ fontSize: 11 }}>
-                              <Text type="secondary">{att.formattedFileSize ?? `${Math.round(att.fileSize / 1024)} KB`}</Text>
-                              {att.uploadedByName && <Text type="secondary">· {att.uploadedByName}</Text>}
-                              <Text type="secondary">· {dayjs(att.createdAt).format('DD/MM/YYYY HH:mm')}</Text>
-                            </Space>
-                          }
-                        />
-                      </List.Item>
-                    )}
-                  />
-                )}
-              </Card>
 
               {/* ── Liên kết ── */}
               <Card

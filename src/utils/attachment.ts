@@ -10,7 +10,7 @@ const imageCache = new Map<string, string>();
 export const fetchAuthImage = async (attachmentId: string): Promise<string> => {
   if (imageCache.has(attachmentId)) return imageCache.get(attachmentId)!;
 
-  const token = localStorage.getItem('accessToken');
+  const token = localStorage.getItem('access_token');
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
   const res = await fetch(`${baseUrl}/attachments/${attachmentId}/inline`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -33,7 +33,7 @@ export const revokeAuthImage = (attachmentId: string) => {
 
 /** Tải file xuống với auth */
 export const downloadAttachment = async (attachmentId: string, fileName: string) => {
-  const token = localStorage.getItem('accessToken');
+  const token = localStorage.getItem('access_token');
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
   const res = await fetch(`${baseUrl}/attachments/${attachmentId}/download`, {
     headers: { Authorization: `Bearer ${token}` },
