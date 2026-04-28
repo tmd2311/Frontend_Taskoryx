@@ -52,6 +52,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const activeProjectTab = searchParams.get('tab') || 'tasks';
 
   const isInProject = !!currentProject;
+  const isTaskDetail = /^\/tasks\/[^/]+/.test(location.pathname);
 
   useEffect(() => {
     const handleResize = () => {
@@ -462,9 +463,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           minHeight: 'calc(100vh - 52px)',
           overflow: 'auto',
         }}>
-          {/* Nếu đang trong project: bỏ padding để full-width như Jira */}
-          {isInProject ? (
-            <div style={{ padding: '16px 20px' }}>
+          {isInProject || isTaskDetail ? (
+            <div style={{ padding: isMobile ? 10 : '16px 20px' }}>
               {children}
             </div>
           ) : (

@@ -93,6 +93,7 @@ const CommentContent: React.FC<{ content: string; mentionedUsers?: MentionedUser
 interface CommentItemProps {
   comment: Comment;
   currentUserId?: string;
+  taskId: string;
   depth?: number;
   onReply: (comment: Comment) => void;
   onEdit: (comment: Comment, newContent: string) => Promise<void>;
@@ -100,17 +101,20 @@ interface CommentItemProps {
 }
 
 const CommentItem: React.FC<CommentItemProps> = ({
-  comment, currentUserId, depth = 0, onReply, onEdit, onDelete,
+  comment, currentUserId, taskId, depth = 0, onReply, onEdit, onDelete,
 }) => {
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
   const [editSaving, setEditSaving] = useState(false);
   const isOwn = currentUserId === comment.userId;
 
+  const isEditEmpty = (html: string) =>
+    !html || html.replace(/<[^>]*>/g, '').trim() === '';
+
   const handleSaveEdit = async () => {
-    if (!editContent.trim()) return;
+    if (isEditEmpty(editContent)) return;
     setEditSaving(true);
-    await onEdit(comment, editContent.trim());
+    await onEdit(comment, editContent);
     setEditSaving(false);
     setEditing(false);
   };
@@ -132,11 +136,15 @@ const CommentItem: React.FC<CommentItemProps> = ({
           </Space>
           {editing ? (
             <div>
-              <TextArea value={editContent} onChange={(e) => setEditContent(e.target.value)}
-                autoSize={{ minRows: 2 }} style={{ marginBottom: 6 }} />
-              <Space size={6}>
+              <TinyCommentEditor
+                value={editContent}
+                onChange={setEditContent}
+                taskId={taskId}
+                minHeight={150}
+              />
+              <Space size={6} style={{ marginTop: 8 }}>
                 <Button size="small" type="primary" loading={editSaving} onClick={handleSaveEdit}
-                  disabled={!editContent.trim()}>Lưu</Button>
+                  disabled={isEditEmpty(editContent)}>Lưu</Button>
                 <Button size="small" onClick={() => { setEditing(false); setEditContent(comment.content); }}>Hủy</Button>
               </Space>
             </div>
@@ -171,7 +179,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
             <div style={{ marginTop: 6, paddingLeft: 8, borderLeft: '2px solid #f0f0f0' }}>
               {comment.replies.map((reply) => (
                 <CommentItem key={reply.id} comment={reply} currentUserId={currentUserId}
-                  depth={1} onReply={onReply} onEdit={onEdit} onDelete={onDelete} />
+                  taskId={taskId} depth={1} onReply={onReply} onEdit={onEdit} onDelete={onDelete} />
               ))}
             </div>
           )}
@@ -627,7 +635,7 @@ const TaskDetailPage: React.FC = () => {
   }
 
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto' }}>
+    <div>
 
       {task && (
         <>
@@ -1076,7 +1084,7 @@ const TaskDetailPage: React.FC = () => {
                   <div style={{ marginBottom: 16 }}>
                     {rootComments.map((comment) => (
                       <CommentItem key={comment.id} comment={comment} currentUserId={user?.id}
-                        onReply={handleReply} onEdit={handleEditComment} onDelete={handleDeleteComment} />
+                        taskId={task.id} onReply={handleReply} onEdit={handleEditComment} onDelete={handleDeleteComment} />
                     ))}
                   </div>
                 )}
