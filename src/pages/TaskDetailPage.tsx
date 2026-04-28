@@ -861,100 +861,6 @@ const TaskDetailPage: React.FC = () => {
               <Divider style={{ margin: '16px 0 0 0' }} />
 
               {/* ═══════════════════════════════════
-                  CHECKLIST – collapsible section
-              ═══════════════════════════════════ */}
-              <div style={{ margin: '0 0' }}>
-                {/* Section header */}
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    if (!checklistOpen && task?.id) fetchChecklist(task.id);
-                    setChecklistOpen(!checklistOpen);
-                  }}
-                  onKeyDown={(e) => e.key === 'Enter' && setChecklistOpen(!checklistOpen)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '10px 0', cursor: 'pointer', userSelect: 'none',
-                  }}
-                >
-                  <RightOutlined
-                    style={{
-                      fontSize: 11, color: '#8c8c8c',
-                      transform: checklistOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.2s',
-                    }}
-                  />
-                  <CheckSquareOutlined style={{ color: '#52c41a', fontSize: 14 }} />
-                  <Text strong style={{ fontSize: 13 }}>Checklist</Text>
-                  {checklist && checklist.totalItems > 0 && (
-                    <Badge
-                      count={`${checklist.checkedItems}/${checklist.totalItems}`}
-                      style={{ backgroundColor: '#52c41a', fontSize: 11 }}
-                    />
-                  )}
-                </div>
-
-                {/* Checklist body */}
-                {checklistOpen && (
-                  <div style={{ paddingLeft: 22, paddingBottom: 12 }}>
-                    {checklistLoading ? (
-                      <div style={{ textAlign: 'center', padding: 20 }}><Spin /></div>
-                    ) : (
-                      <>
-                        {checklist && checklist.totalItems > 0 && (
-                          <div style={{ marginBottom: 12 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                {checklist.checkedItems}/{checklist.totalItems} hoàn thành
-                              </Text>
-                              <Text strong style={{ color: '#52c41a', fontSize: 12 }}>
-                                {checklist.completionPercentage}%
-                              </Text>
-                            </div>
-                            <Progress percent={checklist.completionPercentage} showInfo={false}
-                              strokeColor="#52c41a" size="small" />
-                          </div>
-                        )}
-                        <div style={{ marginBottom: 12 }}>
-                          {checklist?.items.map((item) => (
-                            <div key={item.id} style={{
-                              display: 'flex', alignItems: 'center', gap: 8,
-                              padding: '6px 0', borderBottom: '1px solid #f0f0f0',
-                            }}>
-                              <Checkbox checked={item.isChecked} onChange={() => handleToggleCheckItem(item)} />
-                              <Text style={{
-                                flex: 1, fontSize: 13,
-                                textDecoration: item.isChecked ? 'line-through' : 'none',
-                                color: item.isChecked ? '#8c8c8c' : undefined,
-                              }}>
-                                {item.content}
-                              </Text>
-                              {item.checkedByName && item.isChecked && (
-                                <Text type="secondary" style={{ fontSize: 11 }}>{item.checkedByName}</Text>
-                              )}
-                              <Popconfirm title="Xóa item này?" onConfirm={() => handleDeleteCheckItem(item.id)}
-                                okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
-                                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                              </Popconfirm>
-                            </div>
-                          ))}
-                        </div>
-                        <Space.Compact style={{ width: '100%' }}>
-                          <Input value={newCheckItem} onChange={(e) => setNewCheckItem(e.target.value)}
-                            placeholder="Thêm mục việc cần làm..." onPressEnter={handleAddCheckItem} />
-                          <Button type="primary" icon={<PlusOutlined />} loading={addingCheckItem}
-                            disabled={!newCheckItem.trim()} onClick={handleAddCheckItem}>Thêm</Button>
-                        </Space.Compact>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <Divider style={{ margin: '0 0' }} />
-
-              {/* ═══════════════════════════════════
                   GIỜ LÀM – collapsible section
               ═══════════════════════════════════ */}
               <div style={{ margin: '0 0' }}>
@@ -998,6 +904,7 @@ const TaskDetailPage: React.FC = () => {
                         )}
                       </Space>
                       <Button type="primary" icon={<PlusOutlined />} size="small"
+                        style={{ background: '#52c41a', borderColor: '#52c41a' }}
                         onClick={() => { timeForm.resetFields(); setAddTimeModal(true); }}>
                         Ghi nhận giờ
                       </Button>
