@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "ADMIN_ACCESS":          { "label": "Truy cập trang quản trị",        "resource": "ADMIN"   },
+
+    "USER_VIEW":             { "label": "Xem danh sách người dùng",        "resource": "USER"    },
+    "USER_CREATE":           { "label": "Tạo tài khoản người dùng",        "resource": "USER"    },
+    "USER_UPDATE":           { "label": "Cập nhật thông tin người dùng",   "resource": "USER"    },
+    "USER_DELETE":           { "label": "Xóa tài khoản người dùng",        "resource": "USER"    },
+
+    "PROJECT_VIEW":          { "label": "Xem dự án",                       "resource": "PROJECT" },
+    "PROJECT_CREATE":        { "label": "Tạo dự án mới",                   "resource": "PROJECT" },
+    "PROJECT_UPDATE":        { "label": "Cập nhật thông tin dự án",        "resource": "PROJECT" },
+    "PROJECT_DELETE":        { "label": "Xóa dự án",                       "resource": "PROJECT" },
+    "PROJECT_MANAGE_MEMBERS":{ "label": "Quản lý thành viên dự án",        "resource": "PROJECT" },
+
+    "BOARD_VIEW":            { "label": "Xem bảng Kanban",                 "resource": "BOARD"   },
+    "BOARD_CREATE":          { "label": "Tạo bảng mới",                    "resource": "BOARD"   },
+    "BOARD_UPDATE":          { "label": "Cập nhật bảng",                   "resource": "BOARD"   },
+    "BOARD_DELETE":          { "label": "Xóa bảng",                        "resource": "BOARD"   },
+
+    "TASK_VIEW":             { "label": "Xem công việc",                   "resource": "TASK"    },
+    "TASK_CREATE":           { "label": "Tạo công việc mới",               "resource": "TASK"    },
+    "TASK_UPDATE":           { "label": "Cập nhật công việc",              "resource": "TASK"    },
+    "TASK_DELETE":           { "label": "Xóa công việc",                   "resource": "TASK"    },
+    "TASK_ASSIGN":           { "label": "Giao công việc cho người khác",   "resource": "TASK"    },
+
+    "COMMENT_CREATE":        { "label": "Tạo bình luận",                   "resource": "COMMENT" },
+    "COMMENT_DELETE":        { "label": "Xóa bình luận",                   "resource": "COMMENT" },
+
+    "REPORT_VIEW":           { "label": "Xem báo cáo thống kê",            "resource": "REPORT"  }
+  },
+  "resources": {
+    "ADMIN":   "Quản trị hệ thống",
+    "USER":    "Người dùng",
+    "PROJECT": "Dự án",
+    "BOARD":   "Bảng Kanban",
+    "TASK":    "Công việc",
+    "COMMENT": "Bình luận",
+    "REPORT":  "Báo cáo"
+  }
+}

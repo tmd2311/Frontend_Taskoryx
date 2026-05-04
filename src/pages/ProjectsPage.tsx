@@ -126,8 +126,8 @@ const PROJECT_COLORS = [
 const getRoleColor = (role?: string) => {
   switch (role) {
     case 'OWNER': return 'gold';
-    case 'ADMIN': return 'red';
-    case 'MEMBER': return 'blue';
+    case 'MANAGER': return 'blue';
+    case 'DEVELOPER': return 'green';
     case 'VIEWER': return 'default';
     default: return 'default';
   }
@@ -136,8 +136,8 @@ const getRoleColor = (role?: string) => {
 const getRoleLabel = (role?: string) => {
   switch (role) {
     case 'OWNER': return 'Quản trị viên';
-    case 'ADMIN': return 'Quản trị';
-    case 'MEMBER': return 'Thành viên';
+    case 'MANAGER': return 'Quản lý';
+    case 'DEVELOPER': return 'Lập trình viên';
     case 'VIEWER': return 'Người xem';
     default: return role ?? '';
   }

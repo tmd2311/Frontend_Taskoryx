@@ -28,11 +28,15 @@
       "mcp__agentica__pipeline_complete_role",
       "mcp__agentica__pipeline_confirm_advance",
       "mcp__agentica__registry_save_artifact",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(python3 *)"
     ]
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "agentica"
-  ]
+  ],
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true
+  }
 }

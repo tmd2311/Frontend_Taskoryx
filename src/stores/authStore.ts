@@ -171,6 +171,7 @@ export const useAuthStore = create<AuthState>()(
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
+        isAdmin: state.isAdmin,
       }),
     }
   )

@@ -531,6 +531,9 @@ const ProjectDetailPage: React.FC = () => {
   const total = projectTasks?.totalElements ?? 0;
   const project = currentProject?.id === projectId ? currentProject : null;
   const canDelete = isAdmin || project?.currentUserRole === ProjectRole.OWNER;
+  const canManageMembers = isAdmin
+    || project?.currentUserRole === ProjectRole.OWNER
+    || project?.currentUserRole === ProjectRole.MANAGER;
 
   // Set currentProject vào store sau khi fetch xong (hỗ trợ truy cập URL trực tiếp)
   useEffect(() => {
@@ -557,6 +560,12 @@ const ProjectDetailPage: React.FC = () => {
       title: 'Vai trò', dataIndex: 'role', key: 'role', width: 180,
       render: (role: string, m) => {
         if (role === ProjectRole.OWNER) return <Tag color="gold">Quản trị viên</Tag>;
+        if (!canManageMembers) {
+          const labels: Record<string, string> = {
+            MANAGER: 'Quản lý', DEVELOPER: 'Lập trình viên', VIEWER: 'Người xem',
+          };
+          return <Tag>{labels[role] ?? role}</Tag>;
+        }
         return (
           <Select size="small" value={role} loading={roleUpdating === m.userId}
             style={{ width: 150 }} options={projectRoleOptions}
@@ -571,7 +580,7 @@ const ProjectDetailPage: React.FC = () => {
     {
       title: '', key: 'actions', width: 60,
       render: (_, m) => {
-        if (m.role === ProjectRole.OWNER) return null;
+        if (m.role === ProjectRole.OWNER || !canManageMembers) return null;
         return (
           <Popconfirm title={`Xóa ${m.fullName || m.username} khỏi dự án?`}
             onConfirm={() => handleRemoveMember(m.userId, m.fullName || m.username)}
@@ -680,12 +689,14 @@ const ProjectDetailPage: React.FC = () => {
 
       {activeTab === 'members' && (
         <>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-            <Button type="primary" icon={<UserAddOutlined />}
-              onClick={() => { addForm.resetFields(); setAddModalOpen(true); }}>
-              Thêm thành viên
-            </Button>
-          </div>
+          {canManageMembers && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+              <Button type="primary" icon={<UserAddOutlined />}
+                onClick={() => { addForm.resetFields(); setAddModalOpen(true); }}>
+                Thêm thành viên
+              </Button>
+            </div>
+          )}
           <Table columns={buildMemberColumns()} dataSource={members} rowKey="id"
             pagination={false} scroll={{ x: 'max-content' }} locale={{ emptyText: <Empty description="Không có thành viên" /> }} />
         </>

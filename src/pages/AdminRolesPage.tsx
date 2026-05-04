@@ -13,6 +13,13 @@ import { useAdminStore } from '../stores/adminStore';
 import { useAuthStore } from '../stores/authStore';
 import type { Role, Permission } from '../types';
 import dayjs from 'dayjs';
+import permissionLabels from '../utils/permissionLabels.json';
+
+const getPermissionLabel = (name: string): string =>
+  (permissionLabels.permissions as Record<string, { label: string }>)[name]?.label ?? name;
+
+const getResourceLabel = (resource: string): string =>
+  (permissionLabels.resources as Record<string, string>)[resource] ?? resource;
 
 const { Title, Text } = Typography;
 
@@ -227,7 +234,7 @@ const AdminRolesPage: React.FC = () => {
                     }}
                   />
                 )}
-                <Text strong style={{ fontSize: 12, color: '#4361ee' }}>{resource}</Text>
+                <Text strong style={{ fontSize: 12, color: '#4361ee' }}>{getResourceLabel(resource)}</Text>
                 {checkedCount > 0 && (
                   <Badge count={checkedCount} color="#4361ee" size="small" />
                 )}
@@ -245,8 +252,8 @@ const AdminRolesPage: React.FC = () => {
                         )
                       }
                     >
-                      <Tooltip title={p.description}>
-                        <Text style={{ fontSize: 12 }}>{p.name}</Text>
+                      <Tooltip title={p.name}>
+                        <Text style={{ fontSize: 12 }}>{getPermissionLabel(p.name)}</Text>
                       </Tooltip>
                     </Checkbox>
                   </div>
