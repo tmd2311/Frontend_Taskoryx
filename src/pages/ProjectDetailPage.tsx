@@ -44,12 +44,7 @@ const PRIORITY_LABEL: Record<string, string> = {
   [TaskPriority.LOW]: 'Thấp', [TaskPriority.MEDIUM]: 'Trung bình',
   [TaskPriority.HIGH]: 'Cao', [TaskPriority.URGENT]: 'Khẩn cấp',
 };
-// Fallback khi chưa tải được roles từ API
-const DEFAULT_ROLE_OPTIONS = [
-  { label: 'Quản lý', value: ProjectRole.MANAGER },
-  { label: 'Lập trình viên', value: ProjectRole.DEVELOPER },
-  { label: 'Người xem', value: ProjectRole.VIEWER },
-];
+
 const TASK_STATUS_COLUMNS: { status: TaskStatus; label: string; color: string }[] = [
   { status: TaskStatus.TODO,        label: 'Cần làm',        color: '#8c8c8c' },
   { status: TaskStatus.IN_PROGRESS, label: 'Đang làm',       color: '#1890ff' },
@@ -132,13 +127,7 @@ const ProjectDetailPage: React.FC = () => {
     projectTasks, isLoading, fetchProjectTasks,
   } = useTaskStore();
   const { isAdmin, user: currentUser } = useAuthStore();
-  const { roles: systemRoles, fetchRoles } = useAdminStore();
-  // Roles cho project member — ưu tiên từ API, fallback về hardcoded nếu chưa tải
-  const projectRoleOptions = systemRoles.length > 0
-    ? systemRoles
-        .filter((r) => r.name !== 'OWNER')
-        .map((r) => ({ label: r.name, value: r.name }))
-    : DEFAULT_ROLE_OPTIONS;
+  const { fetchRoles } = useAdminStore();
 
   // Task list filters
   const [keyword, setKeyword] = useState('');
@@ -152,7 +141,7 @@ const ProjectDetailPage: React.FC = () => {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addForm] = Form.useForm();
   const [addSaving, setAddSaving] = useState(false);
-  const [roleUpdating, setRoleUpdating] = useState<string>('');
+
   const [memberSearchResults, setMemberSearchResults] = useState<{ label: React.ReactNode; value: string }[]>([]);
   const [memberSearchLoading, setMemberSearchLoading] = useState(false);
   const memberSearchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -210,7 +199,7 @@ const ProjectDetailPage: React.FC = () => {
     if (!projectId) return;
     fetchProjectById(projectId);
     fetchMembers(projectId);
-    if (systemRoles.length === 0) fetchRoles().catch(() => {});
+    fetchRoles().catch(() => {});
   }, [projectId]);
 
   // Sync currentProject vào store khi load trực tiếp qua URL
@@ -335,19 +324,6 @@ const ProjectDetailPage: React.FC = () => {
     }
   };
 
-  const handleChangeRole = async (userId: string, role: string) => {
-    if (!projectId) return;
-    setRoleUpdating(userId);
-    try {
-      await projectService.updateMemberRole(projectId, userId, { role: role as any });
-      message.success('Đã cập nhật vai trò');
-      fetchMembers(projectId);
-    } catch (e: any) {
-      message.error(e.message || 'Cập nhật vai trò thất bại');
-    } finally {
-      setRoleUpdating('');
-    }
-  };
 
   const handleRemoveMember = async (userId: string, name: string) => {
     if (!projectId) return;
