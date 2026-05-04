@@ -506,7 +506,7 @@ const TaskDetailPage: React.FC = () => {
   const memberOptions = members.map((m) => ({
     label: (
       <Space size={8}>
-        <Avatar size={20} src={m.avatarUrl} icon={<UserOutlined />} />
+        <Avatar size={20} src={resolveAvatarUrl(m.avatarUrl)} icon={<UserOutlined />} />
         <span>{m.fullName || m.username}</span>
         <Text type="secondary" style={{ fontSize: 11 }}>{m.email}</Text>
       </Space>
@@ -951,7 +951,7 @@ const TaskDetailPage: React.FC = () => {
                         const m = (opt.data as any).member as ProjectMember;
                         return (
                           <Space size={6}>
-                            <Avatar size={18} src={m.avatarUrl} icon={<UserOutlined />} />
+                            <Avatar size={18} src={resolveAvatarUrl(m.avatarUrl)} icon={<UserOutlined />} />
                             <span>{m.fullName || m.username}</span>
                             <Text type="secondary" style={{ fontSize: 11 }}>@{m.username}</Text>
                           </Space>
@@ -1093,7 +1093,7 @@ const TaskDetailPage: React.FC = () => {
                       if (!m) return <span>{String(opt.label)}</span>;
                       return (
                         <Space size={6}>
-                          <Avatar size={16} src={m.avatarUrl} icon={<UserOutlined />} />
+                          <Avatar size={16} src={resolveAvatarUrl(m.avatarUrl)} icon={<UserOutlined />} />
                           <span style={{ fontSize: 13 }}>{m.fullName || m.username}</span>
                         </Space>
                       );
