@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { resolveAvatarUrl } from '../utils/avatar';
 import {
   Typography,
   Tabs,
@@ -14,11 +15,11 @@ import {
   Divider,
   Alert,
   message,
-  Select,
   Modal,
   Image,
   Spin,
   Switch,
+  Upload,
 } from 'antd';
 import {
   UserOutlined,
@@ -27,11 +28,11 @@ import {
   LockOutlined,
   EditOutlined,
   SaveOutlined,
-  GlobalOutlined,
-  ClockCircleOutlined,
   SafetyCertificateOutlined,
   QrcodeOutlined,
+  CameraOutlined,
 } from '@ant-design/icons';
+import type { RcFile } from 'antd/es/upload';
 import { useAuthStore } from '../stores/authStore';
 import { userService } from '../services/userService';
 import { authService } from '../services/authService';
@@ -39,30 +40,15 @@ import type { UpdateProfileRequest, ChangePasswordRequest, TwoFactorSetupRespons
 
 const { Title, Text } = Typography;
 
-const TIMEZONES = [
-  'Asia/Ho_Chi_Minh',
-  'Asia/Bangkok',
-  'Asia/Singapore',
-  'Asia/Tokyo',
-  'Asia/Seoul',
-  'UTC',
-  'Europe/London',
-  'America/New_York',
-  'America/Los_Angeles',
-];
-
-const LANGUAGES = [
-  { value: 'vi', label: 'Tiếng Việt' },
-  { value: 'en', label: 'English' },
-];
 
 const ProfilePage: React.FC = () => {
-  const { user, updateProfile } = useAuthStore();
+  const { user, updateProfile, setUser } = useAuthStore();
 
   const [profileForm] = Form.useForm<UpdateProfileRequest>();
   const [passwordForm] = Form.useForm<ChangePasswordRequest>();
   const [twoFaForm] = Form.useForm<{ code: string }>();
 
+  const [avatarPreview, setAvatarPreview] = useState<string | undefined>(undefined);
   const [profileSaving, setProfileSaving] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -146,9 +132,6 @@ const ProfilePage: React.FC = () => {
       profileForm.setFieldsValue({
         fullName: user.fullName,
         phone: user.phone,
-        avatarUrl: user.avatarUrl,
-        timezone: user.timezone,
-        language: user.language,
       });
     }
   }, [user, profileForm]);
@@ -166,6 +149,26 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const handleAvatarUpload = async (file: RcFile): Promise<boolean> => {
+    const isImage = file.type.startsWith('image/');
+    if (!isImage) { message.error('Chỉ hỗ trợ file ảnh!'); return false; }
+    if (file.size > 10 * 1024 * 1024) { message.error('Ảnh không được quá 10MB!'); return false; }
+    setAvatarUploading(true);
+    try {
+      const updated = await userService.uploadAvatar(file);
+      setUser(updated);
+      setAvatarPreview(updated.avatarUrl);
+      message.success('Cập nhật ảnh đại diện thành công!');
+    } catch (err: any) {
+      message.error(err.message || 'Upload ảnh thất bại!');
+    } finally {
+      setAvatarUploading(false);
+    }
+    return false;
+  };
+
   const handlePasswordChange = async (values: ChangePasswordRequest) => {
     setPasswordSaving(true);
     setPasswordError(null);
@@ -180,7 +183,7 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  const avatarUrl = user?.avatarUrl;
+  const avatarUrl = resolveAvatarUrl(avatarPreview || user?.avatarUrl);
   const displayName = user?.fullName || user?.username || '';
   const initial = displayName.charAt(0).toUpperCase();
 
@@ -367,52 +370,40 @@ const ProfilePage: React.FC = () => {
                       </Col>
                     </Row>
 
-                    <Form.Item
-                      name="avatarUrl"
-                      label="URL ảnh đại diện"
-                      rules={[
-                        {
-                          type: 'url',
-                          message: 'Vui lòng nhập URL hợp lệ',
-                          warningOnly: true,
-                        },
-                      ]}
-                    >
-                      <Input placeholder="https://example.com/avatar.png" />
+                    <Form.Item label="Ảnh đại diện">
+                      <Upload
+                        accept="image/*"
+                        showUploadList={false}
+                        beforeUpload={handleAvatarUpload}
+                        disabled={avatarUploading}
+                      >
+                        <div style={{ position: 'relative', display: 'inline-block', cursor: 'pointer' }}
+                          className="avatar-upload-wrapper">
+                          <Avatar
+                            size={72}
+                            src={avatarUrl}
+                            icon={!avatarUrl ? <UserOutlined /> : undefined}
+                            style={{ background: '#1890ff', fontSize: 28, display: 'block' }}
+                          >
+                            {!avatarUrl && initial}
+                          </Avatar>
+                          <div style={{
+                            position: 'absolute', inset: 0, borderRadius: '50%',
+                            background: 'rgba(0,0,0,0.45)', display: 'flex',
+                            alignItems: 'center', justifyContent: 'center',
+                            opacity: avatarUploading ? 1 : 0,
+                            transition: 'opacity 0.2s',
+                          }}
+                            className="avatar-overlay"
+                          >
+                            {avatarUploading
+                              ? <Spin size="small" style={{ color: '#fff' }} />
+                              : <CameraOutlined style={{ color: '#fff', fontSize: 20 }} />}
+                          </div>
+                        </div>
+                      </Upload>
+                      <style>{`.avatar-upload-wrapper:hover .avatar-overlay { opacity: 1 !important; }`}</style>
                     </Form.Item>
-
-                    <Row gutter={16}>
-                      <Col xs={24} sm={12}>
-                        <Form.Item name="timezone" label="Múi giờ">
-                          <Select
-                            placeholder="Chọn múi giờ"
-                            suffixIcon={<ClockCircleOutlined />}
-                            allowClear
-                          >
-                            {TIMEZONES.map((tz) => (
-                              <Select.Option key={tz} value={tz}>
-                                {tz}
-                              </Select.Option>
-                            ))}
-                          </Select>
-                        </Form.Item>
-                      </Col>
-                      <Col xs={24} sm={12}>
-                        <Form.Item name="language" label="Ngôn ngữ">
-                          <Select
-                            placeholder="Chọn ngôn ngữ"
-                            suffixIcon={<GlobalOutlined />}
-                            allowClear
-                          >
-                            {LANGUAGES.map((l) => (
-                              <Select.Option key={l.value} value={l.value}>
-                                {l.label}
-                              </Select.Option>
-                            ))}
-                          </Select>
-                        </Form.Item>
-                      </Col>
-                    </Row>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                       <Button

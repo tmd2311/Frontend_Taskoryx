@@ -25,6 +25,7 @@ import { watcherService } from '../services/watcherService';
 import RichTextEditor from './RichTextEditor';
 import AuthImage from './AuthImage';
 import { downloadAttachment } from '../utils/attachment';
+import { resolveAvatarUrl } from '../utils/avatar';
 import type {
   ProjectMember, Comment, Attachment, ChecklistItem, ChecklistSummary,
   TimeEntry, TaskDependency, MentionedUser,
@@ -127,7 +128,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
     <div style={{ marginBottom: depth === 0 ? 16 : 8 }}>
       <div style={{ display: 'flex', gap: 10 }}>
         <Avatar
-          src={comment.userAvatar}
+          src={resolveAvatarUrl(comment.userAvatar)}
           icon={<UserOutlined />}
           size={depth === 0 ? 36 : 28}
           style={{ flexShrink: 0, marginTop: 2 }}
@@ -651,7 +652,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     ...members.map((m) => ({
       label: (
         <Space size={8}>
-          <Avatar size={20} src={m.avatarUrl} icon={<UserOutlined />} />
+          <Avatar size={20} src={resolveAvatarUrl(m.avatarUrl)} icon={<UserOutlined />} />
           <span>{m.fullName || m.username}</span>
           <Text type="secondary" style={{ fontSize: 11 }}>{m.email}</Text>
         </Space>
@@ -832,7 +833,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                       if (!m) return <span>{String(opt.label)}</span>;
                       return (
                         <Space size={6}>
-                          <Avatar size={18} src={m.avatarUrl} icon={<UserOutlined />} />
+                          <Avatar size={18} src={resolveAvatarUrl(m.avatarUrl)} icon={<UserOutlined />} />
                           {m.fullName || m.username}
                         </Space>
                       );
@@ -1349,7 +1350,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                   value: u.username,
                   label: (
                     <Space size={6}>
-                      <Avatar size={18} src={u.avatarUrl} icon={<UserOutlined />} />
+                      <Avatar size={18} src={resolveAvatarUrl(u.avatarUrl)} icon={<UserOutlined />} />
                       <span>{u.fullName || u.username}</span>
                       <Text type="secondary" style={{ fontSize: 11 }}>@{u.username}</Text>
                     </Space>

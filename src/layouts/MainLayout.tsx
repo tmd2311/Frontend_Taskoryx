@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { resolveAvatarUrl } from '../utils/avatar';
 import { Layout, Menu, Avatar, Dropdown, Typography, notification, Tooltip } from 'antd';
 import {
   MenuFoldOutlined,
@@ -355,7 +356,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             borderTop: `1px solid ${userBottomBorder}`,
             display: 'flex', alignItems: 'center', gap: 8,
           }}>
-            <Avatar src={user?.avatarUrl} style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)', flexShrink: 0 }} size={32}>
+            <Avatar src={resolveAvatarUrl(user?.avatarUrl)} style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)', flexShrink: 0 }} size={32}>
               {initials}
             </Avatar>
             <div style={{ minWidth: 0, flex: 1 }}>
@@ -370,7 +371,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </div>
         ) : (
           <div style={{ padding: '10px 0', display: 'flex', justifyContent: 'center', borderTop: `1px solid ${userBottomBorder}` }}>
-            <Avatar src={user?.avatarUrl} style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)' }} size={28}>{initials}</Avatar>
+            <Avatar src={resolveAvatarUrl(user?.avatarUrl)} style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)' }} size={28}>{initials}</Avatar>
           </div>
         )}
       </Sider>
@@ -443,7 +444,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 onMouseEnter={e => (e.currentTarget.style.background = iconHoverBg)}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                <Avatar src={user?.avatarUrl} size={28} style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)', flexShrink: 0 }}>
+                <Avatar src={resolveAvatarUrl(user?.avatarUrl)} size={28} style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)', flexShrink: 0 }}>
                   {initials}
                 </Avatar>
                 {!isMobile && (

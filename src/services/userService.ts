@@ -17,6 +17,16 @@ export const userService = {
     return response.data ?? response;
   },
 
+  /** POST /users/me/avatar – multipart/form-data */
+  uploadAvatar: async (file: File): Promise<User> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response: any = await api.post('/users/me/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data ?? response;
+  },
+
   /**
    * PUT /users/me/password
    * Body: { currentPassword, newPassword, confirmPassword }

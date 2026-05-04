@@ -37,6 +37,7 @@ import { useAdminStore } from '../stores/adminStore';
 import { useAuthStore } from '../stores/authStore';
 import type { AdminUser } from '../types';
 import dayjs from 'dayjs';
+import { resolveAvatarUrl } from '../utils/avatar';
 
 const { Title, Text } = Typography;
 const PAGE_SIZE = 15;
@@ -249,7 +250,7 @@ const AdminUsersPage: React.FC = () => {
       key: 'user',
       render: (_, u) => (
         <Space>
-          <Avatar src={u.avatarUrl} icon={<UserOutlined />} size={36} />
+          <Avatar src={resolveAvatarUrl(u.avatarUrl)} icon={<UserOutlined />} size={36} />
           <div>
             <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
               {u.fullName || u.username}

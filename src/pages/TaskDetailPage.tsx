@@ -30,6 +30,7 @@ import type {
 import { TaskPriority, TaskStatus, DependencyType } from '../types';
 import StatusSelect from '../components/StatusSelect';
 import dayjs from 'dayjs';
+import { resolveAvatarUrl } from '../utils/avatar';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/vi';
 
