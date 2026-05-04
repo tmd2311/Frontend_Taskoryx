@@ -213,8 +213,8 @@ export interface UpdateProjectRequest {
 }
 
 export interface AddMemberRequest {
-  email: string;   // API dùng email để thêm member
-  role: ProjectRole;
+  email: string;
+  role?: ProjectRole;
 }
 
 export interface UpdateMemberRoleRequest {

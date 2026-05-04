@@ -8,7 +8,7 @@ import {
 import {
   CheckSquareOutlined, TeamOutlined, ExclamationCircleOutlined,
   UserOutlined, CommentOutlined, PaperClipOutlined, SearchOutlined, ReloadOutlined,
-  UserAddOutlined, DeleteOutlined, PlusOutlined,
+  UserAddOutlined, DeleteOutlined, PlusOutlined, ApartmentOutlined,
   ThunderboltOutlined, AppstoreAddOutlined,
   PlayCircleOutlined, CheckCircleOutlined, EditOutlined,
   DownloadOutlined,
@@ -131,7 +131,7 @@ const ProjectDetailPage: React.FC = () => {
   const {
     projectTasks, isLoading, fetchProjectTasks,
   } = useTaskStore();
-  const { isAdmin } = useAuthStore();
+  const { isAdmin, user: currentUser } = useAuthStore();
   const { roles: systemRoles, fetchRoles } = useAdminStore();
   // Roles cho project member — ưu tiên từ API, fallback về hardcoded nếu chưa tải
   const projectRoleOptions = systemRoles.length > 0
@@ -175,6 +175,14 @@ const ProjectDetailPage: React.FC = () => {
   const [createTaskSprintId, setCreateTaskSprintId] = useState<string | null>(null);
   const [createTaskForm] = Form.useForm();
   const [creatingTask, setCreatingTask] = useState(false);
+  // Create task from tab tasks
+  const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false);
+  const [createTaskTabForm] = Form.useForm();
+  const [creatingTaskTab, setCreatingTaskTab] = useState(false);
+  const [tabTaskSprints, setTabTaskSprints] = useState<Sprint[]>([]);
+  const [tabSprintsLoading, setTabSprintsLoading] = useState(false);
+  const [parentCandidates, setParentCandidates] = useState<import('../types').TaskSummary[]>([]);
+  const [parentLoading, setParentLoading] = useState(false);
   // Complete sprint flow
   const [completeSprintId, setCompleteSprintId] = useState<string | null>(null);
   const [incompleteTasksForSprint, setIncompleteTasksForSprint] = useState<TaskSummary[]>([]);
@@ -310,11 +318,11 @@ const ProjectDetailPage: React.FC = () => {
     }, 300);
   };
 
-  const handleAddMember = async (values: { email: string; role: string }) => {
+  const handleAddMember = async (values: { email: string }) => {
     if (!projectId) return;
     setAddSaving(true);
     try {
-      await projectService.addMember(projectId, { email: values.email.trim(), role: values.role as any });
+      await projectService.addMember(projectId, { email: values.email.trim() });
       message.success('Đã thêm thành viên vào dự án');
       setAddModalOpen(false);
       addForm.resetFields();
@@ -430,6 +438,57 @@ const ProjectDetailPage: React.FC = () => {
       message.error(e.message || 'Tạo task thất bại');
     } finally {
       setCreatingTask(false);
+    }
+  };
+
+  const loadTabSprints = async (projId: string) => {
+    setTabSprintsLoading(true);
+    try {
+      const data = await sprintService.getSprints(projId);
+      setTabTaskSprints(Array.isArray(data) ? data.filter(s => s.status !== SprintStatus.COMPLETED) : []);
+    } catch { setTabTaskSprints([]); }
+    finally { setTabSprintsLoading(false); }
+  };
+
+  const loadParentCandidates = async (projId: string) => {
+    setParentLoading(true);
+    try {
+      const candidates = await taskService.getValidParentTasks(projId);
+      setParentCandidates(Array.isArray(candidates) ? candidates : []);
+    } catch { setParentCandidates([]); }
+    finally { setParentLoading(false); }
+  };
+
+  const openCreateTaskModal = () => {
+    createTaskTabForm.resetFields();
+    createTaskTabForm.setFieldsValue({ assigneeId: currentUser?.id });
+    setCreateTaskModalOpen(true);
+    if (!projectId) return;
+    loadTabSprints(projectId);
+    loadParentCandidates(projectId);
+  };
+
+  const handleCreateTaskFromTab = async (values: any) => {
+    if (!projectId) return;
+    setCreatingTaskTab(true);
+    try {
+      const payload: CreateTaskRequest = {
+        title: values.title,
+        description: values.description,
+        priority: values.priority ?? TaskPriority.MEDIUM,
+        sprintId: values.sprintId,
+        parentTaskId: values.parentTaskId,
+        dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
+      };
+      await taskService.createTask(projectId, payload);
+      message.success('Đã tạo task');
+      createTaskTabForm.resetFields();
+      setCreateTaskModalOpen(false);
+      fetchProjectTasks(projectId, { page: 0, size: PAGE_SIZE });
+    } catch (e: any) {
+      message.error(e.message || 'Tạo task thất bại');
+    } finally {
+      setCreatingTaskTab(false);
     }
   };
 
@@ -558,19 +617,14 @@ const ProjectDetailPage: React.FC = () => {
     },
     {
       title: 'Vai trò', dataIndex: 'role', key: 'role', width: 180,
-      render: (role: string, m) => {
-        if (role === ProjectRole.OWNER) return <Tag color="gold">Quản trị viên</Tag>;
-        if (!canManageMembers) {
-          const labels: Record<string, string> = {
-            MANAGER: 'Quản lý', DEVELOPER: 'Lập trình viên', VIEWER: 'Người xem',
-          };
-          return <Tag>{labels[role] ?? role}</Tag>;
-        }
-        return (
-          <Select size="small" value={role} loading={roleUpdating === m.userId}
-            style={{ width: 150 }} options={projectRoleOptions}
-            onChange={(v) => handleChangeRole(m.userId, v)} />
-        );
+      render: (role: string) => {
+        const labels: Record<string, string> = {
+          OWNER: 'Quản trị viên', MANAGER: 'Quản lý', DEVELOPER: 'Lập trình viên', VIEWER: 'Người xem',
+        };
+        const colors: Record<string, string> = {
+          OWNER: 'gold', MANAGER: 'blue', DEVELOPER: 'green', VIEWER: 'default',
+        };
+        return <Tag color={colors[role] ?? 'default'}>{labels[role] ?? role}</Tag>;
       },
     },
     {
@@ -647,6 +701,7 @@ const ProjectDetailPage: React.FC = () => {
               onChange={(e) => !e.target.value && (setKeyword(''), setPage(1))}
               onBlur={(e) => { setKeyword(e.target.value); setPage(1); }}
             />
+
             <Select mode="multiple" placeholder="Lọc ưu tiên" allowClear
               style={{ flex: '1 1 160px', minWidth: 140 }} value={filterPriority}
               onChange={(v) => { setFilterPriority(v); setPage(1); }}
@@ -668,6 +723,9 @@ const ProjectDetailPage: React.FC = () => {
                 fetchProjectTasks(projectId!, { page: 0, size: PAGE_SIZE });
               }} loading={isLoading} />
             </Tooltip>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreateTaskModal}>
+              Tạo task
+            </Button>
           </div>
           <Table
             columns={buildTaskColumns((r) => navigate(`/tasks/${r.taskKey}`))}
@@ -1088,8 +1146,7 @@ const ProjectDetailPage: React.FC = () => {
         open={addModalOpen}
         onCancel={() => { setAddModalOpen(false); addForm.resetFields(); setMemberSearchResults([]); }}
         footer={null} destroyOnHidden>
-        <Form form={addForm} layout="vertical" onFinish={handleAddMember} style={{ marginTop: 8 }}
-          initialValues={{ role: ProjectRole.DEVELOPER }}>
+        <Form form={addForm} layout="vertical" onFinish={handleAddMember} style={{ marginTop: 8 }}>
           <Form.Item name="email" label="Tìm kiếm người dùng"
             rules={[{ required: true, message: 'Vui lòng chọn người dùng!' }]}>
             <Select
@@ -1104,13 +1161,109 @@ const ProjectDetailPage: React.FC = () => {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item name="role" label="Vai trò" rules={[{ required: true }]}>
-            <Select size="large" options={projectRoleOptions} />
-          </Form.Item>
           <Space>
             <Button type="primary" htmlType="submit" loading={addSaving}>Thêm vào dự án</Button>
             <Button onClick={() => { setAddModalOpen(false); addForm.resetFields(); setMemberSearchResults([]); }}>Hủy</Button>
           </Space>
+        </Form>
+      </Modal>
+
+      {/* Modal tạo task từ tab Tasks */}
+      <Modal
+        title="Tạo task mới"
+        open={createTaskModalOpen}
+        onCancel={() => { setCreateTaskModalOpen(false); createTaskTabForm.resetFields(); setParentCandidates([]); }}
+        footer={null}
+        width={560}
+        destroyOnHidden
+      >
+        <Form form={createTaskTabForm} layout="vertical" onFinish={handleCreateTaskFromTab} style={{ marginTop: 12 }}>
+          <Form.Item label="Dự án">
+            <Input value={currentProject ? `[${currentProject.key}] ${currentProject.name}` : ''} disabled />
+          </Form.Item>
+
+          <Form.Item
+            name="title"
+            label="Tiêu đề"
+            rules={[
+              { required: true, message: 'Vui lòng nhập tiêu đề task!' },
+              { max: 500, message: 'Tiêu đề không vượt quá 500 ký tự' },
+              { whitespace: true, message: 'Tiêu đề không được chỉ có khoảng trắng' },
+            ]}
+          >
+            <Input placeholder="Tiêu đề task" autoFocus maxLength={500} />
+          </Form.Item>
+
+          <Form.Item name="description" label="Mô tả">
+            <TextArea rows={3} placeholder="Mô tả chi tiết (tùy chọn)" maxLength={5000} />
+          </Form.Item>
+
+          <Form.Item name="priority" label="Mức ưu tiên" initialValue={TaskPriority.MEDIUM}>
+            <Select
+              options={[
+                { label: <Tag color="green">Thấp</Tag>, value: TaskPriority.LOW },
+                { label: <Tag color="blue">Trung bình</Tag>, value: TaskPriority.MEDIUM },
+                { label: <Tag color="orange">Cao</Tag>, value: TaskPriority.HIGH },
+                { label: <Tag color="red">Khẩn cấp</Tag>, value: TaskPriority.URGENT },
+              ]}
+            />
+          </Form.Item>
+
+          <Form.Item name="dueDate" label="Hạn chót">
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+          </Form.Item>
+
+          <Form.Item
+            name="sprintId"
+            label="Sprint"
+            rules={[{ required: true, message: 'Vui lòng chọn sprint!' }]}
+          >
+            <Select
+              loading={tabSprintsLoading}
+              placeholder={tabSprintsLoading ? 'Đang tải...' : 'Chọn sprint'}
+              options={tabTaskSprints.map(s => ({
+                label: <Space size={6}>
+                  <Tag color={s.status === SprintStatus.ACTIVE ? 'green' : 'default'} style={{ margin: 0 }}>
+                    {s.status === SprintStatus.ACTIVE ? 'Đang chạy' : 'Kế hoạch'}
+                  </Tag>
+                  {s.name}
+                </Space>,
+                value: s.id,
+              }))}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="parentTaskId"
+            label={<Space size={4}><ApartmentOutlined />Task cha</Space>}
+            extra="Để trống = task gốc (cấp 1)"
+          >
+            <Select
+              allowClear
+              showSearch
+              loading={parentLoading}
+              placeholder={parentLoading ? 'Đang tải...' : 'Không chọn = task gốc'}
+              optionFilterProp="label"
+              filterOption={(input, option) =>
+                String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={parentCandidates.map(t => ({
+                label: `[${t.taskKey}] ${t.title}`,
+                value: t.id,
+              }))}
+            />
+          </Form.Item>
+
+          <Form.Item style={{ marginBottom: 0 }}>
+            <Space>
+              <Button type="primary" htmlType="submit" loading={creatingTaskTab}>
+                Tạo task
+              </Button>
+              <Button onClick={() => { setCreateTaskModalOpen(false); createTaskTabForm.resetFields(); setParentCandidates([]); }}>
+                Hủy
+              </Button>
+            </Space>
+          </Form.Item>
         </Form>
       </Modal>
 
