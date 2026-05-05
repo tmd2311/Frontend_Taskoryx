@@ -12,7 +12,6 @@ import {
   TableOutlined,
   TeamOutlined,
   BellOutlined,
-  SettingOutlined,
   SunOutlined,
   MoonOutlined,
   SafetyCertificateOutlined,
@@ -103,7 +102,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const iconColor = isDark ? '#a0a8b8' : '#5a6378';
   const iconHoverBg = isDark ? 'rgba(67,97,238,0.15)' : '#f0f2ff';
   const userTextColor = isDark ? '#e0e0e0' : '#1a1a2e';
-  const userBottomBorder = isDark ? '#2a2a2a' : '#eef0f6';
   const contentBg = isDark ? '#141414' : '#f5f6fa';
 
   const navTo = (path: string) => {
@@ -350,31 +348,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           )}
         </div>
 
-        {/* ── User section ── */}
-        {(isMobile || !collapsed) ? (
-          <div style={{
-            padding: '10px 14px',
-            borderTop: `1px solid ${userBottomBorder}`,
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}>
-            <Avatar src={resolveAvatarUrl(user?.avatarUrl)} style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)', flexShrink: 0 }} size={32}>
-              {initials}
-            </Avatar>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <Text strong style={{ fontSize: 12, display: 'block' }} ellipsis>
-                {user?.fullName || user?.username}
-              </Text>
-              <Text type="secondary" style={{ fontSize: 11 }} ellipsis>{user?.email}</Text>
-            </div>
-            <Tooltip title="Hồ sơ">
-              <SettingOutlined style={{ color: iconColor, cursor: 'pointer', fontSize: 14 }} onClick={() => navigate('/profile')} />
-            </Tooltip>
-          </div>
-        ) : (
-          <div style={{ padding: '10px 0', display: 'flex', justifyContent: 'center', borderTop: `1px solid ${userBottomBorder}` }}>
-            <Avatar src={resolveAvatarUrl(user?.avatarUrl)} style={{ background: 'linear-gradient(135deg, #4361ee, #7c3aed)' }} size={28}>{initials}</Avatar>
-          </div>
-        )}
       </Sider>
 
       {/* ─── Main area ─── */}
