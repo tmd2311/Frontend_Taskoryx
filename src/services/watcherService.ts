@@ -1,5 +1,5 @@
 import api from './api';
-import type { TaskWatcher, WatcherStatus } from '../types';
+import type { TaskWatcher, WatcherStatus, TaskSummary } from '../types';
 
 export const watcherService = {
   watch: (taskId: string): Promise<void> =>
@@ -15,6 +15,11 @@ export const watcherService = {
 
   getStatus: async (taskId: string): Promise<WatcherStatus> => {
     const response: any = await api.get(`/tasks/${taskId}/watchers/status`);
+    return response.data ?? response;
+  },
+
+  getWatchedTasks: async (): Promise<TaskSummary[]> => {
+    const response: any = await api.get('/users/me/watched-tasks');
     return response.data ?? response;
   },
 };

@@ -11,7 +11,7 @@ import {
   FolderOutlined, AppstoreOutlined, SendOutlined,
   ReloadOutlined,
   MessageOutlined, ClockCircleOutlined, LinkOutlined,
-  PlusOutlined, BellOutlined, BellFilled, ArrowLeftOutlined,
+  PlusOutlined, EyeOutlined, EyeFilled, BellOutlined, ArrowLeftOutlined,
   CloseOutlined, RightOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams, Link } from 'react-router-dom';
@@ -593,7 +593,7 @@ const TaskDetailPage: React.FC = () => {
               <Tooltip title={watching ? 'Bỏ theo dõi' : 'Theo dõi task'}>
                 <Button
                   size="small"
-                  icon={watching ? <BellFilled style={{ color: '#1890ff' }} /> : <BellOutlined />}
+                  icon={watching ? <EyeFilled style={{ color: '#1890ff' }} /> : <EyeOutlined />}
                   onClick={handleToggleWatch}
                   loading={watchLoading}
                 >

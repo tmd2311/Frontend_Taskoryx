@@ -12,7 +12,7 @@ import {
   FileOutlined, FileImageOutlined, FilePdfOutlined, FileExcelOutlined,
   FileWordOutlined, FileZipOutlined, ReloadOutlined, DownloadOutlined,
   MessageOutlined, CheckSquareOutlined, ClockCircleOutlined, LinkOutlined,
-  PlusOutlined, BellOutlined, BellFilled,
+  PlusOutlined, EyeOutlined, EyeFilled,
 } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import { useTaskStore } from '../stores/taskStore';
@@ -760,7 +760,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
             <Tooltip title={watching ? 'Bỏ theo dõi' : 'Theo dõi task'}>
               <Button
                 size="small"
-                icon={watching ? <BellFilled style={{ color: '#1890ff' }} /> : <BellOutlined />}
+                icon={watching ? <EyeFilled style={{ color: '#1890ff' }} /> : <EyeOutlined />}
                 onClick={handleToggleWatch}
                 loading={watchLoading}
               />

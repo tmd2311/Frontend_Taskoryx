@@ -28,6 +28,7 @@ import { useThemeStore } from '../stores/themeStore';
 import { useProjectStore } from '../stores/projectStore';
 import { websocketService } from '../services/websocketService';
 import NotificationDropdown from '../components/NotificationDropdown';
+import WatchedTasksDropdown from '../components/WatchedTasksDropdown';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -426,6 +427,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </div>
 
           <div style={{ paddingRight: isMobile ? 8 : 16, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <WatchedTasksDropdown />
+
             <Tooltip title={isDark ? 'Chế độ sáng' : 'Chế độ tối'}>
               <div onClick={toggleTheme} style={iconBtnStyle}
                 onMouseEnter={e => (e.currentTarget.style.background = iconHoverBg)}
