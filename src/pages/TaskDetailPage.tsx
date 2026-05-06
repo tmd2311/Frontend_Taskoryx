@@ -720,7 +720,7 @@ const TaskDetailPage: React.FC = () => {
                 <div style={{ marginTop: 12 }}>
                   {task.parentTaskId && (
                     <div style={{ marginBottom: 8 }}>
-                      <Text type="secondary" style={{ fontSize: 12 }}>Task cha</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>Đầu việc chính</Text>
                       <div style={{
                         marginTop: 6, padding: '8px 12px',
                         background: '#f5f5f5', borderRadius: 6,
@@ -739,7 +739,7 @@ const TaskDetailPage: React.FC = () => {
                   )}
                   {task.subTasks && task.subTasks.length > 0 && (
                     <div>
-                      <Text type="secondary" style={{ fontSize: 12 }}>Subtasks ({task.subTasks.length})</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>Đầu việc con ({task.subTasks.length})</Text>
                       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {task.subTasks.map((sub) => (
                           <div key={sub.id} style={{

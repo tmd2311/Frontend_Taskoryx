@@ -12,9 +12,9 @@ import {
   DatePicker,
   message,
   Popconfirm,
-  Badge,
   Tooltip,
   Avatar,
+  Badge,
 } from 'antd';
 import {
   PlusOutlined,
@@ -50,24 +50,8 @@ const PRIORITY_LABEL: Record<string, string> = {
   [TaskPriority.URGENT]: 'Khẩn cấp',
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  TODO: 'default',
-  IN_PROGRESS: 'processing',
-  IN_REVIEW: 'warning',
-  RESOLVED: 'cyan',
-  DONE: 'success',
-  CANCELLED: 'error',
-};
-const STATUS_LABEL: Record<string, string> = {
-  TODO: 'Chưa làm',
-  IN_PROGRESS: 'Đang làm',
-  IN_REVIEW: 'Đang review',
-  RESOLVED: 'Đã giải quyết',
-  DONE: 'Hoàn thành',
-  CANCELLED: 'Đã hủy',
-};
 
-// Flatten cây task (task cha + subTasks đệ quy) thành mảng phẳng giữ thứ tự
+// Flatten cây task (Đầu việc chính + subTasks đệ quy) thành mảng phẳng giữ thứ tự
 function flattenTree(tasks: TaskSummary[]): TaskSummary[] {
   const result: TaskSummary[] = [];
   const walk = (nodes: TaskSummary[]) => {
@@ -125,21 +109,18 @@ const TasksPage: React.FC = () => {
         const task = useTaskStore.getState().currentTask;
         if (task?.taskKey) navigate(`/tasks/${task.taskKey}`, { replace: true });
       })
-      .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      .catch(() => { });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // API /tasks/my trả về flat list (không có subTasks lồng)
-  // Dùng parentTaskId để tự build cây rồi flatten theo thứ tự cha → con
+  // Flatten cha → con theo thứ tự, lọc trùng task con ở root
   const flatTasks = useMemo(() => {
     const byId: Record<string, TaskSummary> = {};
     myTasks.forEach((t) => { byId[t.id] = t; });
 
-    // Nếu API đã trả về subTasks lồng sẵn trong task cha, dùng luôn
     const hasTree = myTasks.some((t) => (t.subTasks?.length ?? 0) > 0);
-    if (hasTree) return flattenTree(myTasks);
+    if (hasTree) return flattenTree(myTasks.filter(t => !t.parentTaskId));
 
-    // Ngược lại tự build từ parentTaskId
     const childrenOf: Record<string, TaskSummary[]> = {};
     myTasks.forEach((t) => {
       if (t.parentTaskId && byId[t.parentTaskId]) {
@@ -281,50 +262,86 @@ const TasksPage: React.FC = () => {
     setParentCandidates([]);
   };
 
+  const STATUS_BADGE: Record<string, { color: string; text: string }> = {
+    TODO:        { color: '#8c8c8c', text: 'Chưa bắt đầu' },
+    IN_PROGRESS: { color: '#4361ee', text: 'Đang thực hiện' },
+    IN_REVIEW:   { color: '#fa8c16', text: 'Tạm dừng' },
+    RESOLVED:    { color: '#13c2c2', text: 'Đã giải quyết' },
+    DONE:        { color: '#52c41a', text: 'Hoàn thành' },
+    CANCELLED:   { color: '#ff4d4f', text: 'Đã hủy' },
+  };
+
   // ── Cột bảng ─────────────────────────────────────────────────
   const columns: ColumnsType<TaskSummary> = [
     {
       title: 'Mã',
       dataIndex: 'taskKey',
       key: 'taskKey',
-      width: 110,
-      render: (key: string, record) => (
-        <Space size={4}>
-          {(record.depth ?? 1) > 1 && (
-            <span style={{ color: '#bfbfbf', fontSize: 11 }}>{'  ↳'.repeat((record.depth ?? 1) - 1)}</span>
-          )}
-          <Tag style={{ fontFamily: 'monospace', fontSize: 11, margin: 0 }}>{key}</Tag>
-        </Space>
+      width: 105,
+      render: (key: string) => (
+        <Tag style={{ fontFamily: 'monospace', fontSize: 11, margin: 0 }}>{key}</Tag>
       ),
     },
     {
       title: 'Tiêu đề',
       dataIndex: 'title',
       key: 'title',
-      width: '30%',
-      render: (title: string, record) => (
-        <span style={{ paddingLeft: ((record.depth ?? 1) - 1) * 16 }}>
-          {title}
-        </span>
-      ),
+      render: (title: string, r) => {
+        const isChild = !!r.parentTaskId;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: isChild ? 20 : 0 }}>
+            {isChild && <span style={{ color: '#bfbfbf', fontSize: 12, flexShrink: 0 }}>└</span>}
+            <Button
+              type="link"
+              style={{
+                padding: 0, height: 'auto', textAlign: 'left',
+                fontWeight: isChild ? 400 : 500,
+                fontSize: 13,
+                color: isChild ? '#595959' : undefined,
+              }}
+              onClick={(e) => { e.stopPropagation(); navigate(`/tasks/${r.taskKey}`); }}
+            >
+              {title}
+            </Button>
+          </div>
+        );
+      },
     },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
-      width: 130,
-      render: (s: string) => (
-        <Tag color={STATUS_COLOR[s] as any} style={{ fontSize: 11 }}>
-          {STATUS_LABEL[s] ?? s}
-        </Tag>
-      ),
+      width: 150,
+      render: (s: string, record) => {
+        const badge = record.overdue && s !== 'DONE' && s !== 'CANCELLED'
+          ? { color: '#ff4d4f', text: 'Quá hạn' }
+          : (STATUS_BADGE[s] ?? { color: '#d9d9d9', text: s });
+        return (
+          <Badge
+            color={badge.color}
+            text={<span style={{ fontSize: 12, color: badge.color }}>{badge.text}</span>}
+          />
+        );
+      },
     },
     {
       title: 'Ưu tiên',
       dataIndex: 'priority',
       key: 'priority',
-      width: 100,
+      width: 110,
       render: (p: string) => <Tag color={PRIORITY_COLOR[p]}>{PRIORITY_LABEL[p] ?? p}</Tag>,
+    },
+    {
+      title: 'Người thực hiện',
+      dataIndex: 'assigneeName',
+      key: 'assigneeName',
+      width: 160,
+      render: (name?: string, record?: TaskSummary) => name ? (
+        <Space size={6}>
+          <Avatar size={22} src={record?.assigneeAvatar} icon={<UserOutlined />} />
+          <Text style={{ fontSize: 12 }}>{name}</Text>
+        </Space>
+      ) : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>,
     },
     {
       title: 'Hạn chót',
@@ -335,39 +352,13 @@ const TasksPage: React.FC = () => {
         if (!date) return <Text type="secondary">—</Text>;
         return (
           <Space size={4}>
-            {record.overdue && <ExclamationCircleOutlined style={{ color: 'red' }} />}
-            <span style={{ color: record.overdue ? 'red' : undefined, fontSize: 13 }}>
+            {record.overdue && <Tooltip title="Quá hạn"><ExclamationCircleOutlined style={{ color: '#ff4d4f' }} /></Tooltip>}
+            <Text style={{ color: record.overdue ? '#ff4d4f' : undefined, fontSize: 12 }}>
               {dayjs(date).format('DD/MM/YYYY')}
-            </span>
+            </Text>
           </Space>
         );
       },
-    },
-    {
-      title: 'Người thực hiện',
-      dataIndex: 'assigneeName',
-      key: 'assigneeName',
-      width: 150,
-      render: (name?: string, record?: TaskSummary) => name ? (
-        <Space size={6}>
-          <Avatar size={20} src={record?.assigneeAvatar} icon={<UserOutlined />} />
-          {name}
-        </Space>
-      ) : <Text type="secondary">—</Text>,
-    },
-    {
-      title: 'Bình luận',
-      dataIndex: 'commentCount',
-      key: 'commentCount',
-      width: 90,
-      render: (count: number) => <Badge count={count} showZero color="geekblue" />,
-    },
-    {
-      title: 'Tệp đính kèm',
-      dataIndex: 'attachmentCount',
-      key: 'attachmentCount',
-      width: 100,
-      render: (count: number) => <Badge count={count} showZero color="green" />,
     },
     {
       title: 'Thao tác',
@@ -381,13 +372,11 @@ const TasksPage: React.FC = () => {
           <Popconfirm
             title={
               record.subTasks?.length
-                ? `Task này có ${record.subTasks.length} subtask. Xóa sẽ xóa luôn tất cả subtask!`
+                ? `Task này có ${record.subTasks.length} công việc con. Xóa sẽ xóa luôn tất cả!`
                 : 'Xóa task này?'
             }
             onConfirm={(e) => { e?.stopPropagation(); handleDelete(record); }}
-            okText="Xóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true }}
+            okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}
           >
             <Button type="link" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()} />
           </Popconfirm>
@@ -431,13 +420,11 @@ const TasksPage: React.FC = () => {
         loading={isLoading}
         pagination={{ pageSize: 20, showSizeChanger: false }}
         locale={{ emptyText: 'Không có task nào được giao cho bạn' }}
-        scroll={{ x: 'max-content' }}
-        rowClassName={(r) => {
-          const classes = [];
-          if (r.overdue) classes.push('row-overdue');
-          if ((r.depth ?? 1) > 1) classes.push('row-subtask');
-          return classes.join(' ');
-        }}
+        scroll={{ x: 700 }}
+        rowClassName={(r) => [
+          r.overdue ? 'row-overdue' : '',
+          r.parentTaskId ? 'row-subtask' : '',
+        ].filter(Boolean).join(' ')}
         onRow={(record) => ({
           onClick: (e) => {
             const target = e.target as HTMLElement;
@@ -521,14 +508,14 @@ const TasksPage: React.FC = () => {
             </Form.Item>
           )}
 
-          {/* Task cha */}
+          {/* Đầu việc chính */}
           {(selectedProjectId || editingTask) && (
             <Form.Item
               name="parentTaskId"
               label={
                 <Space size={4}>
                   <ApartmentOutlined />
-                  Task cha
+                  Đầu việc chính
                 </Space>
               }
               extra="Để trống = task gốc (cấp 1)"
@@ -568,8 +555,9 @@ const TasksPage: React.FC = () => {
 
       <style>{`
         .row-overdue td { background: #fff2f0 !important; }
-        .row-subtask td { background: #fafcff !important; }
-        .row-subtask:hover td { background: #f0f5ff !important; }
+        .row-subtask td { background: #f8faff !important; }
+        .row-subtask:hover td { background: #eef3ff !important; }
+        .row-subtask td:first-child { border-left: 3px solid #4361ee33 !important; }
       `}</style>
     </div>
   );

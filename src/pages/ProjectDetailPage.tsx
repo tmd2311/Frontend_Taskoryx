@@ -11,7 +11,7 @@ import {
   UserAddOutlined, DeleteOutlined, PlusOutlined, ApartmentOutlined,
   ThunderboltOutlined, AppstoreAddOutlined,
   PlayCircleOutlined, CheckCircleOutlined, EditOutlined,
-  DownloadOutlined,
+  DownloadOutlined, RightOutlined, DownOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useProjectStore } from '../stores/projectStore';
@@ -46,12 +46,12 @@ const PRIORITY_LABEL: Record<string, string> = {
 };
 
 const TASK_STATUS_COLUMNS: { status: TaskStatus; label: string; color: string }[] = [
-  { status: TaskStatus.TODO,        label: 'Cần làm',        color: '#8c8c8c' },
-  { status: TaskStatus.IN_PROGRESS, label: 'Đang làm',       color: '#1890ff' },
-  { status: TaskStatus.IN_REVIEW,   label: 'Đang review',    color: '#fa8c16' },
-  { status: TaskStatus.RESOLVED,    label: 'Đã giải quyết',  color: '#722ed1' },
-  { status: TaskStatus.DONE,        label: 'Hoàn thành',     color: '#52c41a' },
-  { status: TaskStatus.CANCELLED,   label: 'Đã hủy',         color: '#f5222d' },
+  { status: TaskStatus.TODO, label: 'Cần làm', color: '#8c8c8c' },
+  { status: TaskStatus.IN_PROGRESS, label: 'Đang làm', color: '#1890ff' },
+  { status: TaskStatus.IN_REVIEW, label: 'Đang review', color: '#fa8c16' },
+  { status: TaskStatus.RESOLVED, label: 'Đã giải quyết', color: '#722ed1' },
+  { status: TaskStatus.DONE, label: 'Hoàn thành', color: '#52c41a' },
+  { status: TaskStatus.CANCELLED, label: 'Đã hủy', color: '#f5222d' },
 ];
 
 const SPRINT_STATUS_COLOR: Record<string, string> = {
@@ -61,36 +61,125 @@ const SPRINT_STATUS_LABEL: Record<string, string> = {
   PLANNED: 'Kế hoạch', ACTIVE: 'Đang chạy', COMPLETED: 'Hoàn thành', CANCELLED: 'Đã hủy',
 };
 // ─── Task columns ────────────────────────────────────────────
-const buildTaskColumns = (onRowClick?: (r: TaskSummary) => void): ColumnsType<TaskSummary> => [
+const buildTaskColumns = (
+  onRowClick: (r: TaskSummary) => void,
+  expandedKeys: Set<string>,
+  onToggleExpand: (id: string) => void,
+): ColumnsType<TaskSummary> => [
   {
-    title: 'Mã', dataIndex: 'taskKey', key: 'taskKey', width: 110,
-    render: (key: string) => <Tag style={{ fontFamily: 'monospace' }}>{key}</Tag>,
+    title: 'Tiêu đề',
+    dataIndex: 'title',
+    key: 'title',
+    render: (_: string, r) => {
+      const isParent = (r.subTasks?.length ?? 0) > 0;
+      const isChild = !!r.parentTaskId;
+      const expanded = expandedKeys.has(r.id);
+      const doneCount = r.subTasks?.filter(s => s.status === 'DONE').length ?? 0;
+      const totalSub = r.subTasks?.length ?? 0;
+
+      return (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, paddingLeft: isChild ? 28 : 0 }}>
+          {isChild && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center',
+              color: '#bfbfbf', fontSize: 12, marginTop: 3, flexShrink: 0,
+            }}>└─</span>
+          )}
+          {isParent && !isChild && (
+            <span
+              onClick={(e) => { e.stopPropagation(); onToggleExpand(r.id); }}
+              style={{ cursor: 'pointer', color: '#4361ee', fontSize: 11, marginTop: 3, flexShrink: 0, width: 14 }}
+            >
+              {expanded ? <DownOutlined /> : <RightOutlined />}
+            </span>
+          )}
+          {!isParent && !isChild && <span style={{ width: 14, flexShrink: 0 }} />}
+
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <Button
+                type="link"
+                style={{
+                  padding: 0, height: 'auto', textAlign: 'left',
+                  fontWeight: isParent ? 600 : 400,
+                  fontSize: isChild ? 12 : 13,
+                  color: isChild ? '#595959' : undefined,
+                }}
+                onClick={() => onRowClick(r)}
+              >
+                {r.title}
+              </Button>
+              {isChild && (
+                <Tag style={{
+                  fontSize: 10, padding: '0 5px', lineHeight: '16px', height: 16,
+                  border: 'none', borderRadius: 3, margin: 0,
+                  background: '#f0f5ff', color: '#4361ee',
+                }}>
+                  Công việc con
+                </Tag>
+              )}
+              {isParent && (
+                <Tag style={{
+                  fontSize: 10, padding: '0 5px', lineHeight: '16px', height: 16,
+                  border: 'none', borderRadius: 3, margin: 0,
+                  background: '#f6ffed', color: '#52c41a',
+                }}>
+                  Chính
+                </Tag>
+              )}
+            </div>
+            {isParent && (
+              <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Progress
+                  percent={totalSub > 0 ? Math.round((doneCount / totalSub) * 100) : 0}
+                  size="small"
+                  style={{ width: 80, margin: 0 }}
+                  showInfo={false}
+                  strokeColor="#52c41a"
+                />
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  {doneCount}/{totalSub} xong
+                </Text>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    },
   },
   {
-    title: 'Tiêu đề', dataIndex: 'title', key: 'title',
-    render: (title: string, r) => (
-      <Button type="link" style={{ padding: 0, textAlign: 'left', height: 'auto', fontWeight: 400 }}
-        onClick={() => onRowClick?.(r)}>{title}</Button>
+    title: 'Mã', dataIndex: 'taskKey', key: 'taskKey', width: 100,
+    render: (key: string, r) => (
+      <Tag style={{ fontFamily: 'monospace', opacity: r.parentTaskId ? 0.75 : 1 }}>{key}</Tag>
     ),
   },
   {
-    title: 'Ưu tiên', dataIndex: 'priority', key: 'priority', width: 120,
-    render: (p: string) => <Tag color={PRIORITY_COLOR[p]}>{PRIORITY_LABEL[p] ?? p}</Tag>,
+    title: 'Ưu tiên', dataIndex: 'priority', key: 'priority', width: 110,
+    render: (p: string, r) => (
+      <Tag color={PRIORITY_COLOR[p]} style={{ opacity: r.parentTaskId ? 0.8 : 1 }}>
+        {PRIORITY_LABEL[p] ?? p}
+      </Tag>
+    ),
   },
   {
     title: 'Người thực hiện', dataIndex: 'assigneeName', key: 'assigneeName', width: 150,
-    render: (name?: string) => name
-      ? <Space size={6}><Avatar size={24} icon={<UserOutlined />} /><Text style={{ fontSize: 13 }}>{name}</Text></Space>
-      : <Text type="secondary">—</Text>,
+    render: (name?: string, r?: TaskSummary) => name
+      ? (
+        <Space size={6}>
+          <Avatar src={r?.assigneeAvatar} size={22} icon={<UserOutlined />} />
+          <Text style={{ fontSize: 12 }}>{name}</Text>
+        </Space>
+      )
+      : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>,
   },
   {
-    title: 'Hạn chót', dataIndex: 'dueDate', key: 'dueDate', width: 130,
+    title: 'Hạn chót', dataIndex: 'dueDate', key: 'dueDate', width: 120,
     render: (date: string, record) => {
       if (!date) return <Text type="secondary">—</Text>;
       return (
         <Space size={4}>
           {record.overdue && <Tooltip title="Quá hạn"><ExclamationCircleOutlined style={{ color: '#f5222d' }} /></Tooltip>}
-          <Text style={{ color: record.overdue ? '#f5222d' : undefined, fontSize: 13 }}>
+          <Text style={{ color: record.overdue ? '#f5222d' : undefined, fontSize: 12 }}>
             {dayjs(date).format('DD/MM/YYYY')}
           </Text>
         </Space>
@@ -98,7 +187,7 @@ const buildTaskColumns = (onRowClick?: (r: TaskSummary) => void): ColumnsType<Ta
     },
   },
   {
-    title: '', key: 'meta', width: 80,
+    title: '', key: 'meta', width: 70,
     render: (_: any, record) => (
       <Space size={8}>
         {(record.commentCount ?? 0) > 0 && (
@@ -134,6 +223,7 @@ const ProjectDetailPage: React.FC = () => {
   const [filterPriority, setFilterPriority] = useState<string[]>([]);
   const [filterOverdue, setFilterOverdue] = useState<boolean | undefined>(undefined);
   const [page, setPage] = useState(1);
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
   const PAGE_SIZE = 15;
   const activeTab = searchParams.get('tab') || 'tasks';
 
@@ -199,7 +289,7 @@ const ProjectDetailPage: React.FC = () => {
     if (!projectId) return;
     fetchProjectById(projectId);
     fetchMembers(projectId);
-    fetchRoles().catch(() => {});
+    fetchRoles().catch(() => { });
   }, [projectId]);
 
   // Sync currentProject vào store khi load trực tiếp qua URL
@@ -562,8 +652,21 @@ const ProjectDetailPage: React.FC = () => {
     window.open(`${baseUrl}/export/projects/${projectId}/tasks/excel?token=${encodeURIComponent(token ?? '')}`, '_blank');
   };
 
-  const tasks = projectTasks?.content ?? [];
+  const rootTasks = projectTasks?.content ?? [];
+  const visibleTasks = rootTasks.flatMap(t =>
+    expandedTaskIds.has(t.id)
+      ? [t, ...(t.subTasks ?? []) as TaskSummary[]]
+      : [t]
+  );
   const total = projectTasks?.totalElements ?? 0;
+
+  const handleToggleExpand = (id: string) => {
+    setExpandedTaskIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
   const project = currentProject?.id === projectId ? currentProject : null;
   const canDelete = isAdmin || project?.currentUserRole === ProjectRole.OWNER;
   const canManageMembers = isAdmin
@@ -704,8 +807,12 @@ const ProjectDetailPage: React.FC = () => {
             </Button>
           </div>
           <Table
-            columns={buildTaskColumns((r) => navigate(`/tasks/${r.taskKey}`))}
-            dataSource={tasks}
+            columns={buildTaskColumns(
+              (r) => navigate(`/tasks/${r.taskKey}`),
+              expandedTaskIds,
+              handleToggleExpand,
+            )}
+            dataSource={visibleTasks}
             rowKey="id"
             loading={isLoading}
             pagination={{
@@ -715,7 +822,10 @@ const ProjectDetailPage: React.FC = () => {
               showSizeChanger: false,
             }}
             locale={{ emptyText: <Empty description="Không có task nào" /> }}
-            rowClassName={(record) => record.overdue ? 'row-overdue' : ''}
+            rowClassName={(record) => [
+              record.overdue ? 'row-overdue' : '',
+              record.parentTaskId ? 'row-subtask' : '',
+            ].filter(Boolean).join(' ')}
             scroll={{ x: 700 }}
           />
         </>
@@ -737,257 +847,257 @@ const ProjectDetailPage: React.FC = () => {
       )}
 
       {activeTab === 'sprints' && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <Text type="secondary">{sprints.length} sprint</Text>
-                  <Button type="primary" icon={<PlusOutlined />}
-                    onClick={() => { sprintForm.resetFields(); setEditSprint(null); setSprintModal(true); }}>
-                    Tạo Sprint
-                  </Button>
-                </div>
-                {sprintsLoading ? (
-                  <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
-                ) : sprints.length === 0 ? (
-                  <Empty description="Chưa có sprint nào" style={{ padding: '40px 0' }} />
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {sprints.map((sprint) => {
-                      const isActive = sprint.status === SprintStatus.ACTIVE;
-                      const isCompleted = sprint.status === SprintStatus.COMPLETED;
-                      const expanded = expandedSprints[sprint.id];
-                      const total = sprint.taskCount ?? 0;
-                      const completed = sprint.completedTaskCount ?? 0;
-                      const pct = total > 0 ? Math.round(completed / total * 100) : 0;
-                      const isOverdue = isActive && sprint.endDate && dayjs().isAfter(dayjs(sprint.endDate));
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text type="secondary">{sprints.length} sprint</Text>
+            <Button type="primary" icon={<PlusOutlined />}
+              onClick={() => { sprintForm.resetFields(); setEditSprint(null); setSprintModal(true); }}>
+              Tạo Sprint
+            </Button>
+          </div>
+          {sprintsLoading ? (
+            <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
+          ) : sprints.length === 0 ? (
+            <Empty description="Chưa có sprint nào" style={{ padding: '40px 0' }} />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {sprints.map((sprint) => {
+                const isActive = sprint.status === SprintStatus.ACTIVE;
+                const isCompleted = sprint.status === SprintStatus.COMPLETED;
+                const expanded = expandedSprints[sprint.id];
+                const total = sprint.taskCount ?? 0;
+                const completed = sprint.completedTaskCount ?? 0;
+                const pct = total > 0 ? Math.round(completed / total * 100) : 0;
+                const isOverdue = isActive && sprint.endDate && dayjs().isAfter(dayjs(sprint.endDate));
 
-                      return (
-                        <Card key={sprint.id} size="small"
-                          style={{
-                            borderLeft: `4px solid ${isActive ? '#1890ff' : isCompleted ? '#52c41a' : '#d9d9d9'}`,
-                            boxShadow: isActive ? '0 2px 12px rgba(24,144,255,.15)' : '0 1px 4px rgba(0,0,0,.06)',
-                          }}
-                          styles={{ body: { padding: isActive ? '0' : undefined } }}
-                        >
-                          {/* Banner ACTIVE sprint */}
-                          {isActive && (
-                            <div style={{ background: 'linear-gradient(90deg,#1890ff 0%,#096dd9 100%)', padding: '8px 16px', borderRadius: '0 0 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <Space>
-                                <PlayCircleOutlined style={{ color: '#fff', fontSize: 14 }} />
-                                <Text strong style={{ color: '#fff', fontSize: 13 }}>SPRINT ĐANG CHẠY</Text>
-                                {isOverdue && <Tag color="red" style={{ margin: 0 }}>Quá hạn!</Tag>}
-                              </Space>
-                              <Space>
-                                {sprint.startDate && <Text style={{ color: 'rgba(255,255,255,.85)', fontSize: 12 }}>{dayjs(sprint.startDate).format('DD/MM')} → {sprint.endDate ? dayjs(sprint.endDate).format('DD/MM/YYYY') : '?'}</Text>}
-                              </Space>
-                            </div>
-                          )}
-
-                          <div style={{ padding: '12px 16px' }}>
-                            {/* Sprint name + actions */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                              <Text strong style={{ fontSize: 15, flex: 1 }}>{sprint.name}</Text>
-                              {!isActive && (
-                                <Tag color={SPRINT_STATUS_COLOR[sprint.status]} style={{ marginRight: 0 }}>{SPRINT_STATUS_LABEL[sprint.status]}</Tag>
-                              )}
-                              {sprint.boardName && <Tag icon={<AppstoreAddOutlined />} style={{ margin: 0 }}>{sprint.boardName}</Tag>}
-                              <Space size={4}>
-                                {sprint.status === SprintStatus.PLANNED && (
-                                  <Popconfirm title="Bắt đầu sprint này?" onConfirm={() => handleStartSprint(sprint.id)} okText="Bắt đầu" cancelText="Hủy">
-                                    <Button size="small" type="primary" icon={<PlayCircleOutlined />}>Bắt đầu</Button>
-                                  </Popconfirm>
-                                )}
-                                {isActive && (
-                                  <Button size="small" icon={<CheckCircleOutlined />} onClick={() => handleCompleteSprint(sprint)}>Hoàn thành Sprint</Button>
-                                )}
-                                {!isCompleted && (
-                                  <Button size="small" icon={<PlusOutlined />} type="primary" ghost
-                                    onClick={() => { createTaskForm.resetFields(); setCreateTaskSprintId(sprint.id); }}>
-                                    Thêm task
-                                  </Button>
-                                )}
-                                <Button size="small" icon={<EditOutlined />}
-                                  onClick={() => {
-                                    setEditSprint(sprint);
-                                    sprintForm.setFieldsValue({
-                                      name: sprint.name, goal: sprint.goal,
-                                      startDate: sprint.startDate ? dayjs(sprint.startDate) : null,
-                                      endDate: sprint.endDate ? dayjs(sprint.endDate) : null,
-                                    });
-                                    setSprintModal(true);
-                                  }} />
-                                {sprint.status === SprintStatus.PLANNED && (
-                                  <Popconfirm title="Xóa sprint này?" onConfirm={() => handleDeleteSprint(sprint.id)} okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
-                                    <Button size="small" danger icon={<DeleteOutlined />} />
-                                  </Popconfirm>
-                                )}
-                              </Space>
-                            </div>
-
-                            {/* Sprint Goal */}
-                            {sprint.goal && (
-                              <Alert
-                                message={<Text style={{ fontSize: 12 }}><Text strong style={{ fontSize: 12 }}>Sprint Goal: </Text>{sprint.goal}</Text>}
-                                type={isActive ? 'info' : 'success'}
-                                showIcon={false}
-                                style={{ marginBottom: 10, padding: '6px 12px' }}
-                              />
-                            )}
-
-                            {/* Stats + Progress */}
-                            {total > 0 && (
-                              <div style={{ marginBottom: 10 }}>
-                                <Row gutter={16} style={{ marginBottom: 8 }}>
-                                  <Col span={6}>
-                                    <Statistic title="Tổng" value={total} valueStyle={{ fontSize: 18 }} />
-                                  </Col>
-                                  <Col span={6}>
-                                    <Statistic title="Chưa xong" value={total - completed} valueStyle={{ fontSize: 18, color: '#8c8c8c' }} />
-                                  </Col>
-                                  <Col span={6}>
-                                    <Statistic title="Tiến độ" value={`${pct}%`} valueStyle={{ fontSize: 18, color: '#1890ff' }} />
-                                  </Col>
-                                  <Col span={6}>
-                                    <Statistic title="Hoàn thành" value={completed} valueStyle={{ fontSize: 18, color: '#52c41a' }} />
-                                  </Col>
-                                </Row>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <Progress
-                                    percent={pct}
-                                    size="small"
-                                    strokeColor={pct === 100 ? '#52c41a' : isActive ? '#1890ff' : '#d9d9d9'}
-                                    style={{ flex: 1, margin: 0 }}
-                                  />
-                                  <Text style={{ fontSize: 12, fontWeight: 600, color: pct === 100 ? '#52c41a' : '#1890ff', minWidth: 36 }}>{pct}%</Text>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Dates (non-active sprints) */}
-                            {!isActive && (sprint.startDate || sprint.endDate) && (
-                              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8 }}>
-                                {sprint.startDate && `${dayjs(sprint.startDate).format('DD/MM/YYYY')}`}
-                                {sprint.startDate && sprint.endDate && ' → '}
-                                {sprint.endDate && `${dayjs(sprint.endDate).format('DD/MM/YYYY')}`}
-                              </div>
-                            )}
-
-                            {/* Toggle danh sách task */}
-                            <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }}
-                              onClick={() => setExpandedSprints(prev => ({ ...prev, [sprint.id]: !prev[sprint.id] }))}>
-                              {expanded ? '▲ Ẩn task' : `▼ Xem task${total > 0 ? ` (${total})` : ''}`}
-                            </Button>
-
-                            {/* Kanban board với kéo thả */}
-                            {expanded && (
-                              <SprintKanbanView
-                                key={`${sprint.id}-${kanbanKeys[sprint.id] ?? 0}`}
-                                projectId={projectId!}
-                                sprintId={sprint.id}
-                                allSprints={sprints}
-                                onOpenTask={(taskKey) => navigate(`/tasks/${taskKey}`)}
-                                onRefreshStats={() => fetchSprints()}
-                              />
-                            )}
-                          </div>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Modal tạo task mới trong sprint */}
-                <Modal
-                  title={<Space><PlusOutlined />Tạo task trong Sprint: <Text strong>{sprints.find(s => s.id === createTaskSprintId)?.name}</Text></Space>}
-                  open={!!createTaskSprintId}
-                  onCancel={() => { setCreateTaskSprintId(null); createTaskForm.resetFields(); }}
-                  onOk={() => createTaskForm.submit()}
-                  okText="Tạo task"
-                  cancelText="Hủy"
-                  okButtonProps={{ loading: creatingTask }}
-                  width={520}
-                  destroyOnHidden
-                >
-                  <Form form={createTaskForm} layout="vertical" onFinish={handleCreateTaskInSprint} style={{ marginTop: 8 }}>
-                    <Form.Item
-                      name="title"
-                      label="Tiêu đề"
-                      rules={[
-                        { required: true, message: 'Vui lòng nhập tiêu đề!' },
-                        { max: 500, message: 'Tối đa 500 ký tự' },
-                        { whitespace: true, message: 'Tiêu đề không được chỉ có khoảng trắng' },
-                      ]}
-                    >
-                      <Input placeholder="Tiêu đề task" autoFocus maxLength={500} />
-                    </Form.Item>
-                    <Form.Item name="description" label="Mô tả">
-                      <TextArea rows={2} placeholder="Mô tả chi tiết (tùy chọn)" maxLength={5000} />
-                    </Form.Item>
-                    <Row gutter={12}>
-                      <Col span={12}>
-                        <Form.Item name="status" label="Trạng thái / Cột" initialValue={TaskStatus.TODO}>
-                          <Select options={TASK_STATUS_COLUMNS.map(c => ({
-                            label: <Space size={6}><span style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, display: 'inline-block' }} />{c.label}</Space>,
-                            value: c.status,
-                          }))} />
-                        </Form.Item>
-                      </Col>
-                      <Col span={12}>
-                        <Form.Item name="priority" label="Ưu tiên" initialValue={TaskPriority.MEDIUM}>
-                          <Select options={[
-                            { label: <Tag color="green">Thấp</Tag>, value: TaskPriority.LOW },
-                            { label: <Tag color="blue">Trung bình</Tag>, value: TaskPriority.MEDIUM },
-                            { label: <Tag color="orange">Cao</Tag>, value: TaskPriority.HIGH },
-                            { label: <Tag color="red">Khẩn cấp</Tag>, value: TaskPriority.URGENT },
-                          ]} />
-                        </Form.Item>
-                      </Col>
-                    </Row>
-                    <Form.Item name="dueDate" label="Hạn chót">
-                      <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-                    </Form.Item>
-                  </Form>
-                </Modal>
-
-                {/* Modal xử lý task chưa xong khi complete sprint */}
-                <Modal
-                  title={<Space><ExclamationCircleOutlined style={{ color: '#faad14' }} />Hoàn thành Sprint</Space>}
-                  open={!!completeSprintId}
-                  onCancel={() => { setCompleteSprintId(null); setIncompleteTasksForSprint([]); }}
-                  footer={
-                    <Space>
-                      <Button onClick={() => { setCompleteSprintId(null); setIncompleteTasksForSprint([]); }}>Hủy</Button>
-                      <Button danger loading={completeSprintLoading} onClick={handleCompleteAndMoveTasks}>
-                        Gỡ task & Hoàn thành
-                      </Button>
-                      <Button type="primary" loading={completeSprintLoading}
-                        onClick={() => completeSprintId && doCompleteSprint(completeSprintId)}>
-                        Hoàn thành (giữ task trong sprint)
-                      </Button>
-                    </Space>
-                  }
-                  destroyOnHidden
-                >
-                  <p>
-                    Sprint có <Text strong style={{ color: '#faad14' }}>{incompleteTasksForSprint.length} task chưa hoàn thành</Text>:
-                  </p>
-                  <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {incompleteTasksForSprint.map((t) => (
-                      <div key={t.id} style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '6px 10px', background: '#fffbe6', borderRadius: 4,
-                      }}>
-                        <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{t.taskKey}</Tag>
-                        <Text style={{ flex: 1, fontSize: 13 }}>{t.title}</Text>
-                        <Tag color={PRIORITY_COLOR[t.priority]}>{PRIORITY_LABEL[t.priority]}</Tag>
+                return (
+                  <Card key={sprint.id} size="small"
+                    style={{
+                      borderLeft: `4px solid ${isActive ? '#1890ff' : isCompleted ? '#52c41a' : '#d9d9d9'}`,
+                      boxShadow: isActive ? '0 2px 12px rgba(24,144,255,.15)' : '0 1px 4px rgba(0,0,0,.06)',
+                    }}
+                    styles={{ body: { padding: isActive ? '0' : undefined } }}
+                  >
+                    {/* Banner ACTIVE sprint */}
+                    {isActive && (
+                      <div style={{ background: 'linear-gradient(90deg,#1890ff 0%,#096dd9 100%)', padding: '8px 16px', borderRadius: '0 0 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Space>
+                          <PlayCircleOutlined style={{ color: '#fff', fontSize: 14 }} />
+                          <Text strong style={{ color: '#fff', fontSize: 13 }}>SPRINT ĐANG CHẠY</Text>
+                          {isOverdue && <Tag color="red" style={{ margin: 0 }}>Quá hạn!</Tag>}
+                        </Space>
+                        <Space>
+                          {sprint.startDate && <Text style={{ color: 'rgba(255,255,255,.85)', fontSize: 12 }}>{dayjs(sprint.startDate).format('DD/MM')} → {sprint.endDate ? dayjs(sprint.endDate).format('DD/MM/YYYY') : '?'}</Text>}
+                        </Space>
                       </div>
-                    ))}
-                  </div>
-                  <div style={{ marginTop: 16, color: '#8c8c8c', fontSize: 13 }}>
-                    <b>Gỡ task & Hoàn thành</b>: Các task chưa xong sẽ bị gỡ khỏi sprint.<br/>
-                    <b>Hoàn thành (giữ)</b>: Các task vẫn nằm trong sprint đã hoàn thành.
-                  </div>
-                </Modal>
-      </>
+                    )}
+
+                    <div style={{ padding: '12px 16px' }}>
+                      {/* Sprint name + actions */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <Text strong style={{ fontSize: 15, flex: 1 }}>{sprint.name}</Text>
+                        {!isActive && (
+                          <Tag color={SPRINT_STATUS_COLOR[sprint.status]} style={{ marginRight: 0 }}>{SPRINT_STATUS_LABEL[sprint.status]}</Tag>
+                        )}
+                        {sprint.boardName && <Tag icon={<AppstoreAddOutlined />} style={{ margin: 0 }}>{sprint.boardName}</Tag>}
+                        <Space size={4}>
+                          {sprint.status === SprintStatus.PLANNED && (
+                            <Popconfirm title="Bắt đầu sprint này?" onConfirm={() => handleStartSprint(sprint.id)} okText="Bắt đầu" cancelText="Hủy">
+                              <Button size="small" type="primary" icon={<PlayCircleOutlined />}>Bắt đầu</Button>
+                            </Popconfirm>
+                          )}
+                          {isActive && (
+                            <Button size="small" icon={<CheckCircleOutlined />} onClick={() => handleCompleteSprint(sprint)}>Hoàn thành Sprint</Button>
+                          )}
+                          {!isCompleted && (
+                            <Button size="small" icon={<PlusOutlined />} type="primary" ghost
+                              onClick={() => { createTaskForm.resetFields(); setCreateTaskSprintId(sprint.id); }}>
+                              Thêm task
+                            </Button>
+                          )}
+                          <Button size="small" icon={<EditOutlined />}
+                            onClick={() => {
+                              setEditSprint(sprint);
+                              sprintForm.setFieldsValue({
+                                name: sprint.name, goal: sprint.goal,
+                                startDate: sprint.startDate ? dayjs(sprint.startDate) : null,
+                                endDate: sprint.endDate ? dayjs(sprint.endDate) : null,
+                              });
+                              setSprintModal(true);
+                            }} />
+                          {sprint.status === SprintStatus.PLANNED && (
+                            <Popconfirm title="Xóa sprint này?" onConfirm={() => handleDeleteSprint(sprint.id)} okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
+                              <Button size="small" danger icon={<DeleteOutlined />} />
+                            </Popconfirm>
+                          )}
+                        </Space>
+                      </div>
+
+                      {/* Sprint Goal */}
+                      {sprint.goal && (
+                        <Alert
+                          message={<Text style={{ fontSize: 12 }}><Text strong style={{ fontSize: 12 }}>Sprint Goal: </Text>{sprint.goal}</Text>}
+                          type={isActive ? 'info' : 'success'}
+                          showIcon={false}
+                          style={{ marginBottom: 10, padding: '6px 12px' }}
+                        />
+                      )}
+
+                      {/* Stats + Progress */}
+                      {total > 0 && (
+                        <div style={{ marginBottom: 10 }}>
+                          <Row gutter={16} style={{ marginBottom: 8 }}>
+                            <Col span={6}>
+                              <Statistic title="Tổng" value={total} valueStyle={{ fontSize: 18 }} />
+                            </Col>
+                            <Col span={6}>
+                              <Statistic title="Chưa xong" value={total - completed} valueStyle={{ fontSize: 18, color: '#8c8c8c' }} />
+                            </Col>
+                            <Col span={6}>
+                              <Statistic title="Tiến độ" value={`${pct}%`} valueStyle={{ fontSize: 18, color: '#1890ff' }} />
+                            </Col>
+                            <Col span={6}>
+                              <Statistic title="Hoàn thành" value={completed} valueStyle={{ fontSize: 18, color: '#52c41a' }} />
+                            </Col>
+                          </Row>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Progress
+                              percent={pct}
+                              size="small"
+                              strokeColor={pct === 100 ? '#52c41a' : isActive ? '#1890ff' : '#d9d9d9'}
+                              style={{ flex: 1, margin: 0 }}
+                            />
+                            <Text style={{ fontSize: 12, fontWeight: 600, color: pct === 100 ? '#52c41a' : '#1890ff', minWidth: 36 }}>{pct}%</Text>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Dates (non-active sprints) */}
+                      {!isActive && (sprint.startDate || sprint.endDate) && (
+                        <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8 }}>
+                          {sprint.startDate && `${dayjs(sprint.startDate).format('DD/MM/YYYY')}`}
+                          {sprint.startDate && sprint.endDate && ' → '}
+                          {sprint.endDate && `${dayjs(sprint.endDate).format('DD/MM/YYYY')}`}
+                        </div>
+                      )}
+
+                      {/* Toggle danh sách task */}
+                      <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }}
+                        onClick={() => setExpandedSprints(prev => ({ ...prev, [sprint.id]: !prev[sprint.id] }))}>
+                        {expanded ? '▲ Ẩn task' : `▼ Xem task${total > 0 ? ` (${total})` : ''}`}
+                      </Button>
+
+                      {/* Kanban board với kéo thả */}
+                      {expanded && (
+                        <SprintKanbanView
+                          key={`${sprint.id}-${kanbanKeys[sprint.id] ?? 0}`}
+                          projectId={projectId!}
+                          sprintId={sprint.id}
+                          allSprints={sprints}
+                          onOpenTask={(taskKey) => navigate(`/tasks/${taskKey}`)}
+                          onRefreshStats={() => fetchSprints()}
+                        />
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Modal tạo task mới trong sprint */}
+          <Modal
+            title={<Space><PlusOutlined />Tạo task trong Sprint: <Text strong>{sprints.find(s => s.id === createTaskSprintId)?.name}</Text></Space>}
+            open={!!createTaskSprintId}
+            onCancel={() => { setCreateTaskSprintId(null); createTaskForm.resetFields(); }}
+            onOk={() => createTaskForm.submit()}
+            okText="Tạo task"
+            cancelText="Hủy"
+            okButtonProps={{ loading: creatingTask }}
+            width={520}
+            destroyOnHidden
+          >
+            <Form form={createTaskForm} layout="vertical" onFinish={handleCreateTaskInSprint} style={{ marginTop: 8 }}>
+              <Form.Item
+                name="title"
+                label="Tiêu đề"
+                rules={[
+                  { required: true, message: 'Vui lòng nhập tiêu đề!' },
+                  { max: 500, message: 'Tối đa 500 ký tự' },
+                  { whitespace: true, message: 'Tiêu đề không được chỉ có khoảng trắng' },
+                ]}
+              >
+                <Input placeholder="Tiêu đề task" autoFocus maxLength={500} />
+              </Form.Item>
+              <Form.Item name="description" label="Mô tả">
+                <TextArea rows={2} placeholder="Mô tả chi tiết (tùy chọn)" maxLength={5000} />
+              </Form.Item>
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item name="status" label="Trạng thái / Cột" initialValue={TaskStatus.TODO}>
+                    <Select options={TASK_STATUS_COLUMNS.map(c => ({
+                      label: <Space size={6}><span style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, display: 'inline-block' }} />{c.label}</Space>,
+                      value: c.status,
+                    }))} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="priority" label="Ưu tiên" initialValue={TaskPriority.MEDIUM}>
+                    <Select options={[
+                      { label: <Tag color="green">Thấp</Tag>, value: TaskPriority.LOW },
+                      { label: <Tag color="blue">Trung bình</Tag>, value: TaskPriority.MEDIUM },
+                      { label: <Tag color="orange">Cao</Tag>, value: TaskPriority.HIGH },
+                      { label: <Tag color="red">Khẩn cấp</Tag>, value: TaskPriority.URGENT },
+                    ]} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item name="dueDate" label="Hạn chót">
+                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+              </Form.Item>
+            </Form>
+          </Modal>
+
+          {/* Modal xử lý task chưa xong khi complete sprint */}
+          <Modal
+            title={<Space><ExclamationCircleOutlined style={{ color: '#faad14' }} />Hoàn thành Sprint</Space>}
+            open={!!completeSprintId}
+            onCancel={() => { setCompleteSprintId(null); setIncompleteTasksForSprint([]); }}
+            footer={
+              <Space>
+                <Button onClick={() => { setCompleteSprintId(null); setIncompleteTasksForSprint([]); }}>Hủy</Button>
+                <Button danger loading={completeSprintLoading} onClick={handleCompleteAndMoveTasks}>
+                  Gỡ task & Hoàn thành
+                </Button>
+                <Button type="primary" loading={completeSprintLoading}
+                  onClick={() => completeSprintId && doCompleteSprint(completeSprintId)}>
+                  Hoàn thành (giữ task trong sprint)
+                </Button>
+              </Space>
+            }
+            destroyOnHidden
+          >
+            <p>
+              Sprint có <Text strong style={{ color: '#faad14' }}>{incompleteTasksForSprint.length} task chưa hoàn thành</Text>:
+            </p>
+            <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {incompleteTasksForSprint.map((t) => (
+                <div key={t.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 10px', background: '#fffbe6', borderRadius: 4,
+                }}>
+                  <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{t.taskKey}</Tag>
+                  <Text style={{ flex: 1, fontSize: 13 }}>{t.title}</Text>
+                  <Tag color={PRIORITY_COLOR[t.priority]}>{PRIORITY_LABEL[t.priority]}</Tag>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 16, color: '#8c8c8c', fontSize: 13 }}>
+              <b>Gỡ task & Hoàn thành</b>: Các task chưa xong sẽ bị gỡ khỏi sprint.<br />
+              <b>Hoàn thành (giữ)</b>: Các task vẫn nằm trong sprint đã hoàn thành.
+            </div>
+          </Modal>
+        </>
       )}
 
       {activeTab === 'categories' && (
@@ -1211,7 +1321,7 @@ const ProjectDetailPage: React.FC = () => {
 
           <Form.Item
             name="parentTaskId"
-            label={<Space size={4}><ApartmentOutlined />Task cha</Space>}
+            label={<Space size={4}><ApartmentOutlined />Đầu việc chính</Space>}
             extra="Để trống = task gốc (cấp 1)"
           >
             <Select
@@ -1288,6 +1398,9 @@ const ProjectDetailPage: React.FC = () => {
 
       <style>{`
         .row-overdue td { background: #fff2f0 !important; }
+        .row-subtask td { background: #f8faff !important; }
+        .row-subtask:hover td { background: #eef3ff !important; }
+        .row-subtask td:first-child { border-left: 3px solid #4361ee33 !important; }
       `}</style>
     </div>
   );

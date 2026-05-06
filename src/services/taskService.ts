@@ -162,7 +162,7 @@ export const taskService = {
     return response.data ?? response;
   },
 
-  /** GET /projects/:projectId/tasks/valid-parents – Danh sách task hợp lệ làm task cha */
+  /** GET /projects/:projectId/tasks/valid-parents – Danh sách task hợp lệ làm Đầu việc chính */
   getValidParentTasks: async (projectId: string, excludeTaskId?: string): Promise<TaskSummary[]> => {
     const response: any = await api.get(`/projects/${projectId}/tasks/valid-parents`, {
       params: excludeTaskId ? { excludeTaskId } : {},

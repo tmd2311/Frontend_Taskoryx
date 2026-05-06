@@ -44,12 +44,12 @@ const { TextArea } = Input;
 
 // ─── Hằng số ────────────────────────────────────────────────
 const PRIORITY_COLOR: Record<string, string> = {
-  [TaskPriority.LOW]: 'green',   [TaskPriority.MEDIUM]: 'blue',
+  [TaskPriority.LOW]: 'green', [TaskPriority.MEDIUM]: 'blue',
   [TaskPriority.HIGH]: 'orange', [TaskPriority.URGENT]: 'red',
 };
 const PRIORITY_LABEL: Record<string, string> = {
-  [TaskPriority.LOW]: 'Thấp',   [TaskPriority.MEDIUM]: 'Trung bình',
-  [TaskPriority.HIGH]: 'Cao',   [TaskPriority.URGENT]: 'Khẩn cấp',
+  [TaskPriority.LOW]: 'Thấp', [TaskPriority.MEDIUM]: 'Trung bình',
+  [TaskPriority.HIGH]: 'Cao', [TaskPriority.URGENT]: 'Khẩn cấp',
 };
 
 const DEP_TYPE_LABEL: Record<string, string> = {
@@ -307,7 +307,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     if (editMode && task?.projectId && members.length === 0) {
       setMembersLoading(true);
       projectService.getMembers(task.projectId)
-        .then(setMembers).catch(() => {})
+        .then(setMembers).catch(() => { })
         .finally(() => setMembersLoading(false));
     }
   }, [editMode, task?.projectId]);
@@ -814,10 +814,10 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                 </Form.Item>
                 <Form.Item name="priority" label="Mức ưu tiên">
                   <Select options={[
-                    { label: <Tag color="green">Thấp</Tag>,       value: TaskPriority.LOW },
-                    { label: <Tag color="blue">Trung bình</Tag>,  value: TaskPriority.MEDIUM },
-                    { label: <Tag color="orange">Cao</Tag>,        value: TaskPriority.HIGH },
-                    { label: <Tag color="red">Khẩn cấp</Tag>,     value: TaskPriority.URGENT },
+                    { label: <Tag color="green">Thấp</Tag>, value: TaskPriority.LOW },
+                    { label: <Tag color="blue">Trung bình</Tag>, value: TaskPriority.MEDIUM },
+                    { label: <Tag color="orange">Cao</Tag>, value: TaskPriority.HIGH },
+                    { label: <Tag color="red">Khẩn cấp</Tag>, value: TaskPriority.URGENT },
                   ]} />
                 </Form.Item>
                 <Form.Item name="assigneeId" label="Giao cho">
@@ -948,7 +948,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                   <>
                     <Divider style={{ margin: '12px 0' }} />
                     <div>
-                      <Text type="secondary" style={{ fontSize: 12 }}>Task cha</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>Đầu việc chính</Text>
                       <div style={{
                         marginTop: 6, padding: '8px 12px',
                         background: '#f5f5f5', borderRadius: 6,
@@ -961,13 +961,13 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                   </>
                 )}
 
-                {/* ── Subtasks ── */}
+                {/* ── Đầu việc con ── */}
                 {task.subTasks && task.subTasks.length > 0 && (
                   <>
                     <Divider style={{ margin: '12px 0' }} />
                     <div>
                       <Text type="secondary" style={{ fontSize: 12 }}>
-                        Subtasks ({task.subTasks.length})
+                        Đầu việc con ({task.subTasks.length})
                       </Text>
                       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {task.subTasks.map((sub) => (
@@ -1238,16 +1238,16 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                         actions={
                           user?.id === entry.userId
                             ? [
-                                <Tooltip title="Sửa" key="edit">
-                                  <Button type="text" size="small" icon={<EditOutlined />}
-                                    onClick={() => handleOpenEditTime(entry)} />
-                                </Tooltip>,
-                                <Popconfirm key="del" title="Xóa mục này?"
-                                  onConfirm={() => handleDeleteTimeEntry(entry.id)}
-                                  okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
-                                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                                </Popconfirm>,
-                              ]
+                              <Tooltip title="Sửa" key="edit">
+                                <Button type="text" size="small" icon={<EditOutlined />}
+                                  onClick={() => handleOpenEditTime(entry)} />
+                              </Tooltip>,
+                              <Popconfirm key="del" title="Xóa mục này?"
+                                onConfirm={() => handleDeleteTimeEntry(entry.id)}
+                                okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
+                                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                              </Popconfirm>,
+                            ]
                             : []
                         }
                       >
