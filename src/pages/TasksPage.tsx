@@ -15,6 +15,7 @@ import {
   Tooltip,
   Avatar,
   Badge,
+  Progress,
 } from 'antd';
 import {
   PlusOutlined,
@@ -23,14 +24,17 @@ import {
   ExclamationCircleOutlined,
   UserOutlined,
   ApartmentOutlined,
+  RightOutlined,
+  DownOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useTaskStore } from '../stores/taskStore';
 import { useProjectStore } from '../stores/projectStore';
 import { taskService } from '../services/taskService';
 import { sprintService } from '../services/sprintService';
+import { categoryService } from '../services/categoryService';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import type { Sprint, TaskSummary, CreateTaskRequest, UpdateTaskRequest } from '../types';
+import type { Sprint, TaskSummary, CreateTaskRequest, UpdateTaskRequest, IssueCategory } from '../types';
 import { TaskPriority } from '../types';
 import dayjs from 'dayjs';
 
@@ -51,17 +55,20 @@ const PRIORITY_LABEL: Record<string, string> = {
 };
 
 
-// Flatten cây task (Đầu việc chính + subTasks đệ quy) thành mảng phẳng giữ thứ tự
-function flattenTree(tasks: TaskSummary[]): TaskSummary[] {
-  const result: TaskSummary[] = [];
-  const walk = (nodes: TaskSummary[]) => {
-    nodes.forEach((t) => {
-      result.push(t);
-      if (t.subTasks?.length) walk(t.subTasks);
-    });
-  };
-  walk(tasks);
-  return result;
+// Flatten cây đệ quy theo expandedKeys, gán depth vào mỗi node
+function flattenTree(
+  nodes: TaskSummary[],
+  expandedKeys: Set<string>,
+  depth = 0,
+): TaskSummary[] {
+  return nodes.flatMap(node => {
+    const withDepth = { ...node, depth };
+    const hasChildren = (node.subTasks?.length ?? 0) > 0;
+    if (hasChildren && expandedKeys.has(node.id)) {
+      return [withDepth, ...flattenTree(node.subTasks!, expandedKeys, depth + 1)];
+    }
+    return [withDepth];
+  });
 }
 
 // ─── TasksPage ────────────────────────────────────────────────
@@ -86,6 +93,15 @@ const TasksPage: React.FC = () => {
   const [editingTask, setEditingTask] = useState<TaskSummary | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [form] = Form.useForm();
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
+
+  const handleToggleExpand = (id: string) => {
+    setExpandedTaskIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   // Parent task selector state
   const [parentCandidates, setParentCandidates] = useState<TaskSummary[]>([]);
@@ -94,6 +110,10 @@ const TasksPage: React.FC = () => {
   // Sprint selector state
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [sprintsLoading, setSprintsLoading] = useState(false);
+
+  // Category selector state
+  const [categories, setCategories] = useState<IssueCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
 
   useEffect(() => {
     fetchMyTasks();
@@ -113,28 +133,20 @@ const TasksPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // Flatten cha → con theo thứ tự, lọc trùng task con ở root
-  const flatTasks = useMemo(() => {
+  // Lấy root tasks — ưu tiên field subTasks từ server, fallback dựa vào parentTaskId
+  const rootTasks = useMemo(() => {
+    const hasTree = myTasks.some((t) => (t.subTasks?.length ?? 0) > 0);
+    if (hasTree) return myTasks.filter(t => !t.parentTaskId);
     const byId: Record<string, TaskSummary> = {};
     myTasks.forEach((t) => { byId[t.id] = t; });
-
-    const hasTree = myTasks.some((t) => (t.subTasks?.length ?? 0) > 0);
-    if (hasTree) return flattenTree(myTasks.filter(t => !t.parentTaskId));
-
-    const childrenOf: Record<string, TaskSummary[]> = {};
-    myTasks.forEach((t) => {
-      if (t.parentTaskId && byId[t.parentTaskId]) {
-        if (!childrenOf[t.parentTaskId]) childrenOf[t.parentTaskId] = [];
-        childrenOf[t.parentTaskId].push(t);
-      }
-    });
-    const roots = myTasks.filter((t) => !t.parentTaskId || !byId[t.parentTaskId]);
-    const walk = (node: TaskSummary): TaskSummary[] => [
-      node,
-      ...(childrenOf[node.id] ?? []).flatMap(walk),
-    ];
-    return roots.flatMap(walk);
+    return myTasks.filter((t) => !t.parentTaskId || !byId[t.parentTaskId]);
   }, [myTasks]);
+
+  // Flatten đệ quy theo expandedTaskIds
+  const flatTasks = useMemo(
+    () => flattenTree(rootTasks, expandedTaskIds),
+    [rootTasks, expandedTaskIds],
+  );
 
   // ── Handlers ────────────────────────────────────────────────
 
@@ -164,6 +176,19 @@ const TasksPage: React.FC = () => {
     }
   };
 
+  const loadCategories = async (projId: string) => {
+    if (!projId) { setCategories([]); return; }
+    setCategoriesLoading(true);
+    try {
+      const data = await categoryService.getCategories(projId);
+      setCategories(Array.isArray(data) ? data : []);
+    } catch {
+      setCategories([]);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
   const handleOpenCreate = async (projectId?: string) => {
     setEditingTask(null);
     setCurrentTask(null);
@@ -174,6 +199,7 @@ const TasksPage: React.FC = () => {
     if (pid) {
       loadParentCandidates(pid);
       loadSprints(pid);
+      loadCategories(pid);
     }
   };
 
@@ -224,6 +250,7 @@ const TasksPage: React.FC = () => {
           priority: values.priority,
           sprintId: values.sprintId,
           dueDate,
+          categoryId: values.categoryId || undefined,
         };
         if (values.parentTaskId) createPayload.parentTaskId = values.parentTaskId;
         await createTask(selectedProjectId, createPayload);
@@ -287,22 +314,58 @@ const TasksPage: React.FC = () => {
       dataIndex: 'title',
       key: 'title',
       render: (title: string, r) => {
-        const isChild = !!r.parentTaskId;
+        const hasChildren = (r.subTasks?.length ?? 0) > 0;
+        const expanded = expandedTaskIds.has(r.id);
+        const depth = r.depth ?? 0;
+        const doneCount = r.subTasks?.filter(s => s.status === 'DONE').length ?? 0;
+        const totalSub = r.subTasks?.length ?? 0;
+
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: isChild ? 20 : 0 }}>
-            {isChild && <span style={{ color: '#bfbfbf', fontSize: 12, flexShrink: 0 }}>└</span>}
-            <Button
-              type="link"
-              style={{
-                padding: 0, height: 'auto', textAlign: 'left',
-                fontWeight: isChild ? 400 : 500,
-                fontSize: 13,
-                color: isChild ? '#595959' : undefined,
-              }}
-              onClick={(e) => { e.stopPropagation(); navigate(`/tasks/${r.taskKey}`); }}
-            >
-              {title}
-            </Button>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4, paddingLeft: depth * 24 }}>
+            {hasChildren ? (
+              <span
+                onClick={(e) => { e.stopPropagation(); handleToggleExpand(r.id); }}
+                style={{ cursor: 'pointer', color: '#4361ee', fontSize: 11, marginTop: 3, flexShrink: 0, width: 16, textAlign: 'center' }}
+              >
+                {expanded ? <DownOutlined /> : <RightOutlined />}
+              </span>
+            ) : (
+              <span style={{ width: 16, flexShrink: 0, marginTop: 3, textAlign: 'center', color: '#d9d9d9', fontSize: 8 }}>●</span>
+            )}
+
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <Button
+                  type="link"
+                  style={{
+                    padding: 0, height: 'auto', textAlign: 'left',
+                    fontWeight: hasChildren ? 600 : 400,
+                    fontSize: depth === 0 ? 13 : 12,
+                    color: depth === 0 ? undefined : '#595959',
+                  }}
+                  onClick={(e) => { e.stopPropagation(); navigate(`/tasks/${r.taskKey}`); }}
+                >
+                  {title}
+                </Button>
+                {hasChildren && (
+                  <Text type="secondary" style={{ fontSize: 10 }}>
+                    {totalSub} việc con
+                  </Text>
+                )}
+              </div>
+              {hasChildren && (
+                <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Progress
+                    percent={totalSub > 0 ? Math.round((doneCount / totalSub) * 100) : 0}
+                    size="small"
+                    style={{ width: 80, margin: 0 }}
+                    showInfo={false}
+                    strokeColor="#52c41a"
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>{doneCount}/{totalSub} xong</Text>
+                </div>
+              )}
+            </div>
           </div>
         );
       },
@@ -423,7 +486,7 @@ const TasksPage: React.FC = () => {
         scroll={{ x: 700 }}
         rowClassName={(r) => [
           r.overdue ? 'row-overdue' : '',
-          r.parentTaskId ? 'row-subtask' : '',
+          (r.depth ?? 0) > 0 ? 'row-subtask' : '',
         ].filter(Boolean).join(' ')}
         onRow={(record) => ({
           onClick: (e) => {
@@ -454,8 +517,10 @@ const TasksPage: React.FC = () => {
                   setSelectedProjectId(id);
                   form.setFieldValue('parentTaskId', null);
                   form.setFieldValue('sprintId', null);
+                  form.setFieldValue('categoryId', null);
                   loadParentCandidates(id);
                   loadSprints(id);
+                  loadCategories(id);
                 }}
                 options={projects.map((p) => ({ label: `[${p.key}] ${p.name}`, value: p.id }))}
               />
@@ -488,6 +553,17 @@ const TasksPage: React.FC = () => {
               ]}
             />
           </Form.Item>
+
+          {!editingTask && selectedProjectId && categories.length > 0 && (
+            <Form.Item name="categoryId" label="Danh mục">
+              <Select
+                allowClear
+                loading={categoriesLoading}
+                placeholder="Không phân loại"
+                options={categories.map((c) => ({ label: c.name, value: c.id }))}
+              />
+            </Form.Item>
+          )}
 
           <Form.Item name="dueDate" label="Hạn chót">
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />

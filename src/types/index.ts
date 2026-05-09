@@ -243,24 +243,6 @@ export interface CreateLabelRequest {
 // ============================================================
 
 /** Subtask tóm tắt – dùng trong task detail */
-export interface SubTaskSummary {
-  id: string;
-  taskKey: string;
-  title: string;
-  status: TaskStatus;
-  priority: TaskPriority;
-  assigneeId?: string;
-  assigneeName?: string;
-  assigneeAvatar?: string;
-  position?: number;
-  overdue?: boolean;
-  commentCount?: number;
-  attachmentCount?: number;
-  dueDate?: string;
-  parentTaskId?: string;
-  depth?: number;
-}
-
 /** Task summary – dùng trong list, kanban, my-tasks */
 export interface TaskSummary {
   id: string;
@@ -281,7 +263,7 @@ export interface TaskSummary {
   attachmentCount?: number;
   parentTaskId?: string;
   depth?: number;
-  subTasks?: SubTaskSummary[];
+  subTasks?: TaskSummary[];
   sprintId?: string;
   sprintName?: string;
 }
@@ -364,6 +346,27 @@ export interface TaskFilterParams extends PageParams {
   completed?: boolean;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
+  status?: string;
+  categoryId?: string;
+  versionId?: string;
+  subtasking?: 'all' | 'parent_only' | 'exclude_child';
+}
+
+export type TaskFilterStatus = 'all' | 'open' | 'in_progress' | 'resolved' | 'closed' | 'not_closed';
+export type TaskFilterSubtasking = 'all' | 'parent_only' | 'exclude_child';
+
+export interface TaskFilterState {
+  mode: 'search' | 'advanced';
+  status: TaskFilterStatus;
+  subtasking: TaskFilterSubtasking;
+  keyword: string;
+  assigneeId: string | null;
+  categoryId: string | null;
+  versionId: string | null;
+  sprintId: string | null;
+  priorities: string[];
+  page: number;
+  pageSize: number;
 }
 
 // ============================================================

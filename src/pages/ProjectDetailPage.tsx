@@ -21,15 +21,17 @@ import { projectService } from '../services/projectService';
 import { sprintService } from '../services/sprintService';
 import { taskService } from '../services/taskService';
 import { categoryService } from '../services/categoryService';
+import { versionService } from '../services/versionService';
 import { activityService } from '../services/activityService';
 import { searchService } from '../services/searchService';
 import { useAuthStore } from '../stores/authStore';
 import type {
   TaskSummary, ProjectMember, Sprint, IssueCategory, ActivityLog, GanttTask,
-  CreateTaskRequest,
+  CreateTaskRequest, TaskFilterState, Version,
 } from '../types';
 import { TaskPriority, ProjectRole, TaskStatus, SprintStatus } from '../types';
 import SprintKanbanView from '../components/SprintKanbanView';
+import TaskFilterPanel, { DEFAULT_FILTER } from '../components/TaskFilterPanel';
 import dayjs from 'dayjs';
 
 const { TextArea } = Input;
@@ -60,6 +62,22 @@ const SPRINT_STATUS_COLOR: Record<string, string> = {
 const SPRINT_STATUS_LABEL: Record<string, string> = {
   PLANNED: 'Kế hoạch', ACTIVE: 'Đang chạy', COMPLETED: 'Hoàn thành', CANCELLED: 'Đã hủy',
 };
+// ─── Flatten cây đệ quy theo expandedKeys ────────────────────
+function flattenTree(
+  nodes: TaskSummary[],
+  expandedKeys: Set<string>,
+  depth = 0,
+): TaskSummary[] {
+  return nodes.flatMap(node => {
+    const withDepth = { ...node, depth };
+    const hasChildren = (node.subTasks?.length ?? 0) > 0;
+    if (hasChildren && expandedKeys.has(node.id)) {
+      return [withDepth, ...flattenTree(node.subTasks!, expandedKeys, depth + 1)];
+    }
+    return [withDepth];
+  });
+}
+
 // ─── Task columns ────────────────────────────────────────────
 const buildTaskColumns = (
   onRowClick: (r: TaskSummary) => void,
@@ -71,29 +89,25 @@ const buildTaskColumns = (
     dataIndex: 'title',
     key: 'title',
     render: (_: string, r) => {
-      const isParent = (r.subTasks?.length ?? 0) > 0;
-      const isChild = !!r.parentTaskId;
+      const hasChildren = (r.subTasks?.length ?? 0) > 0;
       const expanded = expandedKeys.has(r.id);
+      const depth = r.depth ?? 0;
       const doneCount = r.subTasks?.filter(s => s.status === 'DONE').length ?? 0;
       const totalSub = r.subTasks?.length ?? 0;
 
       return (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, paddingLeft: isChild ? 28 : 0 }}>
-          {isChild && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center',
-              color: '#bfbfbf', fontSize: 12, marginTop: 3, flexShrink: 0,
-            }}>└─</span>
-          )}
-          {isParent && !isChild && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4, paddingLeft: depth * 24 }}>
+          {/* Expand / leaf icon */}
+          {hasChildren ? (
             <span
               onClick={(e) => { e.stopPropagation(); onToggleExpand(r.id); }}
-              style={{ cursor: 'pointer', color: '#4361ee', fontSize: 11, marginTop: 3, flexShrink: 0, width: 14 }}
+              style={{ cursor: 'pointer', color: '#4361ee', fontSize: 11, marginTop: 3, flexShrink: 0, width: 16, textAlign: 'center' }}
             >
               {expanded ? <DownOutlined /> : <RightOutlined />}
             </span>
+          ) : (
+            <span style={{ width: 16, flexShrink: 0, marginTop: 3, textAlign: 'center', color: '#d9d9d9', fontSize: 8 }}>●</span>
           )}
-          {!isParent && !isChild && <span style={{ width: 14, flexShrink: 0 }} />}
 
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -101,35 +115,22 @@ const buildTaskColumns = (
                 type="link"
                 style={{
                   padding: 0, height: 'auto', textAlign: 'left',
-                  fontWeight: isParent ? 600 : 400,
-                  fontSize: isChild ? 12 : 13,
-                  color: isChild ? '#595959' : undefined,
+                  fontWeight: hasChildren ? 600 : 400,
+                  fontSize: depth === 0 ? 13 : 12,
+                  color: depth === 0 ? undefined : '#595959',
                 }}
                 onClick={() => onRowClick(r)}
               >
                 {r.title}
               </Button>
-              {isChild && (
-                <Tag style={{
-                  fontSize: 10, padding: '0 5px', lineHeight: '16px', height: 16,
-                  border: 'none', borderRadius: 3, margin: 0,
-                  background: '#f0f5ff', color: '#4361ee',
-                }}>
-                  Công việc con
-                </Tag>
-              )}
-              {isParent && (
-                <Tag style={{
-                  fontSize: 10, padding: '0 5px', lineHeight: '16px', height: 16,
-                  border: 'none', borderRadius: 3, margin: 0,
-                  background: '#f6ffed', color: '#52c41a',
-                }}>
-                  Chính
-                </Tag>
+              {hasChildren && (
+                <Text type="secondary" style={{ fontSize: 10 }}>
+                  {totalSub} việc con
+                </Text>
               )}
             </div>
-            {isParent && (
-              <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {hasChildren && (
+              <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Progress
                   percent={totalSub > 0 ? Math.round((doneCount / totalSub) * 100) : 0}
                   size="small"
@@ -137,9 +138,7 @@ const buildTaskColumns = (
                   showInfo={false}
                   strokeColor="#52c41a"
                 />
-                <Text type="secondary" style={{ fontSize: 11 }}>
-                  {doneCount}/{totalSub} xong
-                </Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>{doneCount}/{totalSub} xong</Text>
               </div>
             )}
           </div>
@@ -150,13 +149,13 @@ const buildTaskColumns = (
   {
     title: 'Mã', dataIndex: 'taskKey', key: 'taskKey', width: 100,
     render: (key: string, r) => (
-      <Tag style={{ fontFamily: 'monospace', opacity: r.parentTaskId ? 0.75 : 1 }}>{key}</Tag>
+      <Tag style={{ fontFamily: 'monospace', opacity: (r.depth ?? 0) > 0 ? 0.75 : 1 }}>{key}</Tag>
     ),
   },
   {
     title: 'Ưu tiên', dataIndex: 'priority', key: 'priority', width: 110,
     render: (p: string, r) => (
-      <Tag color={PRIORITY_COLOR[p]} style={{ opacity: r.parentTaskId ? 0.8 : 1 }}>
+      <Tag color={PRIORITY_COLOR[p]} style={{ opacity: (r.depth ?? 0) > 0 ? 0.85 : 1 }}>
         {PRIORITY_LABEL[p] ?? p}
       </Tag>
     ),
@@ -218,13 +217,16 @@ const ProjectDetailPage: React.FC = () => {
   const { isAdmin, user: currentUser } = useAuthStore();
   const { fetchRoles } = useAdminStore();
 
-  // Task list filters
-  const [keyword, setKeyword] = useState('');
-  const [filterPriority, setFilterPriority] = useState<string[]>([]);
-  const [filterOverdue, setFilterOverdue] = useState<boolean | undefined>(undefined);
-  const [page, setPage] = useState(1);
+  // Task list filters (unified state)
+  const [taskFilter, setTaskFilter] = useState<TaskFilterState>(DEFAULT_FILTER);
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = DEFAULT_FILTER.pageSize;
+
+  // Versions (milestone) for filter
+  const [versions, setVersions] = useState<Version[]>([]);
+
+  // Derived shorthand
+  const page = taskFilter.page;
   const activeTab = searchParams.get('tab') || 'tasks';
 
   // Members
@@ -290,6 +292,10 @@ const ProjectDetailPage: React.FC = () => {
     fetchProjectById(projectId);
     fetchMembers(projectId);
     fetchRoles().catch(() => { });
+    // Load master data cho filter panel
+    categoryService.getCategories(projectId).then(setCategories).catch(() => {});
+    versionService.getVersions(projectId).then(setVersions).catch(() => {});
+    sprintService.getSprints(projectId).then(setSprints).catch(() => {});
   }, [projectId]);
 
   // Sync currentProject vào store khi load trực tiếp qua URL
@@ -301,14 +307,23 @@ const ProjectDetailPage: React.FC = () => {
     }
   }, [projectId]);
 
+  const buildTaskParams = useCallback((f: TaskFilterState) => {
+    const params: any = { page: f.page - 1, size: PAGE_SIZE };
+    if (f.keyword.trim()) params.keyword = f.keyword.trim();
+    if (f.priorities.length) params.priorities = f.priorities.join(',');
+    if (f.assigneeId) params.assigneeId = f.assigneeId;
+    if (f.categoryId) params.categoryId = f.categoryId;
+    if (f.versionId) params.versionId = f.versionId;
+    if (f.sprintId) params.sprintId = f.sprintId;
+    if (f.status && f.status !== 'all') params.status = f.status;
+    if (f.subtasking && f.subtasking !== 'all') params.subtasking = f.subtasking;
+    return params;
+  }, [PAGE_SIZE]);
+
   useEffect(() => {
     if (!projectId) return;
-    const params: any = { page: page - 1, size: PAGE_SIZE };
-    if (keyword.trim()) params.keyword = keyword.trim();
-    if (filterPriority.length) params.priorities = filterPriority.join(',');
-    if (filterOverdue !== undefined) params.overdue = filterOverdue;
-    fetchProjectTasks(projectId, params);
-  }, [projectId, page, keyword, filterPriority, filterOverdue]);
+    fetchProjectTasks(projectId, buildTaskParams(taskFilter));
+  }, [projectId, taskFilter, buildTaskParams]);
 
   // Fetch sprints
   const fetchSprints = useCallback(async () => {
@@ -492,6 +507,7 @@ const ProjectDetailPage: React.FC = () => {
         status: values.status ?? TaskStatus.TODO,
         sprintId: createTaskSprintId,
         dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
+        categoryId: values.categoryId || undefined,
       };
       await taskService.createTask(projectId, payload);
       message.success('Đã tạo task và thêm vào sprint');
@@ -545,6 +561,7 @@ const ProjectDetailPage: React.FC = () => {
         sprintId: values.sprintId,
         parentTaskId: values.parentTaskId,
         dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
+        categoryId: values.categoryId || undefined,
       };
       await taskService.createTask(projectId, payload);
       message.success('Đã tạo task');
@@ -653,11 +670,7 @@ const ProjectDetailPage: React.FC = () => {
   };
 
   const rootTasks = projectTasks?.content ?? [];
-  const visibleTasks = rootTasks.flatMap(t =>
-    expandedTaskIds.has(t.id)
-      ? [t, ...(t.subTasks ?? []) as TaskSummary[]]
-      : [t]
-  );
+  const visibleTasks = flattenTree(rootTasks, expandedTaskIds);
   const total = projectTasks?.totalElements ?? 0;
 
   const handleToggleExpand = (id: string) => {
@@ -773,39 +786,23 @@ const ProjectDetailPage: React.FC = () => {
 
       {activeTab === 'tasks' && (
         <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-            <Input prefix={<SearchOutlined />} placeholder="Tìm kiếm task..." allowClear
-              style={{ flex: '1 1 160px', minWidth: 140 }}
-              onPressEnter={(e) => { setKeyword((e.target as HTMLInputElement).value); setPage(1); }}
-              onChange={(e) => !e.target.value && (setKeyword(''), setPage(1))}
-              onBlur={(e) => { setKeyword(e.target.value); setPage(1); }}
-            />
-
-            <Select mode="multiple" placeholder="Lọc ưu tiên" allowClear
-              style={{ flex: '1 1 160px', minWidth: 140 }} value={filterPriority}
-              onChange={(v) => { setFilterPriority(v); setPage(1); }}
-              options={[
-                { label: 'Thấp', value: TaskPriority.LOW },
-                { label: 'Trung bình', value: TaskPriority.MEDIUM },
-                { label: 'Cao', value: TaskPriority.HIGH },
-                { label: 'Khẩn cấp', value: TaskPriority.URGENT },
-              ]}
-            />
-            <Select placeholder="Trạng thái hạn" allowClear style={{ flex: '1 1 130px', minWidth: 120 }}
-              value={filterOverdue}
-              onChange={(v) => { setFilterOverdue(v); setPage(1); }}
-              options={[{ label: 'Quá hạn', value: true }, { label: 'Còn hạn', value: false }]}
-            />
-            <Tooltip title="Làm mới">
-              <Button icon={<ReloadOutlined />} onClick={() => {
-                setPage(1);
-                fetchProjectTasks(projectId!, { page: 0, size: PAGE_SIZE });
-              }} loading={isLoading} />
-            </Tooltip>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreateTaskModal}>
               Tạo task
             </Button>
           </div>
+
+          <TaskFilterPanel
+            value={taskFilter}
+            onChange={(patch) => setTaskFilter((prev) => ({ ...prev, ...patch, page: patch.page ?? 1 }))}
+            onSearch={() => fetchProjectTasks(projectId!, buildTaskParams({ ...taskFilter, page: 1 }))}
+            onReset={() => setTaskFilter(DEFAULT_FILTER)}
+            loading={isLoading}
+            members={members}
+            categories={categories}
+            versions={versions}
+            sprints={sprints}
+          />
           <Table
             columns={buildTaskColumns(
               (r) => navigate(`/tasks/${r.taskKey}`),
@@ -817,14 +814,14 @@ const ProjectDetailPage: React.FC = () => {
             loading={isLoading}
             pagination={{
               current: page, pageSize: PAGE_SIZE, total,
-              onChange: (p) => setPage(p),
+              onChange: (p) => setTaskFilter((prev) => ({ ...prev, page: p })),
               showTotal: (t) => `Tổng ${t} task`,
               showSizeChanger: false,
             }}
             locale={{ emptyText: <Empty description="Không có task nào" /> }}
             rowClassName={(record) => [
               record.overdue ? 'row-overdue' : '',
-              record.parentTaskId ? 'row-subtask' : '',
+              (record.depth ?? 0) > 0 ? 'row-subtask' : '',
             ].filter(Boolean).join(' ')}
             scroll={{ x: 700 }}
           />
@@ -1052,6 +1049,15 @@ const ProjectDetailPage: React.FC = () => {
                   </Form.Item>
                 </Col>
               </Row>
+              {categories.length > 0 && (
+                <Form.Item name="categoryId" label="Danh mục">
+                  <Select
+                    allowClear
+                    placeholder="Không phân loại"
+                    options={categories.map(c => ({ label: c.name, value: c.id }))}
+                  />
+                </Form.Item>
+              )}
               <Form.Item name="dueDate" label="Hạn chót">
                 <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
               </Form.Item>
@@ -1294,6 +1300,16 @@ const ProjectDetailPage: React.FC = () => {
               ]}
             />
           </Form.Item>
+
+          {categories.length > 0 && (
+            <Form.Item name="categoryId" label="Danh mục">
+              <Select
+                allowClear
+                placeholder="Không phân loại"
+                options={categories.map(c => ({ label: c.name, value: c.id }))}
+              />
+            </Form.Item>
+          )}
 
           <Form.Item name="dueDate" label="Hạn chót">
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
