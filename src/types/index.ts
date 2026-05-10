@@ -1001,3 +1001,57 @@ export interface UseTemplateRequest {
   color?: string;
   isPublic?: boolean;
 }
+
+// ============================================================
+// AI PROJECT GENERATOR
+// ============================================================
+
+export interface AiSubTask {
+  title: string;
+  description?: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  duration_days: number;
+  start_offset_days: number;
+  sub_tasks: AiSubTask[];
+}
+
+export interface AiTask {
+  title: string;
+  description?: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  duration_days: number;
+  start_offset_days: number;
+  sub_tasks: AiSubTask[];
+}
+
+export interface AiProjectPlan {
+  project_name: string;
+  project_description: string;
+  project_key: string;
+  total_duration_days: number;
+  tasks: AiTask[];
+}
+
+export interface AiGenerateRequest {
+  requirement: string;
+  language?: 'vi' | 'en';
+}
+
+export interface AiGenerateResponse {
+  plan: AiProjectPlan;
+  totalTaskCount: number;
+  modelUsed: string;
+}
+
+export interface AiConfirmRequest {
+  plan: AiProjectPlan;
+  targetProjectId?: string | null;
+}
+
+export interface AiConfirmResponse {
+  projectId: string;
+  projectKey: string;
+  projectName: string;
+  tasksCreated: number;
+  subTasksCreated: number;
+}

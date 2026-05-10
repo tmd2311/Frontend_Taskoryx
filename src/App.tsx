@@ -15,6 +15,7 @@ import AdminUsersPage from './pages/AdminUsersPage';
 import AdminRolesPage from './pages/AdminRolesPage';
 import TimeReportPage from './pages/TimeReportPage';
 import TaskDetailPage from './pages/TaskDetailPage';
+import AiProjectPage from './pages/AiProjectPage';
 import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -184,6 +185,17 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <AdminRolesPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/ai-project"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <AiProjectPage />
                 </MainLayout>
               </ProtectedRoute>
             }

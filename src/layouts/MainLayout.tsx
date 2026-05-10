@@ -19,6 +19,7 @@ import {
   ArrowLeftOutlined,
   ClockCircleOutlined,
   AppstoreAddOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
@@ -134,6 +135,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       icon: <ClockCircleOutlined />,
       label: 'Báo cáo giờ',
       onClick: () => { navTo('/time-report'); setCurrentProject(null); },
+    },
+    {
+      key: '/ai-project',
+      icon: <RobotOutlined />,
+      label: 'Tạo dự án AI',
+      onClick: () => { navTo('/ai-project'); setCurrentProject(null); },
     },
     ...(isAdmin ? [
       { type: 'divider' as const },
