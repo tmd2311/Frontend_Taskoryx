@@ -13,7 +13,6 @@ import {
   Statistic,
   Row,
   Col,
-  Badge,
   Tooltip,
 } from 'antd';
 import {

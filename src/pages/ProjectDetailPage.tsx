@@ -7,7 +7,7 @@ import {
 } from 'antd';
 import {
   CheckSquareOutlined, TeamOutlined, ExclamationCircleOutlined,
-  UserOutlined, CommentOutlined, PaperClipOutlined, SearchOutlined, ReloadOutlined,
+  UserOutlined, CommentOutlined, PaperClipOutlined, ReloadOutlined,
   UserAddOutlined, DeleteOutlined, PlusOutlined, ApartmentOutlined,
   ThunderboltOutlined, AppstoreAddOutlined,
   PlayCircleOutlined, CheckCircleOutlined, EditOutlined,
