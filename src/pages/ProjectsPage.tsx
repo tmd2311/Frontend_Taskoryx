@@ -38,6 +38,7 @@ import {
   StarOutlined,
 } from '@ant-design/icons';
 import { useProjectStore } from '../stores/projectStore';
+import { usePermissionStore } from '../stores/permissionStore';
 import { adminService } from '../services/adminService';
 import { sprintService } from '../services/sprintService';
 import { useAuthStore } from '../stores/authStore';
@@ -280,7 +281,9 @@ const ProjectCard: React.FC<{
 
 const ProjectsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, isAdmin: authIsAdmin } = useAuthStore();
+  const { hasPermission } = usePermissionStore();
+  const canCreateProject = hasPermission('CREATE_PROJECT') || authIsAdmin === true;
   const { projects, isLoading, error, fetchProjects, createProject, deleteProject } = useProjectStore();
 
   const [isAdmin, setIsAdmin] = useState(false);
@@ -455,13 +458,15 @@ const ProjectsPage: React.FC = () => {
           <Tooltip title="Làm mới">
             <Button icon={<ReloadOutlined />} onClick={handleRefresh} loading={loading} />
           </Tooltip>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={openCreateModal}
-          >
-            Tạo dự án
-          </Button>
+          {canCreateProject && (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={openCreateModal}
+            >
+              Tạo dự án
+            </Button>
+          )}
         </Space>
       </div>
 
@@ -500,7 +505,7 @@ const ProjectsPage: React.FC = () => {
                   : 'Bạn chưa tham gia dự án nào'
             }
           >
-            {!search && (
+            {!search && canCreateProject && (
               <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
                 Tạo Dự án đầu tiên
               </Button>

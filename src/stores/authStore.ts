@@ -5,6 +5,7 @@ import { authService } from '../services/authService';
 import { userService } from '../services/userService';
 import { adminService } from '../services/adminService';
 import { STORAGE_KEYS } from '../utils/config';
+import { usePermissionStore } from './permissionStore';
 
 interface AuthState {
   user: User | null;
@@ -77,6 +78,7 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: null,
           });
+          usePermissionStore.getState().fetchMyPermissions(res.userId);
           return {};
         } catch (error: any) {
           set({ error: error.message || 'Đăng nhập thất bại', isLoading: false });
@@ -109,6 +111,7 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: null,
           });
+          usePermissionStore.getState().fetchMyPermissions(res.userId);
         } catch (error: any) {
           set({ error: error.message || 'Đăng ký thất bại', isLoading: false });
           throw error;
@@ -125,6 +128,7 @@ export const useAuthStore = create<AuthState>()(
           localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
           localStorage.removeItem(STORAGE_KEYS.USER_INFO);
           set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false, mustChangePassword: false, isAdmin: null, pendingTwoFactor: false });
+          usePermissionStore.getState().clearPermissions();
         }
       },
 
@@ -133,6 +137,9 @@ export const useAuthStore = create<AuthState>()(
         try {
           const user = await userService.getMe();
           set({ user, isAuthenticated: true, isLoading: false });
+          if (user.id && !usePermissionStore.getState().loaded) {
+            usePermissionStore.getState().fetchMyPermissions(user.id);
+          }
         } catch (error: any) {
           set({ error: error.message || 'Không thể tải thông tin người dùng', isLoading: false });
           throw error;

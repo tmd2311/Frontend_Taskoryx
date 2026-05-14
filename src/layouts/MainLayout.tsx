@@ -23,6 +23,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { usePermissionStore } from '../stores/permissionStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useThemeStore } from '../stores/themeStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -44,6 +45,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAdmin, checkAdminAccess } = useAuthStore();
+  const { hasPermission, fetchMyPermissions, loaded: permLoaded } = usePermissionStore();
   const { fetchUnreadCount, fetchNotifications } = useNotificationStore();
   const { isDark, toggle: toggleTheme } = useThemeStore();
   const { currentProject, setCurrentProject } = useProjectStore();
@@ -72,6 +74,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   useEffect(() => {
     if (isAdmin === null) checkAdminAccess();
+    if (user?.id && !permLoaded) fetchMyPermissions(user.id);
     fetchUnreadCount();
 
     websocketService.connect({
@@ -136,12 +139,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       label: 'Báo cáo giờ',
       onClick: () => { navTo('/time-report'); setCurrentProject(null); },
     },
-    {
+    ...(hasPermission('CREATE_PROJECT') || isAdmin ? [{
       key: '/ai-project',
       icon: <RobotOutlined />,
       label: 'Tạo dự án AI',
       onClick: () => { navTo('/ai-project'); setCurrentProject(null); },
-    },
+    }] : []),
     ...(isAdmin ? [
       { type: 'divider' as const },
       {
