@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { userService } from '../services/userService';
 
 interface PermissionState {
@@ -9,16 +10,27 @@ interface PermissionState {
   clearPermissions: () => void;
 }
 
-export const usePermissionStore = create<PermissionState>((set, get) => ({
-  permissions: [],
-  loaded: false,
+export const usePermissionStore = create<PermissionState>()(
+  persist(
+    (set, get) => ({
+      permissions: [],
+      loaded: false,
 
-  fetchMyPermissions: async (userId: string) => {
-    const perms = await userService.getMyPermissions(userId);
-    set({ permissions: perms, loaded: true });
-  },
+      fetchMyPermissions: async (userId: string) => {
+        const perms = await userService.getMyPermissions(userId);
+        set({ permissions: perms, loaded: true });
+      },
 
-  hasPermission: (name: string) => get().permissions.includes(name),
+      hasPermission: (name: string) => get().permissions.includes(name),
 
-  clearPermissions: () => set({ permissions: [], loaded: false }),
-}));
+      clearPermissions: () => set({ permissions: [], loaded: false }),
+    }),
+    {
+      name: 'permission-storage',
+      partialize: (state) => ({
+        permissions: state.permissions,
+        loaded: state.loaded,
+      }),
+    }
+  )
+);
