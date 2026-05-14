@@ -9,7 +9,8 @@ import {
   BarChartOutlined, HistoryOutlined, EditOutlined, DeleteOutlined,
   LinkOutlined,
 } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
+import type { TableColumnsType } from 'antd';
+type ColumnsType<T> = TableColumnsType<T>;
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip as ReTooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, PieChart, Pie, Cell,
@@ -210,7 +211,7 @@ const MyEntriesTab: React.FC = () => {
       title: 'Task',
       dataIndex: 'taskKey',
       width: 120,
-      render: (key: string, row) => key ? (
+      render: (key: string, row: TimeEntry) => key ? (
         <Tooltip title="Xem task">
           <Tag
             icon={<LinkOutlined />}
@@ -228,7 +229,7 @@ const MyEntriesTab: React.FC = () => {
       title: 'Thời gian',
       dataIndex: 'hours',
       width: 100,
-      render: (h: number, row) => (
+      render: (h: number, row: TimeEntry) => (
         <Space size={4}>
           <ClockCircleOutlined style={{ color: '#4361ee', fontSize: 12 }} />
           <Text strong style={{ color: '#4361ee', fontSize: 13 }}>
@@ -257,7 +258,7 @@ const MyEntriesTab: React.FC = () => {
       title: '',
       key: 'actions',
       width: 80,
-      render: (_, row) => (
+      render: (_: unknown, row: TimeEntry) => (
         <Space size={2}>
           <Tooltip title="Sửa">
             <Button
@@ -437,22 +438,22 @@ const TimeReportPage: React.FC = () => {
 
   // Columns for project stats by task
   const taskColumns: ColumnsType<any> = [
-    { title: 'Mã', dataIndex: 'taskKey', width: 90, render: (v) => <Tag style={{ fontFamily: 'monospace', fontSize: 11 }}>{v}</Tag> },
+    { title: 'Mã', dataIndex: 'taskKey', width: 90, render: (v: any) => <Tag style={{ fontFamily: 'monospace', fontSize: 11 }}>{v}</Tag> },
     { title: 'Tiêu đề', dataIndex: 'taskTitle', ellipsis: true },
-    { title: 'Ước tính', dataIndex: 'estimatedHours', width: 90, render: (v) => v ? `${v}h` : '—' },
+    { title: 'Ước tính', dataIndex: 'estimatedHours', width: 90, render: (v: any) => v ? `${v}h` : '—' },
     {
       title: 'Đã log', dataIndex: 'formattedLoggedHours', width: 90,
-      render: (v, row) => <Text type={row.progressPercent > 100 ? 'danger' : undefined}>{v}</Text>,
+      render: (v: any, row: any) => <Text type={row.progressPercent > 100 ? 'danger' : undefined}>{v}</Text>,
     },
     {
       title: 'Tiến độ', dataIndex: 'progressPercent', width: 120,
-      render: (v) => v != null ? <Progress percent={Math.min(v, 100)} size="small" status={v > 100 ? 'exception' : undefined} /> : '—',
+      render: (v: any) => v != null ? <Progress percent={Math.min(v, 100)} size="small" status={v > 100 ? 'exception' : undefined} /> : '—',
     },
   ];
 
   const memberColumns: ColumnsType<any> = [
     {
-      title: 'Thành viên', dataIndex: 'userName', render: (v, row) => (
+      title: 'Thành viên', dataIndex: 'userName', render: (v: any, row: any) => (
         <Space>
           <Avatar size={24} src={row.userAvatar} icon={<UserOutlined />} />
           <Text>{v}</Text>
@@ -658,13 +659,13 @@ const TimeReportPage: React.FC = () => {
             scroll={{ x: 'max-content' }}
             pagination={{ pageSize: 10, size: 'small' }}
             columns={[
-              { title: 'Ngày', dataIndex: 'date', width: 110, render: (v) => dayjs(v).format('DD/MM/YYYY') },
+              { title: 'Ngày', dataIndex: 'date', width: 110, render: (v: string) => dayjs(v).format('DD/MM/YYYY') },
               { title: 'Thứ', dataIndex: 'dayOfWeek', width: 90 },
               { title: 'Tổng giờ', dataIndex: 'formattedHours', width: 100 },
               { title: 'Số lần ghi', dataIndex: 'entryCount', width: 90 },
               {
                 title: 'Task đã log',
-                render: (_, row: DailyTimeStats) => (
+                render: (_: unknown, row: DailyTimeStats) => (
                   <Space wrap size={4}>
                     {row.entries.slice(0, 3).map((e) => (
                       <Tag key={e.id} style={{ fontFamily: 'monospace', fontSize: 11 }}>

@@ -17,6 +17,7 @@ import {
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useTaskStore } from '../stores/taskStore';
 import { useAuthStore } from '../stores/authStore';
+import { useThemeStore } from '../stores/themeStore';
 import { taskService } from '../services/taskService';
 import { projectService } from '../services/projectService';
 import { timeTrackingService } from '../services/timeTrackingService';
@@ -111,6 +112,7 @@ interface CommentItemProps {
 const CommentItem: React.FC<CommentItemProps> = ({
   comment, currentUserId, taskId, depth = 0, onReply, onEdit, onDelete,
 }) => {
+  const { isDark } = useThemeStore();
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
   const [editSaving, setEditSaving] = useState(false);
@@ -158,7 +160,9 @@ const CommentItem: React.FC<CommentItemProps> = ({
             </div>
           ) : (
             <div style={{
-              background: depth === 0 ? '#f5f5f5' : '#fafafa',
+              background: depth === 0
+                ? (isDark ? '#252842' : '#f5f5f5')
+                : (isDark ? '#1e2133' : '#fafafa'),
               borderRadius: 8, padding: '6px 10px', fontSize: 13,
               whiteSpace: 'pre-wrap', wordBreak: 'break-word',
             }}>
@@ -184,7 +188,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
             </Space>
           )}
           {comment.replies && comment.replies.length > 0 && (
-            <div style={{ marginTop: 6, paddingLeft: 8, borderLeft: '2px solid #f0f0f0' }}>
+            <div style={{ marginTop: 6, paddingLeft: 8, borderLeft: `2px solid ${isDark ? '#2e3250' : '#f0f0f0'}` }}>
               {comment.replies.map((reply) => (
                 <CommentItem key={reply.id} comment={reply} currentUserId={currentUserId}
                   taskId={taskId} depth={1} onReply={onReply} onEdit={onEdit} onDelete={onDelete} />
@@ -201,7 +205,14 @@ const CommentItem: React.FC<CommentItemProps> = ({
 const TaskDetailPage: React.FC = () => {
   const { taskKey } = useParams<{ taskKey: string }>();
   const navigate = useNavigate();
+  const { isDark } = useThemeStore();
   const { user } = useAuthStore();
+
+  const surfaceBg   = isDark ? '#252842' : '#f5f5f5';
+  const subtleBg    = isDark ? '#1e2133' : '#fafafa';
+  const borderColor = isDark ? '#2e3250' : '#f0f0f0';
+  const subColor    = isDark ? '#9397b0' : '#8c8c8c';
+  const sidebarBg   = isDark ? '#181b28' : '#fafbfc';
   const {
     updateTask, updateTaskStatus, deleteTask,
     comments, commentsLoading, fetchComments, addComment, updateComment, deleteComment,
@@ -685,7 +696,7 @@ const TaskDetailPage: React.FC = () => {
                   {!editMode && (
                     <Button type="text" size="small" icon={<EditOutlined />}
                       onClick={handleEnterEdit}
-                      style={{ color: '#8c8c8c', fontSize: 12 }}>
+                      style={{ color: subColor, fontSize: 12 }}>
                       Chỉnh sửa
                     </Button>
                   )}
@@ -729,7 +740,7 @@ const TaskDetailPage: React.FC = () => {
                     minHeight: 80,
                   }}>
                     {task.description ? (
-                      <Paragraph style={{ color: '#555', whiteSpace: 'pre-wrap', marginBottom: 0 }}>
+                      <Paragraph style={{ color: isDark ? '#c5c8df' : '#555', whiteSpace: 'pre-wrap', marginBottom: 0 }}>
                         {task.description}
                       </Paragraph>
                     ) : (
@@ -749,7 +760,7 @@ const TaskDetailPage: React.FC = () => {
                       <Text type="secondary" style={{ fontSize: 12 }}>Đầu việc chính</Text>
                       <div style={{
                         marginTop: 6, padding: '8px 12px',
-                        background: '#f5f5f5', borderRadius: 6,
+                        background: surfaceBg, borderRadius: 6,
                         display: 'flex', alignItems: 'center', gap: 8,
                       }}>
                         <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{task.parentTaskKey}</Tag>
@@ -769,8 +780,8 @@ const TaskDetailPage: React.FC = () => {
                       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {task.subTasks.map((sub) => (
                           <div key={sub.id} style={{
-                            padding: '8px 12px', background: '#fafafa',
-                            borderRadius: 6, border: '1px solid #f0f0f0',
+                            padding: '8px 12px', background: subtleBg,
+                            borderRadius: 6, border: `1px solid ${borderColor}`,
                             display: 'flex', alignItems: 'center', gap: 8,
                           }}>
                             <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{sub.taskKey}</Tag>
@@ -809,7 +820,7 @@ const TaskDetailPage: React.FC = () => {
                 >
                   <RightOutlined
                     style={{
-                      fontSize: 11, color: '#8c8c8c',
+                      fontSize: 11, color: subColor,
                       transform: timeOpen ? 'rotate(90deg)' : 'rotate(0deg)',
                       transition: 'transform 0.2s',
                     }}
@@ -932,7 +943,7 @@ const TaskDetailPage: React.FC = () => {
                 <div>
                   {replyTo && (
                     <div style={{
-                      background: '#f5f5f5', borderRadius: 6, padding: '4px 10px',
+                      background: surfaceBg, borderRadius: 6, padding: '4px 10px',
                       marginBottom: 8, fontSize: 12,
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     }}>
@@ -994,7 +1005,6 @@ const TaskDetailPage: React.FC = () => {
                         type="primary"
                         icon={<SendOutlined />}
                         loading={commentSending}
-                        disabled={isCommentEmpty(commentHtml)}
                         onClick={handleSendComment}
                       >
                         Gửi bình luận
@@ -1037,8 +1047,8 @@ const TaskDetailPage: React.FC = () => {
                     {dependencies.map((dep) => (
                       <div key={dep.id} style={{
                         display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '8px 10px', background: '#fafafa',
-                        borderRadius: 6, border: '1px solid #f0f0f0',
+                        padding: '8px 10px', background: subtleBg,
+                        borderRadius: 6, border: `1px solid ${borderColor}`,
                       }}>
                         <Tag color="purple" style={{ margin: 0, fontSize: 11 }}>
                           {DEP_TYPE_LABEL[dep.type] || dep.type}
@@ -1072,12 +1082,12 @@ const TaskDetailPage: React.FC = () => {
               flexShrink: 0,
               borderLeft: isWide ? '1px solid var(--card-border, #e8eaf0)' : undefined,
               borderTop: !isWide ? '1px solid var(--card-border, #e8eaf0)' : undefined,
-              background: 'var(--sidebar-bg, #fafbfc)',
+              background: sidebarBg,
             }}>
               <div style={{ overflow: 'hidden' }}>
 
                 {/* Trạng thái */}
-                <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0' }}>
+                <div style={{ padding: '10px 14px', borderBottom: `1px solid ${borderColor}` }}>
                   <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Trạng thái</Text>
                   <StatusSelect
                     value={task.status}
@@ -1093,7 +1103,7 @@ const TaskDetailPage: React.FC = () => {
                 </div>
 
                 {/* Ưu tiên */}
-                <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0' }}>
+                <div style={{ padding: '10px 14px', borderBottom: `1px solid ${borderColor}` }}>
                   <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ưu tiên</Text>
                   <Tag color={PRIORITY_COLOR[task.priority]} style={{ margin: 0 }}>
                     {PRIORITY_LABEL[task.priority]}
@@ -1101,7 +1111,7 @@ const TaskDetailPage: React.FC = () => {
                 </div>
 
                 {/* Người thực hiện */}
-                <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0' }}>
+                <div style={{ padding: '10px 14px', borderBottom: `1px solid ${borderColor}` }}>
                   <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Người thực hiện</Text>
                   <Select
                     style={{ width: '100%' }}
@@ -1133,10 +1143,10 @@ const TaskDetailPage: React.FC = () => {
 
                 {/* Dự án */}
                 {task.projectName && (
-                  <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0' }}>
+                  <div style={{ padding: '10px 14px', borderBottom: `1px solid ${borderColor}` }}>
                     <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dự án</Text>
                     <Space size={4}>
-                      <FolderOutlined style={{ color: '#8c8c8c', fontSize: 13 }} />
+                      <FolderOutlined style={{ color: subColor, fontSize: 13 }} />
                       <Link to={`/projects/${task.projectId}`} style={{ fontSize: 13 }}>{task.projectName}</Link>
                     </Space>
                   </div>
@@ -1147,14 +1157,14 @@ const TaskDetailPage: React.FC = () => {
                     <div style={{ padding: '10px 14px' }}>
                       <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ngày bắt đầu</Text>
                       <Space size={4}>
-                        <CalendarOutlined style={{ color: '#8c8c8c', fontSize: 13 }} />
+                        <CalendarOutlined style={{ color: subColor, fontSize: 13 }} />
                         <Text style={{ fontSize: 13 }}>{dayjs(task.startDate).format('DD/MM/YYYY')}</Text>
                       </Space>
                     </div>
                   )}
 
                   {/* Hạn chót */}
-                  <div style={{ padding: '10px 14px', borderRight: '1px solid #f0f0f0' }}>
+                  <div style={{ padding: '10px 14px', borderRight: `1px solid ${borderColor}` }}>
                     <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Hạn chót</Text>
                     {task.dueDate ? (
                       <Space size={4}>
@@ -1171,7 +1181,7 @@ const TaskDetailPage: React.FC = () => {
 
                 </div>
                 {/* Giờ */}
-                <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0' }}>
+                <div style={{ padding: '10px 14px', borderBottom: `1px solid ${borderColor}` }}>
                   <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Giờ ước tính / thực tế</Text>
                   <Space size={4}>
                     <Text style={{ fontSize: 13 }}>{task.estimatedHours ?? '—'}h</Text>
@@ -1190,7 +1200,7 @@ const TaskDetailPage: React.FC = () => {
 
                 {/* Nhãn */}
                 {task.labels && task.labels.length > 0 && (
-                  <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0' }}>
+                  <div style={{ padding: '10px 14px', borderBottom: `1px solid ${borderColor}` }}>
                     <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nhãn</Text>
                     <Space size={4} wrap>
                       {task.labels.map((label) => (
@@ -1202,7 +1212,7 @@ const TaskDetailPage: React.FC = () => {
 
                 {/* Cột Kanban */}
                 {task.columnName && (
-                  <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0' }}>
+                  <div style={{ padding: '10px 14px', borderBottom: `1px solid ${borderColor}` }}>
                     <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cột Kanban</Text>
                     <Tag><AppstoreOutlined /> {task.columnName}</Tag>
                   </div>
@@ -1210,7 +1220,7 @@ const TaskDetailPage: React.FC = () => {
 
                 {/* Người tạo */}
                 {task.reporterName && (
-                  <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0' }}>
+                  <div style={{ padding: '10px 14px', borderBottom: `1px solid ${borderColor}` }}>
                     <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Người tạo</Text>
                     <Space size={6}>
                       <Avatar size={18} icon={<UserOutlined />} />

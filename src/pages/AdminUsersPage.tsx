@@ -31,7 +31,8 @@ import {
   ExclamationCircleOutlined,
   MailOutlined,
 } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
+import type { TableColumnsType } from 'antd';
+type ColumnsType<T> = TableColumnsType<T>;
 import { useNavigate } from 'react-router-dom';
 import { useAdminStore } from '../stores/adminStore';
 import { useAuthStore } from '../stores/authStore';
@@ -248,7 +249,7 @@ const AdminUsersPage: React.FC = () => {
     {
       title: 'Người dùng',
       key: 'user',
-      render: (_, u) => (
+      render: (_: unknown, u: AdminUser) => (
         <Space>
           <Avatar src={resolveAvatarUrl(u.avatarUrl)} icon={<UserOutlined />} size={36} />
           <div>
@@ -275,10 +276,10 @@ const AdminUsersPage: React.FC = () => {
       title: 'Vai trò hệ thống',
       key: 'roles',
       width: 220,
-      render: (_, u) => (
+      render: (_: unknown, u: AdminUser) => (
         <Space size={4} wrap>
           {u.roles && u.roles.length > 0 ? (
-            u.roles.map((r) => (
+            u.roles.map((r: any) => (
               <Popconfirm
                 key={r.id}
                 title={`Xóa vai trò "${r.name}" khỏi người dùng này?`}
@@ -307,7 +308,7 @@ const AdminUsersPage: React.FC = () => {
       title: 'Trạng thái',
       key: 'isActive',
       width: 120,
-      render: (_, u) => (
+      render: (_: unknown, u: AdminUser) => (
         u.isActive
           ? <Badge status="success" text={<Text style={{ fontSize: 13 }}>Hoạt động</Text>} />
           : <Badge status="error" text={<Text style={{ fontSize: 13 }}>Vô hiệu</Text>} />
@@ -339,7 +340,7 @@ const AdminUsersPage: React.FC = () => {
       title: '',
       key: 'actions',
       width: 60,
-      render: (_, u) => {
+      render: (_: unknown, u: AdminUser) => {
         const items: MenuProps['items'] = [
           {
             key: 'edit',

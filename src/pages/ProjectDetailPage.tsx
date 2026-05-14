@@ -14,7 +14,8 @@ import {
   DownloadOutlined, RightOutlined, DownOutlined, HistoryOutlined,
 } from '@ant-design/icons';
 import { resolveAvatarUrl } from '../utils/avatar';
-import type { ColumnsType } from 'antd/es/table';
+import type { TableColumnsType } from 'antd';
+type ColumnsType<T> = TableColumnsType<T>;
 import { useProjectStore } from '../stores/projectStore';
 import { useTaskStore } from '../stores/taskStore';
 import { useAdminStore } from '../stores/adminStore';
@@ -107,11 +108,11 @@ const buildTaskColumns = (
     title: 'Tiêu đề',
     dataIndex: 'title',
     key: 'title',
-    render: (_: string, r) => {
+    render: (_: string, r: TaskSummary) => {
       const hasChildren = (r.subTasks?.length ?? 0) > 0;
       const expanded = expandedKeys.has(r.id);
       const depth = r.depth ?? 0;
-      const doneCount = r.subTasks?.filter(s => s.status === 'DONE').length ?? 0;
+      const doneCount = r.subTasks?.filter((s: TaskSummary) => s.status === 'DONE').length ?? 0;
       const totalSub = r.subTasks?.length ?? 0;
 
       return (
@@ -167,13 +168,13 @@ const buildTaskColumns = (
   },
   {
     title: 'Mã', dataIndex: 'taskKey', key: 'taskKey', width: 100,
-    render: (key: string, r) => (
+    render: (key: string, r: TaskSummary) => (
       <Tag style={{ fontFamily: 'monospace', opacity: (r.depth ?? 0) > 0 ? 0.75 : 1 }}>{key}</Tag>
     ),
   },
   {
     title: 'Ưu tiên', dataIndex: 'priority', key: 'priority', width: 110,
-    render: (p: string, r) => (
+    render: (p: string, r: TaskSummary) => (
       <Tag color={PRIORITY_COLOR[p]} style={{ opacity: (r.depth ?? 0) > 0 ? 0.85 : 1 }}>
         {PRIORITY_LABEL[p] ?? p}
       </Tag>
@@ -192,7 +193,7 @@ const buildTaskColumns = (
   },
   {
     title: 'Hạn chót', dataIndex: 'dueDate', key: 'dueDate', width: 120,
-    render: (date: string, record) => {
+    render: (date: string, record: TaskSummary) => {
       if (!date) return <Text type="secondary">—</Text>;
       return (
         <Space size={4}>
@@ -206,7 +207,7 @@ const buildTaskColumns = (
   },
   {
     title: '', key: 'meta', width: 70,
-    render: (_: any, record) => (
+    render: (_: any, record: TaskSummary) => (
       <Space size={8}>
         {(record.commentCount ?? 0) > 0 && (
           <Tooltip title={`${record.commentCount} bình luận`}>
@@ -716,7 +717,7 @@ const ProjectDetailPage: React.FC = () => {
   const buildMemberColumns = (): ColumnsType<ProjectMember> => [
     {
       title: 'Thành viên', key: 'user',
-      render: (_, m) => (
+      render: (_: unknown, m: ProjectMember) => (
         <Space>
           <Avatar src={m.avatarUrl} icon={<UserOutlined />} />
           <div>
@@ -744,7 +745,7 @@ const ProjectDetailPage: React.FC = () => {
     },
     {
       title: '', key: 'actions', width: 60,
-      render: (_, m) => {
+      render: (_: unknown, m: ProjectMember) => {
         if (m.role === ProjectRole.OWNER || !canManageMembers) return null;
         return (
           <Popconfirm title={`Xóa ${m.fullName || m.username} khỏi dự án?`}
@@ -926,7 +927,7 @@ const ProjectDetailPage: React.FC = () => {
                             <Button size="small" icon={<CheckCircleOutlined />} onClick={() => handleCompleteSprint(sprint)}>Hoàn thành Sprint</Button>
                           )}
                           {!isCompleted && (
-                            <Button size="small" icon={<PlusOutlined />} type="primary" ghost
+                            <Button size="small" icon={<PlusOutlined />} type="primary"
                               onClick={() => { createTaskForm.resetFields(); setCreateTaskSprintId(sprint.id); }}>
                               Thêm task
                             </Button>

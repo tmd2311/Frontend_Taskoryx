@@ -7,7 +7,8 @@ import {
   PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined,
   SafetyCertificateOutlined, LockOutlined,
 } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
+import type { TableColumnsType } from 'antd';
+type ColumnsType<T> = TableColumnsType<T>;
 import { useNavigate } from 'react-router-dom';
 import { useAdminStore } from '../stores/adminStore';
 import { useAuthStore } from '../stores/authStore';
@@ -142,7 +143,7 @@ const AdminRolesPage: React.FC = () => {
   const columns: ColumnsType<Role> = [
     {
       title: 'Tên role', key: 'name',
-      render: (_, r) => (
+      render: (_: unknown, r: Role) => (
         <Space size={8}>
           <Text strong style={{ fontSize: 13 }}>{r.name}</Text>
           {r.isSystemRole && (
@@ -157,7 +158,7 @@ const AdminRolesPage: React.FC = () => {
     },
     {
       title: 'Quyền hạn', key: 'permissions', width: 140,
-      render: (_, r) => {
+      render: (_: unknown, r: Role) => {
         const count = (r.permissions ?? []).length;
         return <Tag color={count > 0 ? 'blue' : 'default'}>{count} quyền</Tag>;
       },
@@ -172,7 +173,7 @@ const AdminRolesPage: React.FC = () => {
     },
     {
       title: 'Thao tác', key: 'actions', width: 150,
-      render: (_, r) => (
+      render: (_: unknown, r: Role) => (
         <Space size={4}>
           <Tooltip title="Xem chi tiết">
             <Button size="small" icon={<EyeOutlined />} onClick={() => openView(r)} />

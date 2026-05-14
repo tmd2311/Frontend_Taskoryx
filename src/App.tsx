@@ -42,7 +42,30 @@ function App() {
           fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
           fontSize: 14,
           lineHeight: 1.6,
-          ...(isDark ? {} : {
+          ...(isDark ? {
+            // Nền container (card, modal, drawer, input)
+            colorBgContainer:    '#1c1f2e',
+            // Nền layout tổng (body background)
+            colorBgLayout:       '#13151f',
+            // Nền elevated (dropdown, popover, tooltip)
+            colorBgElevated:     '#232638',
+            // Nền spotlight (hover row, selected item)
+            colorBgSpotlight:    '#2a2e45',
+            // Text
+            colorText:           '#e8eaf6',
+            colorTextSecondary:  '#9397b0',
+            colorTextTertiary:   '#5c6080',
+            colorTextPlaceholder:'#5c6080',
+            // Border
+            colorBorder:         '#2e3250',
+            colorBorderSecondary:'#252842',
+            // Split line
+            colorSplit:          '#252842',
+            // Fill
+            colorFillAlter:      '#232638',
+            colorFillContent:    '#232638',
+            colorFillSecondary:  '#2a2e45',
+          } : {
             colorBgContainer: '#ffffff',
             colorBgLayout: '#f0f2f5',
           }),

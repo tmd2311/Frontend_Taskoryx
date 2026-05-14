@@ -99,14 +99,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     navigate('/login');
   };
 
-  const siderBg = isDark ? '#141414' : '#ffffff';
-  const siderBorder = isDark ? '#303030' : '#eef0f6';
-  const headerBg = isDark ? '#1f1f1f' : '#ffffff';
-  const headerBorder = isDark ? '#303030' : '#eef0f6';
-  const iconColor = isDark ? '#a0a8b8' : '#5a6378';
-  const iconHoverBg = isDark ? 'rgba(67,97,238,0.15)' : '#f0f2ff';
-  const userTextColor = isDark ? '#e0e0e0' : '#1a1a2e';
-  const contentBg = isDark ? '#141414' : '#f5f6fa';
+  const siderBg = isDark ? '#1c1f2e' : '#ffffff';
+  const siderBorder = isDark ? '#2e3250' : '#eef0f6';
+  const headerBg = isDark ? '#1c1f2e' : '#ffffff';
+  const headerBorder = isDark ? '#2e3250' : '#eef0f6';
+  const iconColor = isDark ? '#9397b0' : '#5a6378';
+  const iconHoverBg = isDark ? 'rgba(99,120,255,0.12)' : '#f0f2ff';
+  const userTextColor = isDark ? '#e8eaf6' : '#1a1a2e';
+  const contentBg = isDark ? '#13151f' : '#f5f6fa';
 
   const navTo = (path: string) => {
     navigate(path);
@@ -304,26 +304,33 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               </div>
               {!collapsed && (
                 <div style={{ minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 13, fontWeight: 600,
-                    color: isDark ? '#e0e0e0' : '#1a1a2e',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {currentProject.name}
-                  </div>
-                  <div style={{ fontSize: 11, color: iconColor }}>{currentProject.key}</div>
+                  <Tooltip title={currentProject.name} placement="right" mouseEnterDelay={0.3}>
+                    <div style={{
+                      fontSize: 13, fontWeight: 600,
+                      color: isDark ? '#e8eaf6' : '#1a1a2e',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      cursor: 'default',
+                    }}>
+                      {currentProject.name}
+                    </div>
+                  </Tooltip>
+                  <div style={{ fontSize: 11, color: iconColor, marginTop: 2 }}>{currentProject.key}</div>
                 </div>
               )}
             </div>
           </div>
         ) : (
           /* ── Global mode: logo ── */
-          <div style={{
-            height: 56,
-            display: 'flex', alignItems: 'center',
-            padding: '0 16px', gap: 10,
-            borderBottom: `1px solid ${siderBorder}`,
-          }}>
+          <div
+            onClick={() => navigate('/dashboard')}
+            style={{
+              height: 56,
+              display: 'flex', alignItems: 'center',
+              padding: '0 16px', gap: 10,
+              borderBottom: `1px solid ${siderBorder}`,
+              cursor: 'pointer',
+            }}
+          >
             <img src="/logo.png" alt="logo" style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, objectFit: 'cover' }} />
             {(isMobile || !collapsed) && (
               <span style={{
@@ -401,8 +408,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 >
                   Dự án
                 </span>
-                <span style={{ color: isDark ? '#555' : '#ccc' }}>/</span>
-                <span style={{ fontWeight: 600, color: isDark ? '#e0e0e0' : '#1a1a2e' }}>
+                <span style={{ color: isDark ? '#3d4268' : '#ccc' }}>/</span>
+                <span style={{ fontWeight: 600, color: isDark ? '#e8eaf6' : '#1a1a2e' }}>
                   {currentProject.name}
                 </span>
               </div>

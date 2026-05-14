@@ -16,6 +16,7 @@ import {
 import { taskService } from '../services/taskService';
 import type { TaskSummary, Sprint } from '../types';
 import { TaskStatus } from '../types';
+import { useThemeStore } from '../stores/themeStore';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
@@ -47,6 +48,18 @@ export interface SprintKanbanViewProps {
 const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
   projectId, sprintId, allSprints = [], onOpenTask, onRefreshStats,
 }) => {
+  const { isDark } = useThemeStore();
+  const colBg        = isDark ? '#1c1f2e' : '#f7f8fa';
+  const cardBg       = isDark ? '#252842' : '#fff';
+  const cardBorder   = isDark ? '#2e3250' : '#f0f0f0';
+  const cardDragBg   = isDark ? '#1a2540' : '#e6f4ff';
+  const dropOverBg   = isDark ? 'rgba(67,97,238,0.12)' : '#e6f7ff';
+  const emptyBorder  = isDark ? '#2e3250' : '#e8e8e8';
+  const emptyColor   = isDark ? '#5c6080' : '#bfbfbf';
+  const subColor     = isDark ? '#9397b0' : '#8c8c8c';
+  const selectBg     = isDark ? '#252842' : '#fff';
+  const selectColor  = isDark ? '#c0c4d8' : '#595959';
+  const selectBorder = isDark ? '#2e3250' : '#d9d9d9';
   const [loading, setLoading] = useState(false);
   const [tasksByStatus, setTasksByStatus] = useState<Record<string, TaskSummary[]>>({});
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null);
@@ -151,7 +164,7 @@ const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
             <div key={col.status} style={{
               width: 220,
               minWidth: 220,
-              background: '#f7f8fa',
+              background: colBg,
               borderRadius: 8,
               display: 'flex',
               flexDirection: 'column',
@@ -187,15 +200,15 @@ const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
                       overflowY: 'auto',
                       flex: 1,
                       minHeight: 60,
-                      background: snapshot.isDraggingOver ? '#e6f7ff' : 'transparent',
+                      background: snapshot.isDraggingOver ? dropOverBg : 'transparent',
                       borderRadius: '0 0 8px 8px',
                       transition: 'background .15s',
                     }}
                   >
                     {tasks.length === 0 && !snapshot.isDraggingOver && (
                       <div style={{
-                        textAlign: 'center', color: '#bfbfbf', padding: '12px 0',
-                        fontSize: 11, border: '2px dashed #e8e8e8', borderRadius: 6,
+                        textAlign: 'center', color: emptyColor, padding: '12px 0',
+                        fontSize: 11, border: `2px dashed ${emptyBorder}`, borderRadius: 6,
                       }}>
                         Kéo task vào đây
                       </div>
@@ -208,8 +221,8 @@ const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
                             ref={drag.innerRef}
                             {...drag.draggableProps}
                             style={{
-                              background: dragSnap.isDragging ? '#e6f4ff' : '#fff',
-                              border: `1px solid ${dragSnap.isDragging ? '#1890ff' : '#f0f0f0'}`,
+                              background: dragSnap.isDragging ? cardDragBg : cardBg,
+                              border: `1px solid ${dragSnap.isDragging ? '#1890ff' : cardBorder}`,
                               borderRadius: 6,
                               padding: '8px 10px',
                               marginBottom: 6,
@@ -250,7 +263,7 @@ const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
 
                                 {/* Due date */}
                                 {task.dueDate && (
-                                  <div style={{ fontSize: 11, color: task.overdue ? '#f5222d' : '#8c8c8c', marginBottom: 4 }}>
+                                  <div style={{ fontSize: 11, color: task.overdue ? '#f5222d' : subColor, marginBottom: 4 }}>
                                     {task.overdue && <ExclamationCircleOutlined style={{ marginRight: 2 }} />}
                                     {dayjs(task.dueDate).format('DD/MM/YYYY')}
                                   </div>
@@ -266,12 +279,12 @@ const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
 
                                   <Space size={4}>
                                     {(task.commentCount ?? 0) > 0 && (
-                                      <span style={{ fontSize: 10, color: '#8c8c8c' }}>
+                                      <span style={{ fontSize: 10, color: subColor }}>
                                         <CommentOutlined /> {task.commentCount}
                                       </span>
                                     )}
                                     {(task.attachmentCount ?? 0) > 0 && (
-                                      <span style={{ fontSize: 10, color: '#8c8c8c' }}>
+                                      <span style={{ fontSize: 10, color: subColor }}>
                                         <PaperClipOutlined /> {task.attachmentCount}
                                       </span>
                                     )}
@@ -285,9 +298,9 @@ const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
                                     <Tooltip title="Chuyển sprint">
                                       <select
                                         style={{
-                                          fontSize: 10, border: '1px solid #d9d9d9', borderRadius: 4,
+                                          fontSize: 10, border: `1px solid ${selectBorder}`, borderRadius: 4,
                                           padding: '1px 4px', cursor: 'pointer', flex: 1,
-                                          background: '#fff', color: '#595959',
+                                          background: selectBg, color: selectColor,
                                         }}
                                         value=""
                                         disabled={movingTaskId === task.id}

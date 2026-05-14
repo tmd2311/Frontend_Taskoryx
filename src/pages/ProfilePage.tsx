@@ -32,7 +32,7 @@ import {
   QrcodeOutlined,
   CameraOutlined,
 } from '@ant-design/icons';
-import type { RcFile } from 'antd/es/upload';
+type RcFile = File;
 import { useAuthStore } from '../stores/authStore';
 import { userService } from '../services/userService';
 import { authService } from '../services/authService';

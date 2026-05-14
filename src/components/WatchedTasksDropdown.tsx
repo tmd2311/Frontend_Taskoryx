@@ -59,11 +59,11 @@ const WatchedTasksDropdown: React.FC = () => {
     }
   };
 
-  const panelBg = isDark ? '#1f1f1f' : '#ffffff';
-  const borderColor = isDark ? '#303030' : '#f0f0f0';
-  const hoverBg = isDark ? 'rgba(67,97,238,0.12)' : '#f5f7ff';
-  const textColor = isDark ? '#e0e0e0' : '#1a1a2e';
-  const subColor = isDark ? '#888' : '#8c8c8c';
+  const panelBg = isDark ? '#1c1f2e' : '#ffffff';
+  const borderColor = isDark ? '#2e3250' : '#f0f0f0';
+  const hoverBg = isDark ? 'rgba(99,120,255,0.12)' : '#f5f7ff';
+  const textColor = isDark ? '#e8eaf6' : '#1a1a2e';
+  const subColor = isDark ? '#9397b0' : '#8c8c8c';
   const subTaskBg = isDark ? 'rgba(255,255,255,0.03)' : '#fafbff';
 
   const renderTask = (task: TaskSummary, depth = 0) => (
@@ -196,7 +196,7 @@ const WatchedTasksDropdown: React.FC = () => {
           borderRadius: 8,
           cursor: 'pointer',
           fontSize: 16,
-          color: isDark ? '#a0a8b8' : '#5a6378',
+          color: isDark ? '#9397b0' : '#5a6378',
           transition: 'background 0.2s',
         }}
           onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(67,97,238,0.15)' : '#f0f2ff')}

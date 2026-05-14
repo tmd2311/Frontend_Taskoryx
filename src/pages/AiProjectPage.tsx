@@ -93,8 +93,8 @@ const TaskNode: React.FC<TaskNodeProps> = ({ task, isSubtask = false, isDark }) 
             </div>
           }
           style={{
-            background: isDark ? '#1f1f1f' : '#f8f9ff',
-            border: `1px solid ${isDark ? '#303030' : '#e8ecff'}`,
+            background: isDark ? '#1c1f2e' : '#f8f9ff',
+            border: `1px solid ${isDark ? '#2e3250' : '#e8ecff'}`,
             borderRadius: 8,
           }}
         >
@@ -121,12 +121,12 @@ const TaskNode: React.FC<TaskNodeProps> = ({ task, isSubtask = false, isDark }) 
         gap: 8,
         padding: '6px 10px',
         borderRadius: 6,
-        background: isDark ? '#262626' : '#fafafa',
-        border: `1px solid ${isDark ? '#303030' : '#f0f0f0'}`,
+        background: isDark ? '#232638' : '#fafafa',
+        border: `1px solid ${isDark ? '#2e3250' : '#f0f0f0'}`,
         marginBottom: 4,
       }}
     >
-      <span style={{ color: isDark ? '#555' : '#ccc', fontSize: 11 }}>├─</span>
+      <span style={{ color: isDark ? '#3d4268' : '#ccc', fontSize: 11 }}>├─</span>
       <PriorityBadge priority={task.priority} />
       <Text style={{ fontSize: 12, flex: 1 }}>{task.title}</Text>
       <Text type="secondary" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
@@ -152,8 +152,8 @@ const AiProjectPage: React.FC = () => {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const cardBg = isDark ? '#1a1a2e' : '#ffffff';
-  const borderColor = isDark ? '#303030' : '#eef0f6';
+  const cardBg = isDark ? '#1c1f2e' : '#ffffff';
+  const borderColor = isDark ? '#2e3250' : '#eef0f6';
 
   const handleGenerate = async () => {
     if (!requirement.trim()) return;
@@ -272,8 +272,8 @@ const AiProjectPage: React.FC = () => {
                   border: `1px solid ${borderColor}`,
                   cursor: 'pointer',
                   fontSize: 13,
-                  color: isDark ? '#a0a8b8' : '#5a6378',
-                  background: isDark ? '#141414' : '#fafafa',
+                  color: isDark ? '#9397b0' : '#5a6378',
+                  background: isDark ? '#232638' : '#fafafa',
                   transition: 'border-color 0.2s, color 0.2s',
                 }}
                 onMouseEnter={e => {
@@ -282,7 +282,7 @@ const AiProjectPage: React.FC = () => {
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.borderColor = borderColor;
-                  e.currentTarget.style.color = isDark ? '#a0a8b8' : '#5a6378';
+                  e.currentTarget.style.color = isDark ? '#9397b0' : '#5a6378';
                 }}
               >
                 {p}

@@ -27,7 +27,8 @@ import {
   RightOutlined,
   DownOutlined,
 } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
+import type { TableColumnsType } from 'antd';
+type ColumnsType<T> = TableColumnsType<T>;
 import { useTaskStore } from '../stores/taskStore';
 import { useProjectStore } from '../stores/projectStore';
 import { taskService } from '../services/taskService';
@@ -313,11 +314,11 @@ const TasksPage: React.FC = () => {
       title: 'Tiêu đề',
       dataIndex: 'title',
       key: 'title',
-      render: (title: string, r) => {
+      render: (title: string, r: TaskSummary) => {
         const hasChildren = (r.subTasks?.length ?? 0) > 0;
         const expanded = expandedTaskIds.has(r.id);
         const depth = r.depth ?? 0;
-        const doneCount = r.subTasks?.filter(s => s.status === 'DONE').length ?? 0;
+        const doneCount = r.subTasks?.filter((s: TaskSummary) => s.status === 'DONE').length ?? 0;
         const totalSub = r.subTasks?.length ?? 0;
 
         return (
@@ -375,7 +376,7 @@ const TasksPage: React.FC = () => {
       dataIndex: 'status',
       key: 'status',
       width: 150,
-      render: (s: string, record) => {
+      render: (s: string, record: TaskSummary) => {
         const badge = record.overdue && s !== 'DONE' && s !== 'CANCELLED'
           ? { color: '#ff4d4f', text: 'Quá hạn' }
           : (STATUS_BADGE[s] ?? { color: '#d9d9d9', text: s });
@@ -411,7 +412,7 @@ const TasksPage: React.FC = () => {
       dataIndex: 'dueDate',
       key: 'dueDate',
       width: 120,
-      render: (date: string, record) => {
+      render: (date: string, record: TaskSummary) => {
         if (!date) return <Text type="secondary">—</Text>;
         return (
           <Space size={4}>
@@ -427,7 +428,7 @@ const TasksPage: React.FC = () => {
       title: 'Thao tác',
       key: 'actions',
       width: 90,
-      render: (_, record) => (
+      render: (_: unknown, record: TaskSummary) => (
         <Space>
           <Tooltip title="Chỉnh sửa">
             <Button type="link" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); handleEdit(record); }} />

@@ -8,6 +8,7 @@ import {
 import type {
   IssueCategory, ProjectMember, Sprint, TaskFilterState, Version,
 } from '../types';
+import { useThemeStore } from '../stores/themeStore';
 
 const STATUS_OPTIONS: { value: string; label: string; color: string }[] = [
   { value: 'not_closed', label: 'Chưa đóng', color: '#4361ee' },
@@ -70,10 +71,19 @@ const TaskFilterPanel: React.FC<TaskFilterPanelProps> = ({
   versions = [],
   sprints = [],
 }) => {
+  const { isDark } = useThemeStore();
   const [keywordDraft, setKeywordDraft] = useState(value.keyword);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync keyword draft when filter resets externally
+  const panelBg      = isDark ? '#1c1f2e' : '#fff';
+  const borderColor  = isDark ? '#2e3250' : '#f0f0f0';
+  const titleColor   = isDark ? '#e8eaf6' : '#1f1f1f';
+  const subColor     = isDark ? '#9397b0' : '#8c8c8c';
+  const toggleColor  = isDark ? '#9397b0' : '#595959';
+  const chipInactive = isDark ? '#252842' : '#fafafa';
+  const chipText     = isDark ? '#c0c4d8' : '#595959';
+  const chipBorder   = isDark ? '#2e3250' : '#d9d9d9';
+
   useEffect(() => {
     setKeywordDraft(value.keyword);
   }, [value.keyword]);
@@ -106,8 +116,8 @@ const TaskFilterPanel: React.FC<TaskFilterPanelProps> = ({
 
   return (
     <div style={{
-      background: '#fff',
-      border: '1px solid #f0f0f0',
+      background: panelBg,
+      border: `1px solid ${borderColor}`,
       borderRadius: 8,
       padding: '14px 16px',
       marginBottom: 16,
@@ -116,7 +126,7 @@ const TaskFilterPanel: React.FC<TaskFilterPanelProps> = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <Space size={4}>
           <FilterOutlined style={{ color: '#4361ee' }} />
-          <span style={{ fontWeight: 600, fontSize: 13, color: '#1f1f1f' }}>Bộ lọc</span>
+          <span style={{ fontWeight: 600, fontSize: 13, color: titleColor }}>Bộ lọc</span>
           {hasActiveFilter && (
             <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>Đang lọc</Tag>
           )}
@@ -126,7 +136,7 @@ const TaskFilterPanel: React.FC<TaskFilterPanelProps> = ({
           size="small"
           icon={isAdvanced ? <UpOutlined /> : <DownOutlined />}
           onClick={() => onChange({ mode: isAdvanced ? 'search' : 'advanced' })}
-          style={{ padding: 0, fontSize: 12, color: '#595959' }}
+          style={{ padding: 0, fontSize: 12, color: toggleColor }}
         >
           {isAdvanced ? 'Thu gọn' : 'Nâng cao'}
         </Button>
@@ -134,7 +144,7 @@ const TaskFilterPanel: React.FC<TaskFilterPanelProps> = ({
 
       {/* Status chips */}
       <div style={{ marginBottom: 10 }}>
-        <span style={{ fontSize: 11, color: '#8c8c8c', marginRight: 8 }}>Trạng thái:</span>
+        <span style={{ fontSize: 11, color: subColor, marginRight: 8 }}>Trạng thái:</span>
         <Space size={4} wrap>
           {STATUS_OPTIONS.map((opt) => {
             const active = value.status === opt.value;
@@ -148,9 +158,9 @@ const TaskFilterPanel: React.FC<TaskFilterPanelProps> = ({
                   padding: '1px 10px',
                   fontSize: 12,
                   fontWeight: active ? 600 : 400,
-                  background: active ? opt.color : '#fafafa',
-                  color: active ? '#fff' : '#595959',
-                  borderColor: active ? opt.color : '#d9d9d9',
+                  background: active ? opt.color : chipInactive,
+                  color: active ? '#fff' : chipText,
+                  borderColor: active ? opt.color : chipBorder,
                   transition: 'all .15s',
                   userSelect: 'none',
                 }}
@@ -164,7 +174,7 @@ const TaskFilterPanel: React.FC<TaskFilterPanelProps> = ({
 
       {/* Subtasking chips */}
       <div style={{ marginBottom: 12 }}>
-        <span style={{ fontSize: 11, color: '#8c8c8c', marginRight: 8 }}>Phân cấp:</span>
+        <span style={{ fontSize: 11, color: subColor, marginRight: 8 }}>Phân cấp:</span>
         <Space size={4}>
           {SUBTASKING_OPTIONS.map((opt) => {
             const active = value.subtasking === opt.value;
@@ -178,9 +188,9 @@ const TaskFilterPanel: React.FC<TaskFilterPanelProps> = ({
                   padding: '1px 10px',
                   fontSize: 12,
                   fontWeight: active ? 600 : 400,
-                  background: active ? '#4361ee' : '#fafafa',
-                  color: active ? '#fff' : '#595959',
-                  borderColor: active ? '#4361ee' : '#d9d9d9',
+                  background: active ? '#4361ee' : chipInactive,
+                  color: active ? '#fff' : chipText,
+                  borderColor: active ? '#4361ee' : chipBorder,
                   transition: 'all .15s',
                   userSelect: 'none',
                 }}
@@ -228,7 +238,7 @@ const TaskFilterPanel: React.FC<TaskFilterPanelProps> = ({
         }}>
           {/* Assignee */}
           <div>
-            <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 4 }}>Người thực hiện</div>
+            <div style={{ fontSize: 11, color: subColor, marginBottom: 4 }}>Người thực hiện</div>
             <Select
               allowClear
               placeholder="Tất cả"
@@ -254,7 +264,7 @@ const TaskFilterPanel: React.FC<TaskFilterPanelProps> = ({
           {/* Category */}
           {categories.length > 0 && (
             <div>
-              <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 4 }}>Danh mục</div>
+              <div style={{ fontSize: 11, color: subColor, marginBottom: 4 }}>Danh mục</div>
               <Select
                 allowClear
                 placeholder="Tất cả"
@@ -269,7 +279,7 @@ const TaskFilterPanel: React.FC<TaskFilterPanelProps> = ({
           {/* Milestone (Version) */}
           {versions.length > 0 && (
             <div>
-              <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 4 }}>Milestone</div>
+              <div style={{ fontSize: 11, color: subColor, marginBottom: 4 }}>Milestone</div>
               <Select
                 allowClear
                 placeholder="Tất cả"
@@ -284,7 +294,7 @@ const TaskFilterPanel: React.FC<TaskFilterPanelProps> = ({
           {/* Sprint */}
           {sprints.length > 0 && (
             <div>
-              <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 4 }}>Sprint</div>
+              <div style={{ fontSize: 11, color: subColor, marginBottom: 4 }}>Sprint</div>
               <Select
                 allowClear
                 placeholder="Tất cả"
@@ -298,7 +308,7 @@ const TaskFilterPanel: React.FC<TaskFilterPanelProps> = ({
 
           {/* Priority */}
           <div>
-            <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 4 }}>Mức ưu tiên</div>
+            <div style={{ fontSize: 11, color: subColor, marginBottom: 4 }}>Mức ưu tiên</div>
             <Select
               mode="multiple"
               allowClear

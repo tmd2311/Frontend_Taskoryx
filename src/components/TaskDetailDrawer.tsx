@@ -17,6 +17,7 @@ import {
 import type { UploadProps } from 'antd';
 import { useTaskStore } from '../stores/taskStore';
 import { useAuthStore } from '../stores/authStore';
+import { useThemeStore } from '../stores/themeStore';
 import { projectService } from '../services/projectService';
 import { checklistService } from '../services/checklistService';
 import { timeTrackingService } from '../services/timeTrackingService';
@@ -125,6 +126,7 @@ interface CommentItemProps {
 const CommentItem: React.FC<CommentItemProps> = ({
   comment, currentUserId, depth = 0, onReply, onEdit, onDelete,
 }) => {
+  const { isDark } = useThemeStore();
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
   const [editSaving, setEditSaving] = useState(false);
@@ -178,7 +180,9 @@ const CommentItem: React.FC<CommentItemProps> = ({
             </div>
           ) : (
             <div style={{
-              background: depth === 0 ? '#f5f5f5' : '#fafafa',
+              background: depth === 0
+                ? (isDark ? '#252842' : '#f5f5f5')
+                : (isDark ? '#1e2133' : '#fafafa'),
               borderRadius: 8, padding: '8px 12px', fontSize: 13,
               wordBreak: 'break-word',
             }}>
@@ -208,7 +212,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
           )}
 
           {comment.replies && comment.replies.length > 0 && (
-            <div style={{ marginTop: 8, paddingLeft: 8, borderLeft: '2px solid #f0f0f0' }}>
+            <div style={{ marginTop: 8, paddingLeft: 8, borderLeft: `2px solid ${isDark ? '#2e3250' : '#f0f0f0'}` }}>
               {comment.replies.map((reply) => (
                 <CommentItem key={reply.id} comment={reply} currentUserId={currentUserId}
                   depth={1} onReply={onReply} onEdit={onEdit} onDelete={onDelete} />
@@ -234,7 +238,13 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   taskId, onClose, onUpdated, onDeleted,
 }) => {
   const drawerWidth = window.innerWidth < 768 ? window.innerWidth : Math.min(640, window.innerWidth - 48);
+  const { isDark } = useThemeStore();
   const { user } = useAuthStore();
+
+  const surfaceBg   = isDark ? '#252842' : '#f5f5f5';
+  const subtleBg    = isDark ? '#1e2133' : '#fafafa';
+  const borderColor = isDark ? '#2e3250' : '#f0f0f0';
+  const subColor    = isDark ? '#9397b0' : '#8c8c8c';
   const {
     currentTask, isLoading, fetchTaskById, updateTask, updateTaskStatus, deleteTask, setCurrentTask,
     comments, commentsLoading, fetchComments, addComment, updateComment, deleteComment,
@@ -925,7 +935,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                   </Text>
                 )}
                 <Divider style={{ margin: '12px 0' }} />
-                <Descriptions column={1} size="small" labelStyle={{ color: '#8c8c8c', width: 130 }}>
+                <Descriptions column={1} size="small" labelStyle={{ color: subColor, width: 130 }}>
                   <Descriptions.Item label="Trạng thái">
                     <StatusSelect
                       value={task.status}
@@ -1008,7 +1018,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                       <Text type="secondary" style={{ fontSize: 12 }}>Đầu việc chính</Text>
                       <div style={{
                         marginTop: 6, padding: '8px 12px',
-                        background: '#f5f5f5', borderRadius: 6,
+                        background: surfaceBg, borderRadius: 6,
                         display: 'flex', alignItems: 'center', gap: 8,
                       }}>
                         <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{task.parentTaskKey}</Tag>
@@ -1029,8 +1039,8 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {task.subTasks.map((sub) => (
                           <div key={sub.id} style={{
-                            padding: '8px 12px', background: '#fafafa',
-                            borderRadius: 6, border: '1px solid #f0f0f0',
+                            padding: '8px 12px', background: subtleBg,
+                            borderRadius: 6, border: `1px solid ${borderColor}`,
                             display: 'flex', alignItems: 'center', gap: 8,
                           }}>
                             <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{sub.taskKey}</Tag>
@@ -1080,7 +1090,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                           key={item.id}
                           style={{
                             display: 'flex', alignItems: 'center', gap: 8,
-                            padding: '6px 0', borderBottom: '1px solid #f0f0f0',
+                            padding: '6px 0', borderBottom: `1px solid ${borderColor}`,
                           }}
                         >
                           <Checkbox
@@ -1355,8 +1365,8 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                     {dependencies.map((dep) => (
                       <div key={dep.id} style={{
                         display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '10px 12px', background: '#fafafa',
-                        borderRadius: 6, border: '1px solid #f0f0f0',
+                        padding: '10px 12px', background: subtleBg,
+                        borderRadius: 6, border: `1px solid ${borderColor}`,
                       }}>
                         <Tag color="purple" style={{ margin: 0 }}>{DEP_TYPE_LABEL[dep.type] || dep.type}</Tag>
                         <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{dep.dependsOnTaskKey}</Tag>
@@ -1394,14 +1404,14 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                     Chưa có lịch sử hoạt động
                   </div>
                 ) : (
-                  <div style={{ borderLeft: '2px solid #f0f0f0', paddingLeft: 16 }}>
+                  <div style={{ borderLeft: `2px solid ${borderColor}`, paddingLeft: 16 }}>
                     {taskActivity.map((log) => (
                       <div key={log.id} style={{ marginBottom: 16, position: 'relative' }}>
                         <div style={{
                           position: 'absolute', left: -23, top: 4,
                           width: 12, height: 12, borderRadius: '50%',
                           background: ACTION_COLOR[log.action] ?? '#d9d9d9',
-                          border: '2px solid #fff',
+                          border: `2px solid ${isDark ? '#1c1f2e' : '#fff'}`,
                         }} />
                         <Space size={8} align="start">
                           <Avatar size={28} src={resolveAvatarUrl(log.userAvatar)} icon={<UserOutlined />} />
@@ -1414,7 +1424,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                               <Text type="secondary" style={{ fontSize: 11 }}>{dayjs(log.createdAt).fromNow()}</Text>
                             </Space>
                             {log.description && (
-                              <div style={{ fontSize: 12, color: '#555', marginTop: 2 }}>{log.description}</div>
+                              <div style={{ fontSize: 12, color: subColor, marginTop: 2 }}>{log.description}</div>
                             )}
                             {(log.oldValue || log.newValue) && (() => {
                               const parseVal = (v: string | null | undefined) => {
@@ -1425,8 +1435,8 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                               const newStr = parseVal(log.newValue);
                               return (
                                 <div style={{ marginTop: 4, fontSize: 11, fontFamily: 'monospace', lineHeight: 1.6 }}>
-                                  {oldStr && <div style={{ color: '#cf1322', background: '#fff1f0', padding: '2px 6px', borderRadius: 3, marginBottom: 2 }}>- {oldStr}</div>}
-                                  {newStr && <div style={{ color: '#389e0d', background: '#f6ffed', padding: '2px 6px', borderRadius: 3 }}>+ {newStr}</div>}
+                                  {oldStr && <div style={{ color: '#ff7875', background: isDark ? '#3d1f1f' : '#fff1f0', padding: '2px 6px', borderRadius: 3, marginBottom: 2 }}>- {oldStr}</div>}
+                                  {newStr && <div style={{ color: '#73d13d', background: isDark ? '#1a3022' : '#f6ffed', padding: '2px 6px', borderRadius: 3 }}>+ {newStr}</div>}
                                 </div>
                               );
                             })()}
@@ -1443,10 +1453,10 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
 
           {/* ═══ Input bình luận (bottom sticky) ═══ */}
           {activeTab === 'comments' && (
-            <div style={{ padding: '12px 24px', borderTop: '1px solid #f0f0f0', background: '#fff' }}>
+            <div style={{ padding: '12px 24px', borderTop: `1px solid ${borderColor}`, background: isDark ? '#1c1f2e' : '#fff' }}>
               {replyTo && (
                 <div style={{
-                  background: '#f5f5f5', borderRadius: 4, padding: '4px 10px',
+                  background: surfaceBg, borderRadius: 4, padding: '4px 10px',
                   marginBottom: 8, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 }}>
                   <Text type="secondary">
