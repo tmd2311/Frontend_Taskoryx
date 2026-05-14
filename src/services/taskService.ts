@@ -156,6 +156,16 @@ export const taskService = {
     await api.delete(`/attachments/${attachmentId}`);
   },
 
+  /** POST /tasks/:taskId/attachments/inline – Upload file nhúng vào comment, trả về public URL */
+  uploadInlineAttachment: async (taskId: string, file: File): Promise<{ url: string; attachmentId: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response: any = await api.post(`/tasks/${taskId}/attachments/inline`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data ?? response;
+  },
+
   /** GET /projects/:projectId/gantt – Tasks có ngày để hiển thị Gantt */
   getGantt: async (projectId: string): Promise<GanttTask[]> => {
     const response: any = await api.get(`/projects/${projectId}/gantt`);

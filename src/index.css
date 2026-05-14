@@ -520,7 +520,8 @@ body {
 .tiny-comment-display ul,
 .tiny-comment-display ol { padding-left: 20px; margin: 4px 0; }
 .tiny-comment-display a { color: #4361ee; }
-.tiny-comment-display img { max-width: 100%; border-radius: 6px; margin: 4px 0; display: block; }
+.tiny-comment-display img { max-width: 100%; border-radius: 6px; margin: 4px 0; display: block; cursor: zoom-in; transition: opacity 0.15s; }
+.tiny-comment-display img:hover { opacity: 0.85; }
 .tiny-comment-display blockquote {
   border-left: 3px solid #d1d5db;
   margin: 6px 0;

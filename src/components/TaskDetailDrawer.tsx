@@ -12,7 +12,7 @@ import {
   FileOutlined, FileImageOutlined, FilePdfOutlined, FileExcelOutlined,
   FileWordOutlined, FileZipOutlined, ReloadOutlined, DownloadOutlined,
   MessageOutlined, CheckSquareOutlined, ClockCircleOutlined, LinkOutlined,
-  PlusOutlined, EyeOutlined, EyeFilled,
+  PlusOutlined, EyeOutlined, EyeFilled, HistoryOutlined,
 } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import { useTaskStore } from '../stores/taskStore';
@@ -28,8 +28,9 @@ import { downloadAttachment } from '../utils/attachment';
 import { resolveAvatarUrl } from '../utils/avatar';
 import type {
   ProjectMember, Comment, Attachment, ChecklistItem, ChecklistSummary,
-  TimeEntry, TaskDependency, MentionedUser,
+  TimeEntry, TaskDependency, MentionedUser, ActivityLog,
 } from '../types';
+import { activityService } from '../services/activityService';
 import { TaskPriority, TaskStatus, DependencyType } from '../types';
 import StatusSelect, { StatusTag } from './StatusSelect';
 import dayjs from 'dayjs';
@@ -55,6 +56,19 @@ const PRIORITY_LABEL: Record<string, string> = {
 const DEP_TYPE_LABEL: Record<string, string> = {
   BLOCKS: 'Chặn',
   RELATES_TO: 'Liên quan đến',
+};
+
+const ACTION_LABEL: Record<string, string> = {
+  CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xóa',
+  MOVE: 'Di chuyển', ASSIGN: 'Phân công', COMPLETE: 'Hoàn thành',
+};
+const ACTION_COLOR: Record<string, string> = {
+  CREATE: '#22c55e', UPDATE: '#3b82f6', DELETE: '#ef4444',
+  MOVE: '#f59e0b', ASSIGN: '#8b5cf6', COMPLETE: '#10b981',
+};
+const ACTION_TAG_COLOR: Record<string, string> = {
+  CREATE: 'success', UPDATE: 'processing', DELETE: 'error',
+  MOVE: 'warning', ASSIGN: 'purple', COMPLETE: 'cyan',
 };
 
 // ─── Icon file theo extension ────────────────────────────────
@@ -272,6 +286,9 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const [watching, setWatching] = useState(false);
   const [watchLoading, setWatchLoading] = useState(false);
 
+  const [taskActivity, setTaskActivity] = useState<ActivityLog[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+
   const open = !!taskId;
   const task = currentTask?.id === taskId ? currentTask : null;
 
@@ -287,6 +304,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
       setChecklist(null);
       setTimeEntries([]);
       setDependencies([]);
+      setTaskActivity([]);
       fetchTaskById(taskId);
       fetchWatchStatus(taskId);
     }
@@ -295,11 +313,15 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   // ── Fetch theo tab ─────────────────────────────────────────
   useEffect(() => {
     if (!taskId) return;
-    if (activeTab === 'comments') fetchComments(taskId);
+    if (activeTab === 'comments') {
+      fetchComments(taskId);
+      if (task?.projectId) loadMentionMembers('', task.projectId);
+    }
     if (activeTab === 'attachments') fetchAttachments(taskId);
     if (activeTab === 'checklist') fetchChecklist(taskId);
     if (activeTab === 'time') fetchTimeEntries(taskId);
     if (activeTab === 'dependencies') fetchDependencies(taskId);
+    if (activeTab === 'history') fetchTaskActivity(taskId);
   }, [activeTab, taskId]);
 
   // ── Fetch members khi vào edit mode ───────────────────────
@@ -350,6 +372,16 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
       setDependencies(data);
     } catch { /* ignore */ } finally {
       setDepsLoading(false);
+    }
+  }, []);
+
+  const fetchTaskActivity = useCallback(async (id: string) => {
+    setActivityLoading(true);
+    try {
+      const data = await activityService.getTaskActivity(id);
+      setTaskActivity(Array.isArray(data) ? data : []);
+    } catch { /* ignore */ } finally {
+      setActivityLoading(false);
     }
   }, []);
 
@@ -450,18 +482,33 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     setReplyTo(comment);
   };
 
-  const handleMentionSearch = useCallback(async (keyword: string) => {
-    if (!task?.projectId) return;
+  const loadMentionMembers = useCallback(async (keyword: string, pid: string) => {
     setMentionLoading(true);
     try {
-      const results = await projectService.searchMembers(task.projectId, keyword);
+      let results: MentionedUser[];
+      if (!keyword) {
+        const members = await projectService.getMembers(pid);
+        results = members.map((m) => ({
+          userId: m.userId,
+          username: m.username,
+          fullName: m.fullName,
+          avatarUrl: m.avatarUrl,
+        }));
+      } else {
+        results = await projectService.searchMembers(pid, keyword);
+      }
       setMentionSuggestions(results ?? []);
     } catch {
       setMentionSuggestions([]);
     } finally {
       setMentionLoading(false);
     }
-  }, [task?.projectId]);
+  }, []);
+
+  // onSearch nhận (text, prefix) từ Ant Design — chỉ dùng text
+  const handleMentionSearch = useCallback((keyword: string) => {
+    if (task?.projectId) loadMentionMembers(keyword, task.projectId);
+  }, [task?.projectId, loadMentionMembers]);
 
   // ── Attachments ───────────────────────────────────────────
   const uploadProps: UploadProps = {
@@ -728,6 +775,16 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
           {dependencies.length > 0 && (
             <Badge count={dependencies.length} size="small" color="#722ed1" />
           )}
+        </Space>
+      ),
+      children: null,
+    },
+    {
+      key: 'history',
+      label: (
+        <Space size={4}>
+          <HistoryOutlined />
+          Lịch sử
         </Space>
       ),
       children: null,
@@ -1320,6 +1377,68 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
               </>
             )}
 
+            {/* ═══════════ LỊCH SỬ HOẠT ĐỘNG ═══════════ */}
+            {activeTab === 'history' && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <Text type="secondary" style={{ fontSize: 13 }}>Lịch sử thay đổi task</Text>
+                  <Button size="small" icon={<ReloadOutlined />} onClick={() => taskId && fetchTaskActivity(taskId)} loading={activityLoading}>
+                    Làm mới
+                  </Button>
+                </div>
+                {activityLoading ? (
+                  <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+                ) : taskActivity.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '30px 0', color: '#bfbfbf' }}>
+                    <HistoryOutlined style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
+                    Chưa có lịch sử hoạt động
+                  </div>
+                ) : (
+                  <div style={{ borderLeft: '2px solid #f0f0f0', paddingLeft: 16 }}>
+                    {taskActivity.map((log) => (
+                      <div key={log.id} style={{ marginBottom: 16, position: 'relative' }}>
+                        <div style={{
+                          position: 'absolute', left: -23, top: 4,
+                          width: 12, height: 12, borderRadius: '50%',
+                          background: ACTION_COLOR[log.action] ?? '#d9d9d9',
+                          border: '2px solid #fff',
+                        }} />
+                        <Space size={8} align="start">
+                          <Avatar size={28} src={resolveAvatarUrl(log.userAvatar)} icon={<UserOutlined />} />
+                          <div style={{ flex: 1 }}>
+                            <Space size={4} wrap>
+                              <Text strong style={{ fontSize: 13 }}>{log.userFullName || log.username}</Text>
+                              <Tag color={ACTION_TAG_COLOR[log.action]} style={{ margin: 0, fontSize: 11 }}>
+                                {ACTION_LABEL[log.action] ?? log.action}
+                              </Tag>
+                              <Text type="secondary" style={{ fontSize: 11 }}>{dayjs(log.createdAt).fromNow()}</Text>
+                            </Space>
+                            {log.description && (
+                              <div style={{ fontSize: 12, color: '#555', marginTop: 2 }}>{log.description}</div>
+                            )}
+                            {(log.oldValue || log.newValue) && (() => {
+                              const parseVal = (v: string | null | undefined) => {
+                                if (!v) return null;
+                                try { return JSON.stringify(JSON.parse(v), null, 2); } catch { return v; }
+                              };
+                              const oldStr = parseVal(log.oldValue);
+                              const newStr = parseVal(log.newValue);
+                              return (
+                                <div style={{ marginTop: 4, fontSize: 11, fontFamily: 'monospace', lineHeight: 1.6 }}>
+                                  {oldStr && <div style={{ color: '#cf1322', background: '#fff1f0', padding: '2px 6px', borderRadius: 3, marginBottom: 2 }}>- {oldStr}</div>}
+                                  {newStr && <div style={{ color: '#389e0d', background: '#f6ffed', padding: '2px 6px', borderRadius: 3 }}>+ {newStr}</div>}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </Space>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
           </div>
 
           {/* ═══ Input bình luận (bottom sticky) ═══ */}
@@ -1341,6 +1460,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                 onChange={setCommentContent}
                 onSearch={handleMentionSearch}
                 loading={mentionLoading}
+                filterOption={false}
                 placeholder={replyTo
                   ? `Trả lời ${replyTo.userFullName || replyTo.username}... (dùng @ để mention)`
                   : 'Viết bình luận... (dùng @ để mention người khác)'}

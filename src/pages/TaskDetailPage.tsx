@@ -3,7 +3,7 @@ import {
   Button, Tag, Space, Typography, Spin, Form, Input, Select,
   DatePicker, Popconfirm, Divider, message, Avatar, Badge,
   List, Tooltip, Progress, InputNumber,
-  Modal, Card, Result,
+  Modal, Card, Result, Image,
 } from 'antd';
 import {
   EditOutlined, DeleteOutlined, SaveOutlined, UserOutlined,
@@ -22,7 +22,7 @@ import { projectService } from '../services/projectService';
 import { timeTrackingService } from '../services/timeTrackingService';
 import { dependencyService } from '../services/dependencyService';
 import { watcherService } from '../services/watcherService';
-import TinyCommentEditor from '../components/TinyCommentEditor';
+import QuillCommentEditor from '../components/QuillCommentEditor';
 import type {
   Task, ProjectMember, Comment,
   TimeEntry, TaskDependency, MentionedUser,
@@ -58,14 +58,40 @@ const DEP_TYPE_LABEL: Record<string, string> = {
 const CommentContent: React.FC<{ content: string; mentionedUsers?: MentionedUser[] }> = ({
   content,
 }) => {
+  const [previewSrc, setPreviewSrc] = React.useState<string | null>(null);
+
   if (!content) return null;
   const isHtml = /<[a-z][\s\S]*>/i.test(content);
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'IMG') {
+      e.preventDefault();
+      setPreviewSrc((target as HTMLImageElement).src);
+    }
+  };
+
   if (isHtml) {
     return (
-      <div
-        className="tiny-comment-display"
-        dangerouslySetInnerHTML={{ __html: content }}
-      />
+      <>
+        <div
+          className="tiny-comment-display"
+          dangerouslySetInnerHTML={{ __html: content }}
+          onClick={handleClick}
+          style={{ cursor: 'default' }}
+        />
+        {previewSrc && (
+          <Image
+            src={previewSrc}
+            style={{ display: 'none' }}
+            preview={{
+              visible: true,
+              src: previewSrc,
+              onVisibleChange: (visible) => { if (!visible) setPreviewSrc(null); },
+            }}
+          />
+        )}
+      </>
     );
   }
   return <span style={{ whiteSpace: 'pre-wrap' }}>{content}</span>;
@@ -118,7 +144,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
           </Space>
           {editing ? (
             <div>
-              <TinyCommentEditor
+              <QuillCommentEditor
                 value={editContent}
                 onChange={setEditContent}
                 taskId={taskId}
@@ -918,13 +944,14 @@ const TaskDetailPage: React.FC = () => {
                   )}
 
                   {task?.id && (
-                    <TinyCommentEditor
+                    <QuillCommentEditor
                       value={commentHtml}
                       onChange={setCommentHtml}
                       taskId={task.id}
+                      projectId={task.projectId}
                       placeholder={replyTo
                         ? `Trả lời ${replyTo.userFullName || replyTo.username}...`
-                        : 'Viết bình luận... (hỗ trợ ảnh, định dạng văn bản)'}
+                        : 'Viết bình luận... (gõ @ để mention)'}
                     />
                   )}
 

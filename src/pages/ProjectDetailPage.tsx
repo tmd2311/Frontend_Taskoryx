@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Typography, Button, Table, Tag, Space, Input, Select,
   Avatar, Empty, Tooltip, Modal, Form, Popconfirm, message, Spin,
-  DatePicker, Card, Progress, List, Timeline, Row, Col, Alert, Statistic,
+  DatePicker, Card, Progress, List, Row, Col, Alert, Statistic,
 } from 'antd';
 import {
   CheckSquareOutlined, TeamOutlined, ExclamationCircleOutlined,
@@ -11,8 +11,9 @@ import {
   UserAddOutlined, DeleteOutlined, PlusOutlined, ApartmentOutlined,
   ThunderboltOutlined, AppstoreAddOutlined,
   PlayCircleOutlined, CheckCircleOutlined, EditOutlined,
-  DownloadOutlined, RightOutlined, DownOutlined,
+  DownloadOutlined, RightOutlined, DownOutlined, HistoryOutlined,
 } from '@ant-design/icons';
+import { resolveAvatarUrl } from '../utils/avatar';
 import type { ColumnsType } from 'antd/es/table';
 import { useProjectStore } from '../stores/projectStore';
 import { useTaskStore } from '../stores/taskStore';
@@ -45,6 +46,24 @@ const PRIORITY_COLOR: Record<string, string> = {
 const PRIORITY_LABEL: Record<string, string> = {
   [TaskPriority.LOW]: 'Thấp', [TaskPriority.MEDIUM]: 'Trung bình',
   [TaskPriority.HIGH]: 'Cao', [TaskPriority.URGENT]: 'Khẩn cấp',
+};
+
+// ─── Activity constants ───────────────────────────────────────
+const ACT_LABEL: Record<string, string> = {
+  CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Đã xóa',
+  MOVE: 'Di chuyển', ASSIGN: 'Phân công', COMPLETE: 'Hoàn thành',
+};
+const ACT_COLOR: Record<string, string> = {
+  CREATE: '#10b981', UPDATE: '#4361ee', DELETE: '#ef4444',
+  MOVE: '#f59e0b', ASSIGN: '#8b5cf6', COMPLETE: '#06b6d4',
+};
+const ACT_BG: Record<string, string> = {
+  CREATE: 'rgba(16,185,129,0.08)', UPDATE: 'rgba(67,97,238,0.08)', DELETE: 'rgba(239,68,68,0.08)',
+  MOVE: 'rgba(245,158,11,0.08)', ASSIGN: 'rgba(139,92,246,0.08)', COMPLETE: 'rgba(6,182,212,0.08)',
+};
+const ENTITY_LABEL: Record<string, string> = {
+  TASK: 'Task', COMMENT: 'Bình luận', PROJECT: 'Dự án',
+  BOARD: 'Board', COLUMN: 'Cột', ATTACHMENT: 'Tệp đính kèm',
 };
 
 const TASK_STATUS_COLUMNS: { status: TaskStatus; label: string; color: string }[] = [
@@ -1151,40 +1170,198 @@ const ProjectDetailPage: React.FC = () => {
       )}
 
       {activeTab === 'activity' && (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-            <Text type="secondary">Lịch sử hoạt động dự án</Text>
-            <Button size="small" icon={<ReloadOutlined />} onClick={() => fetchActivity(0)} loading={activityLoading}>
+        <div>
+          {/* Header */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 20,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: 'rgba(67,97,238,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <HistoryOutlined style={{ color: '#4361ee', fontSize: 15 }} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14, lineHeight: 1.2 }}>Nhật ký hoạt động</div>
+                {activityTotal > 0 && (
+                  <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 1 }}>
+                    {activityTotal} sự kiện được ghi lại
+                  </div>
+                )}
+              </div>
+            </div>
+            <Button
+              size="small"
+              icon={<ReloadOutlined />}
+              onClick={() => fetchActivity(0)}
+              loading={activityLoading}
+              style={{ borderRadius: 6 }}
+            >
               Làm mới
             </Button>
           </div>
+
+          {/* Body */}
           {activityLoading && activity.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 0', gap: 12 }}>
+              <Spin size="large" />
+              <Text type="secondary" style={{ fontSize: 13 }}>Đang tải lịch sử…</Text>
+            </div>
           ) : activity.length === 0 ? (
-            <Empty description="Chưa có hoạt động nào" style={{ padding: '40px 0' }} />
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              padding: '60px 0', gap: 12,
+            }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 16,
+                background: 'rgba(67,97,238,0.06)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <HistoryOutlined style={{ fontSize: 24, color: '#bfbfbf' }} />
+              </div>
+              <Text type="secondary" style={{ fontSize: 13 }}>Chưa có hoạt động nào</Text>
+            </div>
           ) : (
-            <Timeline
-              items={activity.map((a) => ({
-                key: a.id,
-                dot: <Avatar size={24} src={a.userAvatar} icon={<UserOutlined />} />,
-                children: (
-                  <div style={{ paddingBottom: 8 }}>
-                    <Space size={6}>
-                      <Text strong style={{ fontSize: 13 }}>{a.userFullName || a.username}</Text>
-                      <Text type="secondary" style={{ fontSize: 11 }}>{dayjs(a.createdAt).fromNow()}</Text>
-                    </Space>
-                    <div style={{ fontSize: 13, color: '#555', marginTop: 2 }}>{a.description}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {activity.map((a) => {
+                const accentColor = ACT_COLOR[a.action] ?? '#8c8c8c';
+                const bgTint = ACT_BG[a.action] ?? 'transparent';
+                const parseVal = (v: string | null | undefined): string | null => {
+                  if (!v) return null;
+                  try {
+                    const parsed = JSON.parse(v);
+                    return Object.entries(parsed as Record<string, unknown>)
+                      .map(([k, val]) => `${k}: ${val}`)
+                      .join(' · ');
+                  } catch { return v; }
+                };
+                const oldStr = parseVal(a.oldValue);
+                const newStr = parseVal(a.newValue);
+                const hasDiff = !!(oldStr || newStr);
+
+                return (
+                  <div
+                    key={a.id}
+                    style={{
+                      display: 'flex',
+                      gap: 0,
+                      borderRadius: 10,
+                      overflow: 'hidden',
+                      border: '1px solid var(--card-border, #e8eaf0)',
+                      background: 'var(--colorBgContainer, #fff)',
+                      transition: 'box-shadow 0.15s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)')}
+                    onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+                  >
+                    {/* Left accent bar */}
+                    <div style={{ width: 4, flexShrink: 0, background: accentColor }} />
+
+                    {/* Content */}
+                    <div style={{ flex: 1, padding: '10px 14px' }}>
+                      {/* Top row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <Avatar
+                          size={26}
+                          src={resolveAvatarUrl(a.userAvatar)}
+                          icon={<UserOutlined />}
+                          style={{ flexShrink: 0 }}
+                        />
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>
+                          {a.userFullName || a.username || 'Người dùng'}
+                        </span>
+
+                        {/* Action badge */}
+                        <span style={{
+                          fontSize: 11, fontWeight: 600, letterSpacing: '0.02em',
+                          padding: '1px 7px', borderRadius: 20,
+                          color: accentColor, background: bgTint,
+                          border: `1px solid ${accentColor}33`,
+                          lineHeight: '18px',
+                        }}>
+                          {ACT_LABEL[a.action] ?? a.action}
+                        </span>
+
+                        {/* Entity type chip */}
+                        {a.entityType && (
+                          <span style={{
+                            fontSize: 11, padding: '1px 7px', borderRadius: 20,
+                            color: '#595959', background: 'rgba(0,0,0,0.04)',
+                            border: '1px solid rgba(0,0,0,0.08)',
+                            lineHeight: '18px',
+                          }}>
+                            {ENTITY_LABEL[a.entityType] ?? a.entityType}
+                          </span>
+                        )}
+
+                        {/* Timestamp — pushed right */}
+                        <span style={{
+                          marginLeft: 'auto', fontSize: 11,
+                          color: '#8c8c8c', whiteSpace: 'nowrap',
+                        }}>
+                          {dayjs(a.createdAt).fromNow()}
+                        </span>
+                      </div>
+
+                      {/* Description */}
+                      {a.description && (
+                        <div style={{ fontSize: 13, color: '#595959', marginTop: 6, lineHeight: 1.5 }}>
+                          {a.description}
+                        </div>
+                      )}
+
+                      {/* Diff block */}
+                      {hasDiff && (
+                        <div style={{
+                          marginTop: 8, borderRadius: 6, overflow: 'hidden',
+                          border: '1px solid rgba(0,0,0,0.07)',
+                          fontSize: 11, fontFamily: "'Fira Code', 'Cascadia Code', monospace",
+                          lineHeight: 1.7,
+                        }}>
+                          {oldStr && (
+                            <div style={{
+                              padding: '3px 10px',
+                              background: 'rgba(239,68,68,0.06)',
+                              color: '#cf1322',
+                              borderBottom: newStr ? '1px solid rgba(0,0,0,0.05)' : undefined,
+                            }}>
+                              − {oldStr}
+                            </div>
+                          )}
+                          {newStr && (
+                            <div style={{
+                              padding: '3px 10px',
+                              background: 'rgba(16,185,129,0.06)',
+                              color: '#389e0d',
+                            }}>
+                              + {newStr}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ),
-              }))}
-            />
-          )}
-          {activityTotal > activity.length && (
-            <div style={{ textAlign: 'center', marginTop: 16 }}>
-              <Button onClick={() => fetchActivity(activityPage + 1)}>Xem thêm</Button>
+                );
+              })}
             </div>
           )}
-        </>
+
+          {/* Load more */}
+          {activityTotal > activity.length && (
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <Button
+                onClick={() => fetchActivity(activityPage + 1)}
+                loading={activityLoading}
+                style={{ borderRadius: 8, minWidth: 160 }}
+              >
+                Tải thêm · {activity.length}/{activityTotal}
+              </Button>
+            </div>
+          )}
+        </div>
       )}
 
       {activeTab === 'gantt' && (

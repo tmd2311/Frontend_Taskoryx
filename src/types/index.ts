@@ -937,6 +937,7 @@ export interface WatcherStatus {
 export interface ActivityLog {
   id: string;
   projectId?: string;
+  projectName?: string;
   taskId?: string;
   userId: string;
   username?: string;
@@ -946,6 +947,8 @@ export interface ActivityLog {
   entityType?: string;
   entityId?: string;
   description: string;
+  oldValue?: string | null;
+  newValue?: string | null;
   createdAt: string;
 }
 
