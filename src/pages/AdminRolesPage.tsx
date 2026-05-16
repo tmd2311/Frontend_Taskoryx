@@ -16,11 +16,28 @@ import type { Role, Permission } from '../types';
 import dayjs from 'dayjs';
 import permissionLabels from '../utils/permissionLabels.json';
 
+// Ưu tiên displayName từ API, fallback về JSON, fallback về name
 const getPermissionLabel = (p: { name: string; displayName?: string }): string =>
   p.displayName || (permissionLabels.permissions as Record<string, { label: string }>)[p.name]?.label || p.name;
 
 const getResourceLabel = (resource: string): string =>
   (permissionLabels.resources as Record<string, string>)[resource] ?? resource;
+
+// System roles cũ không có displayName → fallback về name
+const getRoleLabel = (role: Role): string => role.displayName ?? role.name;
+
+// Sinh mã role preview theo logic giống BE
+function generateRoleName(displayName: string): string {
+  if (!displayName?.trim()) return '';
+  return displayName
+    .trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .toUpperCase();
+}
 
 const { Title, Text } = Typography;
 
@@ -49,6 +66,7 @@ const AdminRolesPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const [checkedPerms, setCheckedPerms] = useState<string[]>([]);
+  const [displayNamePreview, setDisplayNamePreview] = useState('');
 
   useEffect(() => {
     if (isAdmin === false) {
@@ -72,19 +90,22 @@ const AdminRolesPage: React.FC = () => {
     setModalMode('create');
     form.resetFields();
     setCheckedPerms([]);
+    setDisplayNamePreview('');
   };
 
   const openView = (role: Role) => {
     setTargetRole(role);
     setModalMode('view');
     setCheckedPerms((role.permissions ?? []).map((p) => p.id));
+    setDisplayNamePreview('');
   };
 
   const openEdit = (role: Role) => {
     setTargetRole(role);
     setModalMode('edit');
-    form.setFieldsValue({ name: role.name, description: role.description });
+    form.setFieldsValue({ displayName: role.displayName ?? role.name, description: role.description });
     setCheckedPerms((role.permissions ?? []).map((p) => p.id));
+    setDisplayNamePreview(generateRoleName(role.displayName ?? role.name));
   };
 
   const closeModal = () => {
@@ -92,6 +113,7 @@ const AdminRolesPage: React.FC = () => {
     setTargetRole(null);
     form.resetFields();
     setCheckedPerms([]);
+    setDisplayNamePreview('');
   };
 
   // ── Lưu ───────────────────────────────────────────────────
@@ -102,14 +124,14 @@ const AdminRolesPage: React.FC = () => {
     try {
       if (modalMode === 'create') {
         await createRole({
-          name: values.name.trim(),
+          displayName: values.displayName.trim(),
           description: values.description?.trim() || undefined,
           permissionIds: checkedPerms.length > 0 ? checkedPerms : undefined,
         });
         message.success('Tạo role thành công');
       } else if (modalMode === 'edit' && targetRole) {
         await updateRole(targetRole.id, {
-          name: values.name.trim(),
+          displayName: values.displayName.trim(),
           description: values.description?.trim() || undefined,
         });
         const currentIds = new Set((targetRole.permissions ?? []).map((p) => p.id));
@@ -132,7 +154,7 @@ const AdminRolesPage: React.FC = () => {
   const handleDelete = async (role: Role) => {
     try {
       await deleteRole(role.id);
-      message.success(`Đã xóa role "${role.name}"`);
+      message.success(`Đã xóa role "${getRoleLabel(role)}"`);
       fetchRoles();
     } catch (e: any) {
       message.error(e.message || 'Xóa role thất bại');
@@ -144,11 +166,14 @@ const AdminRolesPage: React.FC = () => {
     {
       title: 'Tên role', key: 'name',
       render: (_: unknown, r: Role) => (
-        <Space size={8}>
-          <Text strong style={{ fontSize: 13 }}>{r.name}</Text>
-          {r.isSystemRole && (
-            <Tag icon={<LockOutlined />} color="red" style={{ fontSize: 11 }}>System</Tag>
-          )}
+        <Space size={6} direction="vertical" style={{ gap: 2 }}>
+          <Space size={6}>
+            <Text strong style={{ fontSize: 13 }}>{getRoleLabel(r)}</Text>
+            {r.isSystemRole && (
+              <Tag icon={<LockOutlined />} color="red" style={{ fontSize: 11 }}>System</Tag>
+            )}
+          </Space>
+          <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>{r.name}</Text>
         </Space>
       ),
     },
@@ -184,7 +209,7 @@ const AdminRolesPage: React.FC = () => {
                 <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
               </Tooltip>
               <Popconfirm
-                title={`Xóa role "${r.name}"?`}
+                title={`Xóa role "${getRoleLabel(r)}"?`}
                 description="Người dùng đang có role này sẽ bị ảnh hưởng."
                 onConfirm={() => handleDelete(r)}
                 okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}
@@ -219,7 +244,6 @@ const AdminRolesPage: React.FC = () => {
           return (
             <div key={resource}>
               {idx > 0 && <Divider style={{ margin: '10px 0' }} />}
-              {/* Resource header with select-all */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 {!isViewMode && (
                   <Checkbox
@@ -240,7 +264,6 @@ const AdminRolesPage: React.FC = () => {
                   <Badge count={checkedCount} color="#4361ee" size="small" />
                 )}
               </div>
-              {/* Permission checkboxes */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 0', paddingLeft: isViewMode ? 0 : 22 }}>
                 {perms.map((p) => (
                   <div key={p.id} style={{ width: '50%' }}>
@@ -296,8 +319,8 @@ const AdminRolesPage: React.FC = () => {
           <Space>
             <SafetyCertificateOutlined />
             {modalMode === 'create' && 'Tạo Role mới'}
-            {modalMode === 'edit' && `Chỉnh sửa — ${targetRole?.name}`}
-            {modalMode === 'view' && targetRole?.name}
+            {modalMode === 'edit' && `Chỉnh sửa — ${getRoleLabel(targetRole!)}`}
+            {modalMode === 'view' && getRoleLabel(targetRole!)}
           </Space>
         }
         open={modalMode !== null}
@@ -321,16 +344,31 @@ const AdminRolesPage: React.FC = () => {
         {isEditable && (
           <Form form={form} layout="vertical" style={{ marginBottom: 16 }}>
             <Form.Item
-              name="name" label="Tên Role"
+              name="displayName"
+              label="Tên hiển thị"
               rules={[
                 { required: true, message: 'Vui lòng nhập tên role!' },
                 { max: 100, message: 'Tối đa 100 ký tự!' },
               ]}
             >
-              <Input placeholder="VD: Team Lead, Reviewer..." />
+              <Input
+                placeholder="VD: Quản lý nhân sự, HR Manager..."
+                onChange={(e) => setDisplayNamePreview(generateRoleName(e.target.value))}
+              />
             </Form.Item>
+            {/* Preview mã role */}
+            <div style={{ marginTop: -10, marginBottom: 16 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Mã role:{' '}
+                {displayNamePreview
+                  ? <Text code style={{ fontSize: 12 }}>{displayNamePreview}</Text>
+                  : <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic' }}>tự động sinh từ tên</Text>
+                }
+              </Text>
+            </div>
             <Form.Item
-              name="description" label="Mô tả"
+              name="description"
+              label="Mô tả"
               rules={[{ max: 255, message: 'Tối đa 255 ký tự!' }]}
             >
               <Input.TextArea rows={2} placeholder="Mô tả vai trò này (tùy chọn)" />
@@ -341,8 +379,9 @@ const AdminRolesPage: React.FC = () => {
         {/* Header khi xem */}
         {isViewMode && targetRole && (
           <div style={{ marginBottom: 12 }}>
-            <Space size={8}>
-              <Text strong style={{ fontSize: 15 }}>{targetRole.name}</Text>
+            <Space size={8} align="center">
+              <Text strong style={{ fontSize: 15 }}>{getRoleLabel(targetRole)}</Text>
+              <Text code style={{ fontSize: 12 }}>{targetRole.name}</Text>
               {targetRole.isSystemRole && (
                 <Tag icon={<LockOutlined />} color="red">System Role</Tag>
               )}

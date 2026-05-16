@@ -603,6 +603,7 @@ export interface Permission {
 export interface Role {
   id: string;
   name: string;
+  displayName?: string | null;
   description?: string;
   isSystemRole?: boolean;
   permissions?: Permission[];
@@ -610,13 +611,13 @@ export interface Role {
 }
 
 export interface CreateRoleRequest {
-  name: string;
+  displayName: string;
   description?: string;
-  permissionIds?: string[]; // có thể gán permissions ngay khi tạo
+  permissionIds?: string[];
 }
 
 export interface UpdateRoleRequest {
-  name?: string;
+  displayName?: string;
   description?: string;
 }
 
