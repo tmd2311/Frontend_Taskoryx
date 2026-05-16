@@ -16,8 +16,8 @@ import type { Role, Permission } from '../types';
 import dayjs from 'dayjs';
 import permissionLabels from '../utils/permissionLabels.json';
 
-const getPermissionLabel = (name: string): string =>
-  (permissionLabels.permissions as Record<string, { label: string }>)[name]?.label ?? name;
+const getPermissionLabel = (p: { name: string; displayName?: string }): string =>
+  p.displayName || (permissionLabels.permissions as Record<string, { label: string }>)[p.name]?.label || p.name;
 
 const getResourceLabel = (resource: string): string =>
   (permissionLabels.resources as Record<string, string>)[resource] ?? resource;
@@ -254,7 +254,7 @@ const AdminRolesPage: React.FC = () => {
                       }
                     >
                       <Tooltip title={p.name}>
-                        <Text style={{ fontSize: 12 }}>{getPermissionLabel(p.name)}</Text>
+                        <Text style={{ fontSize: 12 }}>{getPermissionLabel(p)}</Text>
                       </Tooltip>
                     </Checkbox>
                   </div>

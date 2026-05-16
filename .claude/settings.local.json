@@ -29,7 +29,18 @@
       "mcp__agentica__pipeline_confirm_advance",
       "mcp__agentica__registry_save_artifact",
       "Bash(npm run:*)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(awk NR>=1150 && NR<=1210 *)",
+      "Bash(awk NR>=937 && NR<=970 *)",
+      "Bash(awk NR>=667 && NR<=770 *)",
+      "Bash(awk NR>=1 && NR<=17 *)",
+      "Bash(awk NR>=29 && NR<=40 *)",
+      "Bash(awk NR>=352 && NR<=380 *)",
+      "Bash(awk NR>=1300 && NR<=1380 *)",
+      "Bash(awk NR>=175 && NR<=220 *)",
+      "Bash(awk NR>=35 && NR<=50 *)",
+      "Bash(node *)",
+      "Bash(npm uninstall *)"
     ]
   },
   "enableAllProjectMcpServers": true,

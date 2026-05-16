@@ -16,6 +16,7 @@ import {
   Badge,
   Dropdown,
   Alert,
+  Typography as Typo,
 } from 'antd';
 import type { MenuProps } from 'antd';
 import {
@@ -30,6 +31,8 @@ import {
   KeyOutlined,
   ExclamationCircleOutlined,
   MailOutlined,
+  CopyOutlined,
+  LockOutlined,
 } from '@ant-design/icons';
 import type { TableColumnsType } from 'antd';
 type ColumnsType<T> = TableColumnsType<T>;
@@ -41,11 +44,12 @@ import dayjs from 'dayjs';
 import { resolveAvatarUrl } from '../utils/avatar';
 
 const { Title, Text } = Typography;
+const { Paragraph } = Typo;
 const PAGE_SIZE = 15;
 
 const AdminUsersPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isAdmin } = useAuthStore();
+  const { isAdmin, user: currentUser } = useAuthStore();
   const {
     users,
     roles,
@@ -85,6 +89,11 @@ const AdminUsersPage: React.FC = () => {
   const [roleSaving, setRoleSaving] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState<string>('');
 
+  // Modal hiển thị temporary password sau khi tạo user
+  const [tempPasswordModal, setTempPasswordModal] = useState<{ open: boolean; password: string; username: string }>({
+    open: false, password: '', username: '',
+  });
+
   // Kiểm tra quyền admin
   useEffect(() => {
     if (isAdmin === false) {
@@ -99,7 +108,7 @@ const AdminUsersPage: React.FC = () => {
 
   useEffect(() => {
     const params: any = { page: page - 1, size: PAGE_SIZE };
-    if (search.trim()) params.search = search.trim();
+    if (search.trim()) params.keyword = search.trim();
     if (filterRole) params.roleId = filterRole;
     if (filterActive !== undefined) params.isActive = filterActive;
     fetchUsers(params);
@@ -108,7 +117,7 @@ const AdminUsersPage: React.FC = () => {
   const reload = () => {
     setPage(1);
     const params: any = { page: 0, size: PAGE_SIZE };
-    if (search.trim()) params.search = search.trim();
+    if (search.trim()) params.keyword = search.trim();
     if (filterRole) params.roleId = filterRole;
     if (filterActive !== undefined) params.isActive = filterActive;
     fetchUsers(params);
@@ -118,16 +127,26 @@ const AdminUsersPage: React.FC = () => {
   const handleCreate = async (values: any) => {
     setCreateSaving(true);
     try {
-      await createUser({
+      const newUser = await createUser({
         username: values.username.trim(),
         email: values.email.trim(),
         fullName: values.fullName?.trim() || undefined,
         phone: values.phone?.trim() || undefined,
+        timezone: values.timezone?.trim() || undefined,
+        language: values.language?.trim() || undefined,
       });
-      message.success('Tạo tài khoản thành công. Mật khẩu đã được gửi về email của người dùng.');
       setCreateModalOpen(false);
       createForm.resetFields();
       reload();
+      if (newUser.temporaryPassword) {
+        setTempPasswordModal({
+          open: true,
+          password: newUser.temporaryPassword,
+          username: newUser.fullName || newUser.username,
+        });
+      } else {
+        message.success('Tạo tài khoản thành công. Mật khẩu đã được gửi về email của người dùng.');
+      }
     } catch (e: any) {
       message.error(e.message || 'Tạo người dùng thất bại');
     } finally {
@@ -341,6 +360,7 @@ const AdminUsersPage: React.FC = () => {
       key: 'actions',
       width: 60,
       render: (_: unknown, u: AdminUser) => {
+        const isSelf = currentUser?.id === u.id;
         const items: MenuProps['items'] = [
           {
             key: 'edit',
@@ -365,9 +385,10 @@ const AdminUsersPage: React.FC = () => {
             ? {
                 key: 'deactivate',
                 icon: <StopOutlined />,
-                label: 'Vô hiệu hóa',
-                danger: true,
-                onClick: () => handleDeactivate(u),
+                label: isSelf ? 'Không thể tự vô hiệu hóa' : 'Vô hiệu hóa',
+                danger: !isSelf,
+                disabled: isSelf,
+                onClick: isSelf ? undefined : () => handleDeactivate(u),
               }
             : {
                 key: 'activate',
@@ -597,6 +618,56 @@ const AdminUsersPage: React.FC = () => {
             notFoundContent={<Text type="secondary">Người dùng đã có tất cả vai trò</Text>}
           />
         </div>
+      </Modal>
+
+      {/* Modal hiển thị mật khẩu tạm thời */}
+      <Modal
+        title={
+          <Space>
+            <LockOutlined style={{ color: '#f5a623' }} />
+            Tài khoản đã tạo thành công
+          </Space>
+        }
+        open={tempPasswordModal.open}
+        onOk={() => setTempPasswordModal({ open: false, password: '', username: '' })}
+        onCancel={() => setTempPasswordModal({ open: false, password: '', username: '' })}
+        okText="Đã lưu mật khẩu"
+        cancelButtonProps={{ style: { display: 'none' } }}
+        closable={false}
+        maskClosable={false}
+        destroyOnHidden
+      >
+        <Alert
+          type="warning"
+          showIcon
+          icon={<ExclamationCircleOutlined />}
+          message="Lưu ý quan trọng"
+          description="Đây là lần duy nhất mật khẩu tạm thời được hiển thị. Sau khi đóng modal này, bạn không thể xem lại mật khẩu này nữa."
+          style={{ marginBottom: 16, marginTop: 8 }}
+        />
+        <div style={{ marginBottom: 8 }}>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            Mật khẩu tạm thời cho <strong>{tempPasswordModal.username}</strong>:
+          </Text>
+        </div>
+        <Paragraph
+          copyable={{ text: tempPasswordModal.password, icon: [<CopyOutlined />, <CopyOutlined style={{ color: '#52c41a' }} />] }}
+          style={{
+            background: '#f5f5f5',
+            padding: '10px 14px',
+            borderRadius: 6,
+            fontFamily: 'monospace',
+            fontSize: 16,
+            letterSpacing: 2,
+            marginBottom: 0,
+            border: '1px solid #e8e8e8',
+          }}
+        >
+          {tempPasswordModal.password}
+        </Paragraph>
+        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 10 }}>
+          Người dùng sẽ được yêu cầu đổi mật khẩu khi đăng nhập lần đầu.
+        </Text>
       </Modal>
     </div>
   );

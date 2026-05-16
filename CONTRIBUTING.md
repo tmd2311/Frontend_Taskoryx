@@ -6,8 +6,8 @@ Cảm ơn bạn đã quan tâm đến việc đóng góp cho Taskoryx! Tài li�
 
 ## Mục lục
 
-- [Báo cáo lỗi (Bug Report)](#báo-cáo-lỗi)
-- [Đề xuất tính năng (Feature Request)](#đề-xuất-tính-năng)
+- [Báo cáo lỗi](#báo-cáo-lỗi)
+- [Đề xuất tính năng](#đề-xuất-tính-năng)
 - [Quy trình đóng góp code](#quy-trình-đóng-góp-code)
 - [Quy ước code](#quy-ước-code)
 - [Cài đặt môi trường phát triển](#cài-đặt-môi-trường-phát-triển)
@@ -106,10 +106,17 @@ npm run build     # đảm bảo build thành công
 - Mỗi page là 1 file trong `src/pages/`
 - Components dùng chung đặt trong `src/components/`
 
-### Service
+### Store & Service
 
-- Mỗi domain là 1 file service trong `src/services/`
-- Không viết logic HTTP trực tiếp trong component, luôn đi qua service
+- Mỗi domain là 1 file service trong `src/services/` và 1 store trong `src/stores/`
+- Không gọi API thẳng từ component — luôn đi qua service; không gọi service thẳng từ component — luôn đi qua store
+- Store chỉ nên gọi đúng service của domain mình
+
+### Quản trị (Admin)
+
+- Chỉ render menu và trang Admin khi `user.permissions` chứa `ADMIN_ACCESS`
+- Dùng `displayName` từ `GET /admin/permissions` để hiển thị tên quyền trên UI, không hardcode
+- Disable thao tác "Vô hiệu hóa" nếu target user là chính mình (`user.id === currentUser.id`)
 
 ### Style
 
@@ -133,6 +140,9 @@ npm run lint
 
 # Type check
 npx tsc --noEmit
+
+# Build
+npm run build
 ```
 
 Chi tiết xem thêm tại [README.md](./README.md).

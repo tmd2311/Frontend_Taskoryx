@@ -553,10 +553,13 @@ export interface UserSearchParams extends PageParams {
 export interface AdminUser extends Omit<User, 'role'> {
   roles: Role[];
   mustChangePassword?: boolean;
+  emailVerified?: boolean;
+  deletedAt?: string | null;
+  temporaryPassword?: string | null;
 }
 
 export interface AdminUserFilter extends PageParams {
-  search?: string;
+  keyword?: string;
   isActive?: boolean;
   roleId?: string;
 }
@@ -566,6 +569,8 @@ export interface CreateAdminUserRequest {
   email: string;
   fullName?: string;
   phone?: string;
+  timezone?: string;
+  language?: string;
 }
 
 export interface UpdateAdminUserRequest {
@@ -590,8 +595,9 @@ export interface ResetPasswordRequest {
 export interface Permission {
   id: string;
   name: string;
+  displayName?: string;
   description?: string;
-  resource: string; // API không có "action" field
+  resource: string;
 }
 
 export interface Role {

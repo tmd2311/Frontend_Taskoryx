@@ -5,7 +5,7 @@
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
 ![Ant Design](https://img.shields.io/badge/Ant%20Design-6.2-0170FE?logo=antdesign&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-7.3-646CFF?logo=vite&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-7.2-646CFF?logo=vite&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-22c55e)
 
 ---
@@ -83,11 +83,7 @@ Spring Boot API (port 8080)
 |-----------|-------|
 | **Log giờ làm** | Ghi nhận, sửa, xóa time entry theo task và ngày |
 | **Tổng giờ** | Hiển thị tổng giờ thực tế so với ước tính (thanh progress) |
-| **Thống kê ngày** | `GET /time-entries/stats/daily` – chi tiết từng ngày |
-| **Thống kê tuần** | `GET /time-entries/stats/weekly` – tổng hợp theo tuần |
-| **Thống kê tháng** | `GET /time-entries/stats/monthly` – 12 tháng trong năm |
-| **Tổng hợp** | `GET /time-entries/stats/summary` – overview theo dự án & ngày |
-| **Thống kê dự án** | `GET /projects/{id}/time-entries/stats` – phân tích theo thành viên & task |
+| **Báo cáo thời gian** | Thống kê daily / weekly / monthly / summary; lọc theo dự án và thành viên |
 
 ### Thông báo & Realtime
 
@@ -106,11 +102,24 @@ Spring Boot API (port 8080)
 | **Xác thực JWT** | Access token 24h, auto-refresh khi hết hạn, logout phía client |
 | **2FA (TOTP)** | Bật/tắt xác thực 2 bước, tương thích Google Authenticator |
 | **Hồ sơ cá nhân** | Sửa tên, số điện thoại, avatar, timezone, ngôn ngữ |
-| **Đổi mật khẩu** | Nhập mật khẩu hiện tại, buộc đổi khi admin reset |
+| **Đổi mật khẩu** | Nhập mật khẩu hiện tại; buộc đổi sau khi admin reset |
 | **Dark / Light Mode** | Chuyển đổi chế độ sáng/tối, lưu cố định theo thiết bị |
-| **Quản trị hệ thống** | Admin quản lý users, roles, permissions; kích hoạt/khóa tài khoản |
-| **Export Excel** | Xuất danh sách task của dự án ra file `.xlsx` |
 | **Dashboard** | Thống kê tổng quan, biểu đồ ưu tiên & hạn chót bằng Recharts |
+| **AI Project** | Tạo dự án bằng mô tả tự nhiên, AI tự đề xuất cấu trúc task |
+
+### Quản trị hệ thống (Admin)
+
+> Chỉ hiển thị với user có quyền `ADMIN_ACCESS`.
+
+| Tính năng | Mô tả |
+|-----------|-------|
+| **Quản lý người dùng** | Tìm kiếm, tạo tài khoản, chỉnh sửa thông tin, xem trạng thái |
+| **Kích hoạt / Vô hiệu hóa** | Soft-delete tài khoản (không xóa dữ liệu); kích hoạt lại khi cần |
+| **Đặt lại mật khẩu** | Admin reset → BE sinh mật khẩu ngẫu nhiên, gửi email; user bị buộc đổi khi đăng nhập |
+| **Mật khẩu tạm thời** | Hiển thị một lần trong modal sau khi tạo tài khoản (có nút copy) |
+| **Gán / thu hồi Role** | Gán hoặc xóa role cho từng user |
+| **Quản lý Roles** | Tạo/sửa/xóa custom role; system role (`isSystemRole=true`) không thể xóa |
+| **Phân quyền** | Gán/thu hồi permissions cho role; nhóm theo resource; dùng `displayName` từ API |
 
 ---
 
@@ -119,13 +128,15 @@ Spring Boot API (port 8080)
 | Thư viện | Phiên bản | Mục đích |
 |----------|-----------|----------|
 | [React](https://react.dev) | 19.x | UI Framework |
-| [TypeScript](https://typescriptlang.org) | 5.x | Static typing |
+| [TypeScript](https://typescriptlang.org) | 5.9.x | Static typing |
 | [Vite](https://vitejs.dev) | 7.x | Build tool & Dev server |
 | [Ant Design](https://ant.design) | 6.x | UI Component Library |
 | [Zustand](https://zustand-demo.pmnd.rs) | 5.x | State management (với persist middleware) |
 | [Axios](https://axios-http.com) | 1.x | HTTP client (interceptor auto-refresh token) |
 | [React Router DOM](https://reactrouter.com) | 7.x | Client-side routing |
+| [@hello-pangea/dnd](https://github.com/hello-pangea/dnd) | 18.x | Kéo-thả Kanban board |
 | [@stomp/stompjs](https://stomp-js.github.io) + sockjs-client | 7.x / 1.x | WebSocket realtime |
+| [react-quill-new](https://github.com/VaguelySerious/react-quill-new) + quill-mention | 3.x / 6.x | Rich-text editor + @mention autocomplete |
 | [Recharts](https://recharts.org) | 3.x | Biểu đồ thống kê |
 | [Day.js](https://day.js.org) | 1.x | Xử lý ngày giờ (locale vi) |
 
@@ -196,7 +207,9 @@ src/
 │   └── index.ts                  # Toàn bộ TypeScript interfaces & enums
 │
 ├── utils/
-│   └── config.ts                 # Cấu hình env, STORAGE_KEYS
+│   ├── avatar.ts                 # Resolve avatar URL
+│   ├── config.ts                 # Cấu hình env, STORAGE_KEYS
+│   └── permissionLabels.json     # Nhãn tiếng Việt cho permissions (fallback)
 │
 ├── hooks/
 │   └── useMentionInput.ts        # Hook @mention autocomplete cho textarea
@@ -207,8 +220,14 @@ src/
 ├── components/
 │   ├── ProtectedRoute.tsx        # Auth guard (redirect /login nếu chưa đăng nhập)
 │   ├── TaskDetailDrawer.tsx      # Drawer xem chi tiết task (6 tabs + @mention)
+│   ├── TaskFilterPanel.tsx       # Bộ lọc task (trạng thái, ưu tiên, assignee...)
+│   ├── SprintKanbanView.tsx      # Kanban board trong Sprint
 │   ├── StatusSelect.tsx          # Dropdown chọn / hiển thị trạng thái task
-│   └── NotificationDropdown.tsx  # Chuông thông báo (badge + điều hướng khi click)
+│   ├── NotificationDropdown.tsx  # Chuông thông báo (badge + điều hướng khi click)
+│   ├── WatchedTasksDropdown.tsx  # Dropdown task đang theo dõi
+│   ├── QuillCommentEditor.tsx    # Editor bình luận (Quill + @mention)
+│   ├── RichTextEditor.tsx        # Rich-text editor dùng chung
+│   └── AuthImage.tsx             # Ảnh xác thực (avatar upload)
 │
 ├── pages/
 │   ├── LoginPage.tsx             # Đăng nhập (hỗ trợ 2FA TOTP)
@@ -216,17 +235,21 @@ src/
 │   ├── ChangePasswordPage.tsx    # Buộc đổi mật khẩu (sau reset bởi admin)
 │   ├── DashboardPage.tsx         # Tổng quan: thống kê & biểu đồ Recharts
 │   ├── ProjectsPage.tsx          # Danh sách dự án (member + admin view)
-│   ├── ProjectDetailPage.tsx     # Chi tiết dự án (8 tabs: Task / Thành viên /
-│   │                             #   Backlog / Sprint / Version / Danh mục /
-│   │                             #   Hoạt động / Gantt)
+│   ├── ProjectDetailPage.tsx     # Chi tiết dự án (8 tabs: Task · Thành viên ·
+│   │                             #   Backlog · Sprint · Version · Danh mục ·
+│   │                             #   Hoạt động · Gantt)
 │   ├── BoardsPage.tsx            # Kanban board kéo-thả (drag & drop)
 │   ├── TasksPage.tsx             # Task được giao cho tôi (hỗ trợ ?openTask=)
+│   ├── TaskDetailPage.tsx        # Trang chi tiết task (standalone)
 │   ├── ProfilePage.tsx           # Hồ sơ cá nhân + bật/tắt 2FA
-│   └── AdminUsersPage.tsx        # Quản trị: users / roles / permissions
+│   ├── TimeReportPage.tsx        # Báo cáo thời gian (daily/weekly/monthly)
+│   ├── AiProjectPage.tsx         # Tạo dự án bằng AI
+│   ├── AdminUsersPage.tsx        # Quản trị: danh sách & quản lý user
+│   └── AdminRolesPage.tsx        # Quản trị: roles & permissions
 │
 ├── services/                     # Tầng gọi API – 1 file = 1 domain
 │   ├── api.ts                    # Axios instance: auto attach token, auto refresh 401
-│   ├── authService.ts            # /auth/login, /register, /refresh, /logout
+│   ├── authService.ts            # /auth/login, /register, /refresh, /logout, 2FA
 │   ├── userService.ts            # /users/me, /users/search
 │   ├── projectService.ts         # /projects, /members, /labels, members/search
 │   ├── taskService.ts            # /tasks, /tasks/my, move, status
@@ -244,16 +267,18 @@ src/
 │   ├── dashboardService.ts       # /dashboard/me
 │   ├── templateService.ts        # /templates/public, use template
 │   ├── searchService.ts          # /search global
-│   └── adminService.ts           # /admin/users, roles, permissions
+│   ├── aiService.ts              # AI project generation
+│   └── adminService.ts           # /admin/users, /admin/roles, /admin/permissions
 │
 └── stores/                       # Zustand global state
-    ├── authStore.ts              # Auth state (persist localStorage)
+    ├── authStore.ts              # Auth state + checkAdminAccess (persist)
     ├── taskStore.ts              # Tasks + comments + attachments
     ├── projectStore.ts           # Projects + members + labels
     ├── boardStore.ts             # Boards + columns + kanban data
     ├── notificationStore.ts      # Notifications + unread count
+    ├── permissionStore.ts        # Permissions của user hiện tại
     ├── searchStore.ts            # Global search results
-    ├── adminStore.ts             # Admin user/role management
+    ├── adminStore.ts             # Admin: users / roles / permissions
     └── themeStore.ts             # Dark/light preference (persist)
 ```
 
@@ -273,34 +298,38 @@ Tạo file `.env` tại thư mục gốc (tham khảo `.env.example`):
 ## Kiến trúc hệ thống
 
 ```
-┌──────────────────────────────────────────┐
-│                  PAGES                   │
-│  DashboardPage · BoardsPage · TasksPage  │
-│  ProjectDetailPage · AdminUsersPage ...  │
-├──────────────────────────────────────────┤
-│               COMPONENTS                 │
-│  TaskDetailDrawer · NotificationDropdown │
-│  StatusSelect · ProtectedRoute           │
-├──────────────────────────────────────────┤
-│           CUSTOM HOOKS                   │
-│  useMentionInput (@ autocomplete)        │
-├──────────────────────────────────────────┤
-│            ZUSTAND STORES                │
-│  authStore · taskStore · boardStore      │
-│  projectStore · notificationStore ...    │
-├──────────────────────────────────────────┤
-│            SERVICE LAYER                 │
-│  taskService · boardService · ...        │
-│  timeTrackingService · adminService ...  │
-├──────────────────────────────────────────┤
-│      AXIOS HTTP CLIENT (api.ts)          │
-│  Auto attach Bearer token                │
-│  Auto refresh khi nhận 401              │
-│  Redirect /login nếu refresh thất bại   │
-├──────────────────────────────────────────┤
-│        SPRING BOOT REST API              │
-│        http://localhost:8080/api         │
-└──────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│                     PAGES                        │
+│  DashboardPage · BoardsPage · TasksPage          │
+│  ProjectDetailPage · TimeReportPage              │
+│  AdminUsersPage · AdminRolesPage · AiProjectPage │
+├──────────────────────────────────────────────────┤
+│                  COMPONENTS                      │
+│  TaskDetailDrawer · NotificationDropdown         │
+│  SprintKanbanView · TaskFilterPanel              │
+│  QuillCommentEditor · StatusSelect               │
+├──────────────────────────────────────────────────┤
+│              CUSTOM HOOKS                        │
+│  useMentionInput (@ autocomplete)               │
+├──────────────────────────────────────────────────┤
+│               ZUSTAND STORES                     │
+│  authStore · taskStore · boardStore              │
+│  projectStore · notificationStore                │
+│  permissionStore · adminStore · themeStore       │
+├──────────────────────────────────────────────────┤
+│               SERVICE LAYER                      │
+│  taskService · boardService · sprintService      │
+│  timeTrackingService · adminService              │
+│  websocketService · aiService · ...              │
+├──────────────────────────────────────────────────┤
+│        AXIOS HTTP CLIENT (api.ts)                │
+│  Auto attach Bearer token                        │
+│  Auto refresh khi nhận 401                       │
+│  Redirect /login nếu refresh thất bại            │
+├──────────────────────────────────────────────────┤
+│           SPRING BOOT REST API                   │
+│           http://localhost:8080/api              │
+└──────────────────────────────────────────────────┘
                     ▲
                     │ WebSocket (STOMP/SockJS)
            websocketService.ts
@@ -344,7 +373,7 @@ Mọi request (trừ `/auth/*`) gửi kèm header `Authorization: Bearer <access
 | Dashboard | `/dashboard/me` | Thống kê tổng quan cá nhân |
 | Template | `/templates/public` | Template dự án công khai |
 | Search | `/search` | Tìm kiếm toàn cục |
-| Admin | `/admin/*` | Quản trị users, roles, permissions |
+| Admin | `/admin/users`, `/admin/roles`, `/admin/permissions` | Quản trị users, roles, permissions |
 
 ---
 

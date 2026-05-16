@@ -18,7 +18,7 @@ export const adminService = {
   // ── Users ──────────────────────────────────────────────────
 
   /**
-   * GET /admin/users?page=0&size=20
+   * GET /admin/users?keyword=&page=0&size=20
    * Response: SpringPage<AdminUser> – content[] với roles embedded
    */
   getUsers: async (params?: AdminUserFilter): Promise<SpringPage<AdminUser>> => {
