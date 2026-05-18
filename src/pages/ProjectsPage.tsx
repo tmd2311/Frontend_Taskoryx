@@ -20,6 +20,7 @@ import {
   message,
   Steps,
   Divider,
+  ColorPicker,
 } from 'antd';
 import {
   PlusOutlined,
@@ -656,25 +657,13 @@ const ProjectsPage: React.FC = () => {
               <Input.TextArea rows={3} placeholder="Mô tả ngắn về dự án..." />
             </Form.Item>
 
-            <Form.Item name="color" label="Màu sắc">
-              <Select placeholder="Chọn màu">
-                {PROJECT_COLORS.map((c) => (
-                  <Select.Option key={c} value={c}>
-                    <Space>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          width: 16,
-                          height: 16,
-                          borderRadius: 4,
-                          background: c,
-                        }}
-                      />
-                      {c}
-                    </Space>
-                  </Select.Option>
-                ))}
-              </Select>
+            <Form.Item
+              name="color"
+              label="Màu sắc"
+              getValueFromEvent={(c) => c.toHexString().slice(0, 7)}
+              getValueProps={(v) => ({ value: v })}
+            >
+              <ColorPicker format="hex" showText disabledAlpha />
             </Form.Item>
 
             <Form.Item name="isPublic" label="Phạm vi" initialValue={false}>

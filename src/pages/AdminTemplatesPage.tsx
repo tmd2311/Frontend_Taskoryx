@@ -377,7 +377,8 @@ const AdminTemplatesPage: React.FC = () => {
               <ColorPicker
                 size="small"
                 value={col.color}
-                onChange={(c) => updateColumn(idx, { color: c.toHexString() })}
+                onChange={(c) => updateColumn(idx, { color: c.toHexString().slice(0, 7) })}
+                disabledAlpha
               />
               <Tooltip title="Cột hoàn thành">
                 <Switch
@@ -512,8 +513,13 @@ const AdminTemplatesPage: React.FC = () => {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="color" label="Màu sắc">
-                <Input placeholder="#1976d2" disabled={isViewMode} />
+              <Form.Item
+                name="color"
+                label="Màu sắc"
+                getValueFromEvent={(c) => c.toHexString().slice(0, 7)}
+                getValueProps={(v) => ({ value: v })}
+              >
+                <ColorPicker format="hex" showText disabledAlpha disabled={isViewMode} />
               </Form.Item>
             </Col>
           </Row>
