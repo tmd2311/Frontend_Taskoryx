@@ -2,12 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Typography, Card, Row, Col, Statistic, DatePicker, Select, Space, Spin,
   Table, Progress, Tabs, Button, Tag, Avatar, Segmented, Modal, Form,
-  Input, InputNumber, Popconfirm, message, Empty, Tooltip,
+  Input, InputNumber, Popconfirm, message, Empty, Tooltip, Divider, Badge,
 } from 'antd';
 import {
   ClockCircleOutlined, CalendarOutlined, ReloadOutlined, UserOutlined,
   BarChartOutlined, HistoryOutlined, EditOutlined, DeleteOutlined,
-  LinkOutlined,
+  LinkOutlined, PlusOutlined, CheckCircleOutlined, ThunderboltOutlined,
 } from '@ant-design/icons';
 import type { TableColumnsType } from 'antd';
 type ColumnsType<T> = TableColumnsType<T>;
@@ -17,10 +17,11 @@ import {
 } from 'recharts';
 import { timeTrackingService } from '../services/timeTrackingService';
 import { projectService } from '../services/projectService';
+import { taskService } from '../services/taskService';
 import { useNavigate } from 'react-router-dom';
 import type {
   DailyTimeStats, WeeklyTimeStats, MonthlyTimeStats,
-  TimeStatsSummary, ProjectTimeStats, TimeStatsByProject, TimeEntry,
+  TimeStatsSummary, ProjectTimeStats, TimeStatsByProject, TimeEntry, TaskSummary,
 } from '../types';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/vi';
@@ -106,6 +107,350 @@ const ProjectPieChart: React.FC<{ data: TimeStatsByProject[] }> = ({ data }) => 
         <ReTooltip formatter={(v: any) => [`${v}h`, 'Giờ làm']} />
       </PieChart>
     </ResponsiveContainer>
+  );
+};
+
+// ─── Tab ghi giờ làm việc ────────────────────────────────────
+const LogTimeTab: React.FC = () => {
+  const navigate = useNavigate();
+  const [form] = Form.useForm();
+  const [submitting, setSubmitting] = useState(false);
+  const [myTasks, setMyTasks] = useState<TaskSummary[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+
+  // Các entry đã ghi hôm nay (refresh sau mỗi lần ghi)
+  const [todayEntries, setTodayEntries] = useState<TimeEntry[]>([]);
+  const [loadingToday, setLoadingToday] = useState(false);
+
+  // Quick-log hours buttons
+  const QUICK_HOURS = [0.5, 1, 1.5, 2, 3, 4, 8];
+
+  const fetchMyTasks = useCallback(async () => {
+    setLoadingTasks(true);
+    try {
+      const tasks = await taskService.getMyTasks();
+      // Lọc bỏ task đã hoàn thành
+      setMyTasks(tasks.filter((t) => t.status !== 'DONE' && t.status !== 'CLOSED'));
+    } catch {
+      message.error('Không thể tải danh sách task');
+    } finally {
+      setLoadingTasks(false);
+    }
+  }, []);
+
+  const fetchTodayEntries = useCallback(async () => {
+    setLoadingToday(true);
+    try {
+      const today = dayjs().format('YYYY-MM-DD');
+      // getDailyStats trả đủ entries trong ngày, đáng tin hơn getByRange
+      const dailyData = await timeTrackingService.getDailyStats(today, today);
+      const todayData = Array.isArray(dailyData) ? dailyData[0] : null;
+      setTodayEntries(todayData?.entries ?? []);
+    } catch {
+      // fallback: thử getByRange
+      try {
+        const today = dayjs().format('YYYY-MM-DD');
+        const res = await timeTrackingService.getByRange(today, today);
+        setTodayEntries(res);
+      } catch {
+        setTodayEntries([]);
+      }
+    } finally {
+      setLoadingToday(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMyTasks();
+    fetchTodayEntries();
+  }, [fetchMyTasks, fetchTodayEntries]);
+
+  const handleSubmit = async () => {
+    try {
+      const vals = await form.validateFields();
+      setSubmitting(true);
+      await timeTrackingService.logTime({
+        taskId: vals.taskId,
+        hours: vals.hours,
+        description: vals.description,
+        workDate: vals.workDate.format('YYYY-MM-DD'),
+      });
+      message.success('Đã ghi nhận giờ làm việc!');
+      form.setFieldsValue({ taskId: undefined, hours: undefined, description: '' });
+      fetchTodayEntries();
+    } catch (err: any) {
+      if (err?.errorFields) return; // validation error, không toast
+      message.error('Ghi giờ thất bại, vui lòng thử lại');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteToday = async (id: string) => {
+    try {
+      await timeTrackingService.delete(id);
+      message.success('Đã xóa');
+      fetchTodayEntries();
+    } catch {
+      message.error('Xóa thất bại');
+    }
+  };
+
+  const todayTotal = todayEntries.reduce((sum, e) => sum + (e.hours ?? 0), 0);
+
+  // Render option cho task select
+  const taskOptions = myTasks.map((t) => ({
+    value: t.id,
+    label: (
+      <Space size={6}>
+        <Tag style={{ fontFamily: 'monospace', fontSize: 11, margin: 0 }}>{t.taskKey}</Tag>
+        <span style={{ fontSize: 13 }}>{t.title}</span>
+        {t.sprintName && <Tag color="blue" style={{ fontSize: 10 }}>{t.sprintName}</Tag>}
+      </Space>
+    ),
+    // dùng cho filter
+    search: `${t.taskKey} ${t.title}`.toLowerCase(),
+  }));
+
+  return (
+    <Row gutter={[20, 20]}>
+      {/* ── Form ghi giờ ── */}
+      <Col xs={24} lg={14}>
+        <Card
+          title={
+            <Space>
+              <ThunderboltOutlined style={{ color: '#4361ee' }} />
+              <span>Ghi nhận giờ làm việc</span>
+            </Space>
+          }
+          style={{ borderRadius: 12 }}
+        >
+          <Form
+            form={form}
+            layout="vertical"
+            initialValues={{ workDate: dayjs(), hours: 1 }}
+          >
+            {/* Chọn task */}
+            <Form.Item
+              name="taskId"
+              label="Task đang thực hiện"
+              rules={[{ required: true, message: 'Vui lòng chọn task!' }]}
+            >
+              <Select
+                showSearch
+                loading={loadingTasks}
+                placeholder="Tìm và chọn task được giao cho bạn..."
+                optionFilterProp="search"
+                filterOption={(input, opt: any) =>
+                  (opt?.search ?? '').includes(input.toLowerCase())
+                }
+                options={taskOptions}
+                optionLabelProp="label"
+                notFoundContent={
+                  loadingTasks
+                    ? <Spin size="small" />
+                    : <Empty description="Không có task nào" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                }
+                style={{ width: '100%' }}
+                dropdownStyle={{ maxHeight: 320 }}
+              />
+            </Form.Item>
+
+            {/* Ngày làm việc + Số giờ */}
+            <Row gutter={12}>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="workDate"
+                  label="Ngày làm việc"
+                  rules={[{ required: true, message: 'Chọn ngày!' }]}
+                >
+                  <DatePicker
+                    style={{ width: '100%' }}
+                    format="DD/MM/YYYY"
+                    allowClear={false}
+                    disabledDate={(d) => d.isAfter(dayjs(), 'day')}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="hours"
+                  label="Số giờ"
+                  rules={[
+                    { required: true, message: 'Nhập số giờ!' },
+                    { type: 'number', min: 0.25, max: 24, message: 'Từ 0.25 đến 24h' },
+                  ]}
+                >
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    step={0.25} min={0.25} max={24}
+                    placeholder="VD: 1.5"
+                    addonAfter="giờ"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            {/* Quick-log buttons */}
+            <div style={{ marginBottom: 16, marginTop: -8 }}>
+              <Space size={6} wrap>
+                <span style={{ fontSize: 12, color: '#888' }}>Nhanh:</span>
+                {QUICK_HOURS.map((h) => (
+                  <Button
+                    key={h}
+                    size="small"
+                    onClick={() => form.setFieldValue('hours', h)}
+                    style={{ fontSize: 12 }}
+                  >
+                    {h}h
+                  </Button>
+                ))}
+              </Space>
+            </div>
+
+            {/* Mô tả */}
+            <Form.Item name="description" label="Mô tả công việc">
+              <Input.TextArea
+                rows={3}
+                placeholder="Hôm nay bạn đã làm gì? (không bắt buộc)"
+                maxLength={500}
+                showCount
+              />
+            </Form.Item>
+
+            <Form.Item style={{ marginBottom: 0 }}>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={handleSubmit}
+                loading={submitting}
+                size="large"
+                block
+              >
+                Ghi nhận giờ làm
+              </Button>
+            </Form.Item>
+          </Form>
+        </Card>
+      </Col>
+
+      {/* ── Đã ghi hôm nay ── */}
+      <Col xs={24} lg={10}>
+        <Card
+          title={
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Space>
+                <CheckCircleOutlined style={{ color: '#10b981' }} />
+                <span>Đã ghi hôm nay</span>
+                <Badge
+                  count={todayEntries.length}
+                  style={{ backgroundColor: todayEntries.length > 0 ? '#4361ee' : '#d9d9d9' }}
+                />
+              </Space>
+              {todayTotal > 0 && (
+                <Space>
+                  <ClockCircleOutlined style={{ color: '#4361ee', fontSize: 12 }} />
+                  <Text strong style={{ color: '#4361ee', fontSize: 14 }}>
+                    {todayTotal % 1 === 0 ? `${todayTotal}h` : `${todayTotal.toFixed(1)}h`}
+                  </Text>
+                </Space>
+              )}
+            </div>
+          }
+          style={{ borderRadius: 12 }}
+        >
+          <Spin spinning={loadingToday}>
+            {todayEntries.length === 0 ? (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={
+                  <Text type="secondary" style={{ fontSize: 13 }}>
+                    Chưa có ghi nhận nào hôm nay
+                  </Text>
+                }
+                style={{ padding: '20px 0' }}
+              />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {todayEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #f0f0f0',
+                      background: '#fafafa',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 10,
+                    }}
+                  >
+                    {/* Giờ */}
+                    <div style={{
+                      minWidth: 48, textAlign: 'center', padding: '4px 8px',
+                      background: '#eef2ff', borderRadius: 6,
+                    }}>
+                      <Text strong style={{ color: '#4361ee', fontSize: 14, display: 'block' }}>
+                        {entry.formattedHours ?? `${entry.hours}h`}
+                      </Text>
+                    </div>
+
+                    {/* Nội dung */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {entry.taskKey ? (
+                        <Tag
+                          icon={<LinkOutlined />}
+                          style={{ fontFamily: 'monospace', fontSize: 11, cursor: 'pointer', marginBottom: 4 }}
+                          onClick={() => navigate(`/tasks/${entry.taskKey}`)}
+                        >
+                          {entry.taskKey}
+                        </Tag>
+                      ) : null}
+                      {entry.description ? (
+                        <Text style={{ fontSize: 12, display: 'block' }} ellipsis={{ tooltip: entry.description }}>
+                          {entry.description}
+                        </Text>
+                      ) : (
+                        <Text type="secondary" style={{ fontSize: 12 }}>Không có mô tả</Text>
+                      )}
+                    </div>
+
+                    {/* Xóa */}
+                    <Popconfirm
+                      title="Xóa ghi nhận này?"
+                      okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}
+                      onConfirm={() => handleDeleteToday(entry.id)}
+                    >
+                      <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                    </Popconfirm>
+                  </div>
+                ))}
+
+                {todayEntries.length >= 3 && (
+                  <>
+                    <Divider style={{ margin: '4px 0' }} />
+                    <Text type="secondary" style={{ fontSize: 12, textAlign: 'center' }}>
+                      Xem toàn bộ lịch sử tại tab <strong>Lịch sử ghi giờ</strong>
+                    </Text>
+                  </>
+                )}
+              </div>
+            )}
+          </Spin>
+        </Card>
+
+        {/* Tips */}
+        <Card
+          size="small"
+          style={{ marginTop: 12, borderRadius: 10, background: '#f0f5ff', border: '1px solid #d6e4ff' }}
+        >
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            <strong>Mẹo:</strong> Ghi giờ mỗi ngày giúp báo cáo chính xác hơn.
+            Hệ thống chỉ hiện task chưa hoàn thành được giao cho bạn.
+          </Text>
+        </Card>
+      </Col>
+    </Row>
   );
 };
 
@@ -379,7 +724,7 @@ const MyEntriesTab: React.FC = () => {
 
 // ─── Main page ───────────────────────────────────────────────
 const TimeReportPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>('stats');
+  const [activeTab, setActiveTab] = useState<string>('log');
   const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
     dayjs().startOf('month'),
@@ -704,6 +1049,16 @@ const TimeReportPage: React.FC = () => {
         size="large"
         style={{ marginBottom: 0 }}
         items={[
+          {
+            key: 'log',
+            label: (
+              <Space size={6}>
+                <PlusOutlined />
+                Ghi giờ
+              </Space>
+            ),
+            children: activeTab === 'log' ? <LogTimeTab /> : null,
+          },
           {
             key: 'stats',
             label: (

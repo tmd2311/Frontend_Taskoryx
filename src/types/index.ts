@@ -993,6 +993,30 @@ export interface GanttTask {
 // TEMPLATE
 // ============================================================
 
+export interface TemplateColumn {
+  name: string;
+  color: string;
+  isCompleted: boolean;
+  mappedStatus?: string;
+  taskLimit?: number | null;
+}
+
+export interface TemplateEvaluationConfig {
+  onTimeWeight: number;
+  completionWeight: number;
+  timeAccuracyWeight: number;
+  engagementWeight: number;
+}
+
+export interface TemplateConfig {
+  projectType?: string;
+  boardType: 'KANBAN' | 'SCRUM' | 'PERSONAL';
+  enabledModules?: string[];
+  columns: TemplateColumn[];
+  taskFields?: string[];
+  evaluationConfig?: TemplateEvaluationConfig;
+}
+
 export interface ProjectTemplate {
   id: string;
   name: string;
@@ -1002,6 +1026,8 @@ export interface ProjectTemplate {
   color?: string;
   isPublic: boolean;
   createdAt?: string;
+  createdBy?: string | null;
+  config?: TemplateConfig;
 }
 
 export interface UseTemplateRequest {
@@ -1011,6 +1037,18 @@ export interface UseTemplateRequest {
   color?: string;
   isPublic?: boolean;
 }
+
+export interface CreateTemplateRequest {
+  name: string;
+  description?: string;
+  category?: string;
+  icon?: string;
+  color?: string;
+  isPublic?: boolean;
+  columnsConfig: string; // JSON.stringify(TemplateConfig)
+}
+
+export type UpdateTemplateRequest = CreateTemplateRequest;
 
 // ============================================================
 // AI PROJECT GENERATOR

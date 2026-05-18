@@ -13,6 +13,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminRolesPage from './pages/AdminRolesPage';
+import AdminTemplatesPage from './pages/AdminTemplatesPage';
 import TimeReportPage from './pages/TimeReportPage';
 import TaskDetailPage from './pages/TaskDetailPage';
 import AiProjectPage from './pages/AiProjectPage';
@@ -208,6 +209,17 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <AdminRolesPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/templates"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <AdminTemplatesPage />
                 </MainLayout>
               </ProtectedRoute>
             }

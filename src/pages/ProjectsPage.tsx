@@ -32,89 +32,17 @@ import {
   ReloadOutlined,
   CrownOutlined,
   AppstoreOutlined,
-  RocketOutlined,
-  CodeOutlined,
-  BugOutlined,
-  StarOutlined,
 } from '@ant-design/icons';
 import { useProjectStore } from '../stores/projectStore';
 import { usePermissionStore } from '../stores/permissionStore';
 import { adminService } from '../services/adminService';
-import { sprintService } from '../services/sprintService';
+import { templateService } from '../services/templateService';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
-import type { Project, CreateProjectRequest } from '../types';
+import type { Project, CreateProjectRequest, ProjectTemplate } from '../types';
 
-interface FrontendTemplate {
-  id: string;
-  name: string;
-  description: string;
-  icon: React.ReactNode;
-  color: string;
-  sprints: { name: string; goal?: string }[];
-}
-
-const FRONTEND_TEMPLATES: FrontendTemplate[] = [
-  {
-    id: 'blank',
-    name: 'Trống',
-    description: 'Bắt đầu từ đầu với 1 sprint trống',
-    icon: <AppstoreOutlined />,
-    color: '#8c8c8c',
-    sprints: [{ name: 'Sprint 1' }],
-  },
-  {
-    id: 'scrum',
-    name: 'Scrum Cơ bản',
-    description: '3 sprint theo quy trình Scrum tiêu chuẩn',
-    icon: <RocketOutlined />,
-    color: '#1890ff',
-    sprints: [
-      { name: 'Sprint 1 – Khởi động', goal: 'Thiết lập nền tảng dự án' },
-      { name: 'Sprint 2 – Phát triển', goal: 'Xây dựng tính năng chính' },
-      { name: 'Sprint 3 – Hoàn thiện', goal: 'Kiểm thử và ra mắt' },
-    ],
-  },
-  {
-    id: 'software',
-    name: 'Phát triển Phần mềm',
-    description: '4 sprint: Phân tích → Thiết kế → Dev → QA',
-    icon: <CodeOutlined />,
-    color: '#722ed1',
-    sprints: [
-      { name: 'Sprint 1 – Phân tích', goal: 'Thu thập yêu cầu và phân tích hệ thống' },
-      { name: 'Sprint 2 – Thiết kế', goal: 'Thiết kế kiến trúc và UI/UX' },
-      { name: 'Sprint 3 – Phát triển', goal: 'Lập trình các tính năng chính' },
-      { name: 'Sprint 4 – QA & Deploy', goal: 'Kiểm thử và triển khai' },
-    ],
-  },
-  {
-    id: 'bugfix',
-    name: 'Sửa lỗi & Cải tiến',
-    description: '2 sprint: Bug triage → Fix & Release',
-    icon: <BugOutlined />,
-    color: '#f5222d',
-    sprints: [
-      { name: 'Sprint 1 – Phân loại lỗi', goal: 'Liệt kê và ưu tiên các lỗi cần sửa' },
-      { name: 'Sprint 2 – Sửa & Phát hành', goal: 'Sửa lỗi và phát hành phiên bản mới' },
-    ],
-  },
-  {
-    id: 'launch',
-    name: 'Ra mắt Sản phẩm',
-    description: '5 sprint từ ý tưởng đến ra mắt',
-    icon: <StarOutlined />,
-    color: '#fa8c16',
-    sprints: [
-      { name: 'Sprint 1 – Khám phá', goal: 'Nghiên cứu thị trường và xác định MVP' },
-      { name: 'Sprint 2 – Prototype', goal: 'Xây dựng nguyên mẫu sản phẩm' },
-      { name: 'Sprint 3 – Alpha', goal: 'Phát triển phiên bản Alpha nội bộ' },
-      { name: 'Sprint 4 – Beta', goal: 'Kiểm thử với người dùng Beta' },
-      { name: 'Sprint 5 – Ra mắt', goal: 'Phát hành chính thức và theo dõi' },
-    ],
-  },
-];
+const BLANK_TEMPLATE_ID = '__blank__';
 
 const { Title, Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -296,7 +224,9 @@ const ProjectsPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm<CreateProjectRequest>();
   const [createStep, setCreateStep] = useState<0 | 1>(0);
-  const [selectedTemplate, setSelectedTemplate] = useState<FrontendTemplate>(FRONTEND_TEMPLATES[0]);
+  const [apiTemplates, setApiTemplates] = useState<ProjectTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(BLANK_TEMPLATE_ID);
 
   // Phát hiện admin & tải projects
   useEffect(() => {
@@ -305,12 +235,10 @@ const ProjectsPage: React.FC = () => {
       setAdminError(null);
 
       try {
-        // Gọi admin endpoint – nếu thành công → user là admin
         const allProjects = await adminService.getAllProjects();
         setIsAdmin(true);
         setAdminProjects(allProjects);
       } catch (err: any) {
-        // 403 / 401 → không phải admin, dùng endpoint thường
         setIsAdmin(false);
         await fetchProjects().catch(() => { });
       } finally {
@@ -319,6 +247,13 @@ const ProjectsPage: React.FC = () => {
     };
 
     init();
+
+    // Tải templates từ API
+    setTemplatesLoading(true);
+    templateService.getAll()
+      .then(setApiTemplates)
+      .catch(() => { })
+      .finally(() => setTemplatesLoading(false));
   }, []);
 
   const handleRefresh = async () => {
@@ -376,29 +311,41 @@ const ProjectsPage: React.FC = () => {
   const openCreateModal = () => {
     form.resetFields();
     setCreateStep(0);
-    setSelectedTemplate(FRONTEND_TEMPLATES[0]);
+    setSelectedTemplateId(BLANK_TEMPLATE_ID);
     setCreateModalOpen(true);
   };
 
   const handleCreate = async (values: any) => {
     setSubmitting(true);
     try {
-      const newProject = await createProject({
-        name: values.name,
-        key: values.key,
-        description: values.description,
-        color: values.color,
-        isPublic: values.isPublic,
-      });
-      // Tạo các sprint theo template đã chọn
-      for (const sprint of selectedTemplate.sprints) {
-        await sprintService.create(newProject.id, { name: sprint.name, goal: sprint.goal });
+      let newProject: Project;
+      const selectedApiTemplate = apiTemplates.find((t) => t.id === selectedTemplateId);
+
+      if (selectedApiTemplate) {
+        // Dùng API template → POST /templates/{id}/use
+        newProject = await templateService.useTemplate(selectedApiTemplate.id, {
+          name: values.name,
+          key: values.key,
+          description: values.description,
+          color: values.color,
+          isPublic: values.isPublic,
+        });
+        message.success(`Đã tạo dự án từ template "${selectedApiTemplate.name}"`);
+      } else {
+        // Blank: tạo project trống
+        newProject = await createProject({
+          name: values.name,
+          key: values.key,
+          description: values.description,
+          color: values.color,
+          isPublic: values.isPublic,
+        });
+        message.success('Đã tạo dự án thành công');
       }
+
       if (isAdmin) {
         setAdminProjects((prev) => [newProject, ...prev]);
       }
-      const sprintCount = selectedTemplate.sprints.length;
-      message.success(`Đã tạo dự án với ${sprintCount} sprint từ template "${selectedTemplate.name}"`);
       form.resetFields();
       setCreateModalOpen(false);
     } catch (e: any) {
@@ -557,48 +504,111 @@ const ProjectsPage: React.FC = () => {
         {/* Step 0: Template selection */}
         {createStep === 0 && (
           <div>
-            <Row gutter={[10, 10]}>
-              {FRONTEND_TEMPLATES.map(tpl => (
-                <Col key={tpl.id} span={12}>
+            <Spin spinning={templatesLoading} tip="Đang tải templates...">
+              <Row gutter={[10, 10]}>
+                {/* Blank option */}
+                <Col span={12}>
                   <div
-                    onClick={() => setSelectedTemplate(tpl)}
+                    onClick={() => setSelectedTemplateId(BLANK_TEMPLATE_ID)}
                     style={{
-                      border: `2px solid ${selectedTemplate.id === tpl.id ? tpl.color : '#f0f0f0'}`,
+                      border: `2px solid ${selectedTemplateId === BLANK_TEMPLATE_ID ? '#8c8c8c' : '#f0f0f0'}`,
                       borderRadius: 8,
                       padding: '12px 14px',
                       cursor: 'pointer',
-                      background: selectedTemplate.id === tpl.id ? `${tpl.color}08` : '#fff',
+                      background: selectedTemplateId === BLANK_TEMPLATE_ID ? '#f5f5f5' : '#fff',
                       transition: 'all .15s',
                     }}
                   >
                     <Space align="start">
-                      <span style={{ fontSize: 20, color: tpl.color }}>{tpl.icon}</span>
+                      <span style={{ fontSize: 20 }}><AppstoreOutlined style={{ color: '#8c8c8c' }} /></span>
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{tpl.name}</div>
-                        <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>{tpl.description}</div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>Trống</div>
+                        <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>
+                          Bắt đầu từ đầu, không áp dụng template
+                        </div>
                       </div>
                     </Space>
                   </div>
                 </Col>
-              ))}
-            </Row>
 
-            {/* Sprint preview */}
-            <Divider style={{ margin: '16px 0 10px' }} />
-            <div style={{ fontSize: 12, color: '#595959', marginBottom: 6, fontWeight: 500 }}>
-              Sprint sẽ được tạo ({selectedTemplate.sprints.length}):
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {selectedTemplate.sprints.map((s, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12 }}>
-                  <Tag style={{ margin: 0, minWidth: 28, textAlign: 'center', flexShrink: 0 }}>{i + 1}</Tag>
-                  <div>
-                    <span style={{ fontWeight: 500 }}>{s.name}</span>
-                    {s.goal && <span style={{ color: '#8c8c8c', marginLeft: 6 }}>– {s.goal}</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
+                {/* API templates */}
+                {apiTemplates.map((tpl) => {
+                  const color = tpl.color || '#1890ff';
+                  const isSelected = selectedTemplateId === tpl.id;
+                  return (
+                    <Col key={tpl.id} span={12}>
+                      <div
+                        onClick={() => setSelectedTemplateId(tpl.id)}
+                        style={{
+                          border: `2px solid ${isSelected ? color : '#f0f0f0'}`,
+                          borderRadius: 8,
+                          padding: '12px 14px',
+                          cursor: 'pointer',
+                          background: isSelected ? `${color}10` : '#fff',
+                          transition: 'all .15s',
+                        }}
+                      >
+                        <Space align="start">
+                          <span style={{ fontSize: 20 }}>{tpl.icon || '📋'}</span>
+                          <div>
+                            <Space size={4}>
+                              <span style={{ fontWeight: 600, fontSize: 13 }}>{tpl.name}</span>
+                              {tpl.category && (
+                                <Tag style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>
+                                  {tpl.category}
+                                </Tag>
+                              )}
+                            </Space>
+                            {tpl.description && (
+                              <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>
+                                {tpl.description}
+                              </div>
+                            )}
+                          </div>
+                        </Space>
+                      </div>
+                    </Col>
+                  );
+                })}
+
+                {!templatesLoading && apiTemplates.length === 0 && (
+                  <Col span={24}>
+                    <div style={{ textAlign: 'center', padding: '12px 0', color: '#8c8c8c', fontSize: 13 }}>
+                      Chưa có template nào. Chỉ có thể tạo dự án trống.
+                    </div>
+                  </Col>
+                )}
+              </Row>
+
+              {/* Preview cột của template được chọn */}
+              {(() => {
+                const tpl = apiTemplates.find((t) => t.id === selectedTemplateId);
+                if (!tpl?.config?.columns?.length) return null;
+                return (
+                  <>
+                    <Divider style={{ margin: '16px 0 10px' }} />
+                    <div style={{ fontSize: 12, color: '#595959', marginBottom: 6, fontWeight: 500 }}>
+                      Cột Kanban ({tpl.config.boardType}) — {tpl.config.columns.length} cột:
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {tpl.config.columns.map((col, i) => (
+                        <Tag
+                          key={i}
+                          style={{ borderColor: col.color, color: col.color, background: `${col.color}15` }}
+                        >
+                          {col.name}{col.isCompleted ? ' ✓' : ''}
+                        </Tag>
+                      ))}
+                    </div>
+                    {tpl.config.taskFields && tpl.config.taskFields.length > 0 && (
+                      <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
+                        Task fields: {tpl.config.taskFields.join(', ')}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </Spin>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
               <Button onClick={() => setCreateModalOpen(false)}>Hủy</Button>

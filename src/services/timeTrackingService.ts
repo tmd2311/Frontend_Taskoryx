@@ -33,9 +33,12 @@ export const timeTrackingService = {
     return response.data ?? response;
   },
 
-  getByRange: async (startDate: string, endDate: string): Promise<TimeEntry[]> => {
-    const response: any = await api.get('/time-entries/range', { params: { startDate, endDate } });
-    return response.data ?? response;
+  getByRange: async (start: string, end: string): Promise<TimeEntry[]> => {
+    const response: any = await api.get('/time-entries/range', { params: { start, end } });
+    const data = response.data ?? response;
+    if (Array.isArray(data)) return data;
+    if (data?.content) return data.content;
+    return [];
   },
 
   update: async (id: string, data: UpdateTimeEntryRequest): Promise<TimeEntry> => {

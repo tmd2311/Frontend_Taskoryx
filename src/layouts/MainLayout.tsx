@@ -159,6 +159,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         label: 'Quản lý Role',
         onClick: () => navTo('/admin/roles'),
       },
+      {
+        key: '/admin/templates',
+        icon: <AppstoreAddOutlined />,
+        label: 'Quản lý Template',
+        onClick: () => navTo('/admin/templates'),
+      },
     ] : []),
   ];
 
