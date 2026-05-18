@@ -1,13 +1,14 @@
 import React, { useRef, useMemo, useEffect } from 'react';
 import ReactQuill, { Quill } from 'react-quill-new';
 import { Mention } from 'quill-mention';
+import { MentionBlot } from 'quill-mention';
 import 'react-quill-new/dist/quill.snow.css';
 import 'quill-mention/dist/quill.mention.css';
 import { projectService } from '../services/projectService';
 import { taskService } from '../services/taskService';
 import { message } from 'antd';
 
-Quill.register('modules/mention', Mention);
+Quill.register({ 'blots/mention': MentionBlot, 'modules/mention': Mention }, true);
 
 interface QuillCommentEditorProps {
   value: string;

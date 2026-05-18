@@ -3,7 +3,7 @@ import {
   Drawer, Button, Tag, Space, Typography, Spin, Form, Input, Select,
   DatePicker, Popconfirm, Divider, Descriptions, message, Avatar, Badge,
   Tabs, List, Upload, Tooltip, Checkbox, Progress, InputNumber,
-  Modal, Mentions,
+  Modal,
 } from 'antd';
 import {
   EditOutlined, DeleteOutlined, CloseOutlined, SaveOutlined, UserOutlined,
@@ -24,12 +24,13 @@ import { timeTrackingService } from '../services/timeTrackingService';
 import { dependencyService } from '../services/dependencyService';
 import { watcherService } from '../services/watcherService';
 import RichTextEditor from './RichTextEditor';
+import QuillCommentEditor from './QuillCommentEditor';
 import AuthImage from './AuthImage';
 import { downloadAttachment } from '../utils/attachment';
 import { resolveAvatarUrl } from '../utils/avatar';
 import type {
   ProjectMember, Comment, Attachment, ChecklistItem, ChecklistSummary,
-  TimeEntry, TaskDependency, MentionedUser, ActivityLog,
+  TimeEntry, TaskDependency, ActivityLog,
 } from '../types';
 import { activityService } from '../services/activityService';
 import { TaskPriority, TaskStatus, DependencyType } from '../types';
@@ -95,9 +96,24 @@ interface CommentContentProps {
 
 const CommentContent: React.FC<CommentContentProps> = ({ content }) => {
   if (!content) return null;
-  // Nếu content là plain text (không có thẻ HTML), hiển thị như cũ
   const isHtml = /<[a-z][\s\S]*>/i.test(content);
-  if (!isHtml) return <span style={{ whiteSpace: 'pre-wrap' }}>{content}</span>;
+  if (!isHtml) {
+    // Highlight @mention trong plain text
+    const parts = content.split(/(@\w+)/g);
+    return (
+      <span style={{ whiteSpace: 'pre-wrap' }}>
+        {parts.map((part, i) =>
+          /^@\w+$/.test(part) ? (
+            <span key={i} style={{ color: '#4361ee', fontWeight: 600, background: '#eff6ff', borderRadius: 3, padding: '0 2px' }}>
+              {part}
+            </span>
+          ) : (
+            part
+          )
+        )}
+      </span>
+    );
+  }
 
   return (
     <div
@@ -260,11 +276,9 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const [membersLoading, setMembersLoading] = useState(false);
 
   // Comments
-  const [commentContent, setCommentContent] = useState('');
+  const [commentHtml, setCommentHtml] = useState('');
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [commentSending, setCommentSending] = useState(false);
-  const [mentionSuggestions, setMentionSuggestions] = useState<MentionedUser[]>([]);
-  const [mentionLoading, setMentionLoading] = useState(false);
 
   // Upload
   const [uploading, setUploading] = useState(false);
@@ -308,9 +322,8 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
       setEditMode(false);
       setActiveTab('detail');
       setMembers([]);
-      setCommentContent('');
+      setCommentHtml('');
       setReplyTo(null);
-      setMentionSuggestions([]);
       setChecklist(null);
       setTimeEntries([]);
       setDependencies([]);
@@ -325,7 +338,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     if (!taskId) return;
     if (activeTab === 'comments') {
       fetchComments(taskId);
-      if (task?.projectId) loadMentionMembers('', task.projectId);
     }
     if (activeTab === 'attachments') fetchAttachments(taskId);
     if (activeTab === 'checklist') fetchChecklist(taskId);
@@ -449,22 +461,22 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     setEditMode(false);
     form.resetFields();
     setMembers([]);
-    setCommentContent('');
+    setCommentHtml('');
     setReplyTo(null);
-    setMentionSuggestions([]);
     setCurrentTask(null);
     onClose();
   };
 
   // ── Comments ──────────────────────────────────────────────
+  const isCommentEmpty = (html: string) => !html || html.replace(/<[^>]*>/g, '').trim() === '';
+
   const handleSendComment = async () => {
-    if (!taskId || !commentContent.trim()) return;
+    if (!taskId || isCommentEmpty(commentHtml)) return;
     setCommentSending(true);
     try {
-      await addComment(taskId, { content: commentContent, parentId: replyTo?.id });
-      setCommentContent('');
+      await addComment(taskId, { content: commentHtml, parentId: replyTo?.id });
+      setCommentHtml('');
       setReplyTo(null);
-      setMentionSuggestions([]);
     } catch (e: any) {
       message.error(e.message || 'Gửi bình luận thất bại');
     } finally {
@@ -491,34 +503,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const handleReply = (comment: Comment) => {
     setReplyTo(comment);
   };
-
-  const loadMentionMembers = useCallback(async (keyword: string, pid: string) => {
-    setMentionLoading(true);
-    try {
-      let results: MentionedUser[];
-      if (!keyword) {
-        const members = await projectService.getMembers(pid);
-        results = members.map((m) => ({
-          userId: m.userId,
-          username: m.username,
-          fullName: m.fullName,
-          avatarUrl: m.avatarUrl,
-        }));
-      } else {
-        results = await projectService.searchMembers(pid, keyword);
-      }
-      setMentionSuggestions(results ?? []);
-    } catch {
-      setMentionSuggestions([]);
-    } finally {
-      setMentionLoading(false);
-    }
-  }, []);
-
-  // onSearch nhận (text, prefix) từ Ant Design — chỉ dùng text
-  const handleMentionSearch = useCallback((keyword: string) => {
-    if (task?.projectId) loadMentionMembers(keyword, task.projectId);
-  }, [task?.projectId, loadMentionMembers]);
 
   // ── Attachments ───────────────────────────────────────────
   const uploadProps: UploadProps = {
@@ -1465,35 +1449,22 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                   <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setReplyTo(null)} />
                 </div>
               )}
-              <Mentions
-                value={commentContent}
-                onChange={setCommentContent}
-                onSearch={handleMentionSearch}
-                loading={mentionLoading}
-                filterOption={false}
+              <QuillCommentEditor
+                value={commentHtml}
+                onChange={setCommentHtml}
+                taskId={taskId!}
+                projectId={task?.projectId}
                 placeholder={replyTo
-                  ? `Trả lời ${replyTo.userFullName || replyTo.username}... (dùng @ để mention)`
-                  : 'Viết bình luận... (dùng @ để mention người khác)'}
-                autoSize={{ minRows: 3, maxRows: 8 }}
-                style={{ marginBottom: 4, width: '100%' }}
-                options={mentionSuggestions.map((u) => ({
-                  value: u.username,
-                  label: (
-                    <Space size={6}>
-                      <Avatar size={18} src={resolveAvatarUrl(u.avatarUrl)} icon={<UserOutlined />} />
-                      <span>{u.fullName || u.username}</span>
-                      <Text type="secondary" style={{ fontSize: 11 }}>@{u.username}</Text>
-                    </Space>
-                  ),
-                }))}
+                  ? `Trả lời ${replyTo.userFullName || replyTo.username}... (gõ @ để mention)`
+                  : 'Viết bình luận... (gõ @ để mention người khác)'}
+                minHeight={120}
               />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text type="secondary" style={{ fontSize: 11 }}>Gõ @ để tag người khác</Text>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
                 <Button
                   type="primary"
                   icon={<SendOutlined />}
                   loading={commentSending}
-                  disabled={!commentContent.trim()}
+                  disabled={isCommentEmpty(commentHtml)}
                   onClick={handleSendComment}
                 >
                   Gửi
