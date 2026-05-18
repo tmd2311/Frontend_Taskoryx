@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Typography, Button, Table, Tag, Space, Input, Select,
   Avatar, Empty, Tooltip, Modal, Form, Popconfirm, message, Spin,
-  DatePicker, Card, Progress, List, Row, Col, Alert, Statistic,
+  DatePicker, Card, Progress, List, Row, Col, Alert, Statistic, Badge,
 } from 'antd';
 import {
   CheckSquareOutlined, TeamOutlined, ExclamationCircleOutlined,
@@ -12,7 +12,13 @@ import {
   ThunderboltOutlined, AppstoreAddOutlined,
   PlayCircleOutlined, CheckCircleOutlined, EditOutlined,
   DownloadOutlined, RightOutlined, DownOutlined, HistoryOutlined,
+  WarningOutlined, RiseOutlined, CalendarOutlined, LinkOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip as ReTooltip, ResponsiveContainer, Legend,
+} from 'recharts';
 import { resolveAvatarUrl } from '../utils/avatar';
 import type { TableColumnsType } from 'antd';
 type ColumnsType<T> = TableColumnsType<T>;
@@ -29,7 +35,8 @@ import { searchService } from '../services/searchService';
 import { useAuthStore } from '../stores/authStore';
 import type {
   TaskSummary, ProjectMember, Sprint, IssueCategory, ActivityLog, GanttTask,
-  CreateTaskRequest, TaskFilterState, Version,
+  CreateTaskRequest, TaskFilterState, Version, ProjectStatsResponse,
+  TaskAlertItem, MemberTaskStats,
 } from '../types';
 import { TaskPriority, ProjectRole, TaskStatus, SprintStatus } from '../types';
 import SprintKanbanView from '../components/SprintKanbanView';
@@ -307,6 +314,10 @@ const ProjectDetailPage: React.FC = () => {
   const [ganttLoading, setGanttLoading] = useState(false);
   const [ganttError, setGanttError] = useState<string | null>(null);
 
+  // Stats
+  const [projectStats, setProjectStats] = useState<ProjectStatsResponse | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
   useEffect(() => {
     if (!projectId) return;
     fetchProjectById(projectId);
@@ -398,11 +409,25 @@ const ProjectDetailPage: React.FC = () => {
     }
   }, [projectId]);
 
+  const fetchStats = useCallback(async () => {
+    if (!projectId) return;
+    setStatsLoading(true);
+    try {
+      const data = await projectService.getStats(projectId);
+      setProjectStats(data);
+    } catch {
+      // giữ data cũ nếu có
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     if (activeTab === 'sprints') fetchSprints();
     if (activeTab === 'categories') fetchCategories();
     if (activeTab === 'activity') fetchActivity(0);
     if (activeTab === 'gantt') fetchGantt();
+    if (activeTab === 'stats') fetchStats();
   }, [activeTab]);
 
   // ── Members ──────────────────────────────────────────────
@@ -1410,6 +1435,294 @@ const ProjectDetailPage: React.FC = () => {
         </>
       )}
 
+
+      {/* ── Tab thống kê dự án ── */}
+      {activeTab === 'stats' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text strong style={{ fontSize: 15 }}>
+              <RiseOutlined style={{ marginRight: 6, color: '#4361ee' }} />
+              Thống kê dự án
+            </Text>
+            <Button size="small" icon={<ReloadOutlined />} onClick={fetchStats} loading={statsLoading}>Làm mới</Button>
+          </div>
+
+          {statsLoading && !projectStats ? (
+            <div style={{ textAlign: 'center', padding: 60 }}><Spin /></div>
+          ) : !projectStats ? (
+            <Empty description="Không thể tải thống kê" style={{ padding: '40px 0' }} />
+          ) : projectStats.taskOverview.total === 0 ? (
+            <Empty description="Dự án chưa có task nào" style={{ padding: '40px 0' }} />
+          ) : (() => {
+            const { taskOverview: ov, completionTrend, memberStats, activeSprint, overdueTasks, upcomingTasks } = projectStats;
+
+            // Tổng quan
+            const overviewItems = [
+              { label: 'Cần làm', value: ov.todo, color: '#6b7280' },
+              { label: 'Đang làm', value: ov.inProgress, color: '#3b82f6' },
+              { label: 'Hoàn thành', value: ov.done + ov.resolved, color: '#10b981' },
+              { label: 'Quá hạn', value: ov.overdue, color: '#ef4444' },
+            ];
+
+            // Chart data
+            const trendData = completionTrend.map((d) => ({
+              date: d.date.slice(5),
+              'Hoàn thành': d.completed,
+              'Tạo mới': d.created,
+            }));
+
+            // Priority rows
+            const priorityRows = [
+              { label: 'Khẩn cấp', value: ov.urgent, color: '#ef4444' },
+              { label: 'Cao', value: ov.high, color: '#f97316' },
+              { label: 'Trung bình', value: ov.medium, color: '#3b82f6' },
+              { label: 'Thấp', value: ov.low, color: '#6b7280' },
+            ].filter((r) => r.value > 0);
+
+            // Alert columns
+            const alertCols = (type: 'overdue' | 'upcoming'): ColumnsType<TaskAlertItem> => [
+              {
+                title: 'Task', dataIndex: 'taskKey', width: 100,
+                render: (k: string) => (
+                  <Tag
+                    icon={<LinkOutlined />}
+                    style={{ fontFamily: 'monospace', fontSize: 11, cursor: 'pointer' }}
+                    onClick={() => navigate(`/tasks/${k}`)}
+                  >{k}</Tag>
+                ),
+              },
+              { title: 'Tiêu đề', dataIndex: 'title', ellipsis: true, render: (v: string) => <Text style={{ fontSize: 13 }}>{v}</Text> },
+              {
+                title: 'Ưu tiên', dataIndex: 'priority', width: 110,
+                render: (p: string) => <Tag color={PRIORITY_COLOR[p]}>{PRIORITY_LABEL[p]}</Tag>,
+              },
+              {
+                title: type === 'overdue' ? 'Quá hạn' : 'Còn lại',
+                dataIndex: 'daysFromNow', width: 100,
+                render: (v: number) => type === 'overdue'
+                  ? <Tag color="red">+{v} ngày</Tag>
+                  : <Tag color={Math.abs(v) <= 1 ? 'red' : Math.abs(v) <= 3 ? 'orange' : 'gold'}>{Math.abs(v)} ngày</Tag>,
+              },
+              {
+                title: 'Assignee', dataIndex: 'assigneeName', width: 130,
+                render: (name: string | null, row: TaskAlertItem) => name
+                  ? <Space size={4}><Avatar size={20} icon={<UserOutlined />} src={row.assigneeAvatarUrl ?? undefined} /><Text style={{ fontSize: 12 }}>{name}</Text></Space>
+                  : <Text type="secondary" style={{ fontSize: 12 }}>Chưa giao</Text>,
+              },
+            ];
+
+            const memberCols: ColumnsType<MemberTaskStats> = [
+              {
+                title: 'Thành viên', dataIndex: 'fullName',
+                render: (name: string, row: MemberTaskStats) => (
+                  <Space>
+                    <Avatar size={26} src={row.avatarUrl ?? undefined} icon={<UserOutlined />} />
+                    <Text style={{ fontSize: 13 }}>{name}</Text>
+                  </Space>
+                ),
+              },
+              {
+                title: 'Tiến độ', dataIndex: 'total', width: 160,
+                render: (_: number, row: MemberTaskStats) => (
+                  <div>
+                    <Progress percent={row.total > 0 ? Math.round((row.done / row.total) * 100) : 0} size="small" strokeColor="#10b981" style={{ marginBottom: 2 }} />
+                    <Text type="secondary" style={{ fontSize: 11 }}>{row.done}/{row.total} xong</Text>
+                  </div>
+                ),
+              },
+              { title: 'Đang làm', dataIndex: 'inProgress', width: 80, align: 'center' as const, render: (v: number) => <Tag color="blue">{v}</Tag> },
+              {
+                title: 'Quá hạn', dataIndex: 'overdue', width: 80, align: 'center' as const,
+                render: (v: number) => v > 0 ? <Badge count={v} style={{ backgroundColor: '#ef4444' }} /> : <Text type="secondary">—</Text>,
+              },
+            ];
+
+            return (
+              <>
+                {/* Completion rate + 4 card */}
+                <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+                  <Col xs={24} sm={4} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    <Card style={{ textAlign: 'center', width: '100%' }}>
+                      <Progress type="circle" percent={Math.round(ov.completionRate)} strokeColor="#4361ee" size={90} />
+                      <div style={{ marginTop: 8 }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Hoàn thành</Text>
+                        <br />
+                        <Text strong style={{ fontSize: 12 }}>{ov.total} task</Text>
+                      </div>
+                    </Card>
+                  </Col>
+                  <Col xs={24} sm={20}>
+                    <Row gutter={[10, 10]}>
+                      {overviewItems.map((item) => (
+                        <Col xs={12} sm={6} key={item.label}>
+                          <Card style={{ borderTop: `3px solid ${item.color}` }}>
+                            <Statistic title={item.label} value={item.value} valueStyle={{ color: item.color, fontSize: 22 }} />
+                          </Card>
+                        </Col>
+                      ))}
+                    </Row>
+                  </Col>
+                </Row>
+
+                {/* Sprint + Priority */}
+                <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+                  <Col xs={24} md={14}>
+                    {activeSprint ? (
+                      <Card
+                        title={<Space><ThunderboltOutlined style={{ color: '#4361ee' }} />{activeSprint.sprintName}</Space>}
+                        extra={
+                          <Tag color={activeSprint.daysRemaining > 3 ? 'success' : activeSprint.daysRemaining >= 1 ? 'warning' : 'error'}>
+                            {activeSprint.daysRemaining > 0 ? `Còn ${activeSprint.daysRemaining} ngày` : activeSprint.daysRemaining === 0 ? 'Hết hạn hôm nay' : `Trễ ${Math.abs(activeSprint.daysRemaining)} ngày`}
+                          </Tag>
+                        }
+                        style={{ height: '100%' }}
+                      >
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <Text type="secondary" style={{ fontSize: 12 }}>Tiến độ</Text>
+                            <Text strong style={{ color: '#4361ee', fontSize: 13 }}>{activeSprint.doneTasks}/{activeSprint.totalTasks} task</Text>
+                          </div>
+                          <Progress percent={Math.round(activeSprint.completionRate)} strokeColor="#4361ee" />
+                        </div>
+                        <Row gutter={8}>
+                          {[
+                            { label: 'Cần làm', value: activeSprint.todoTasks, color: '#6b7280' },
+                            { label: 'Đang làm', value: activeSprint.inProgressTasks, color: '#3b82f6' },
+                            { label: 'Xong', value: activeSprint.doneTasks, color: '#10b981' },
+                          ].map((s) => (
+                            <Col span={8} key={s.label}>
+                              <div style={{ textAlign: 'center', padding: '6px 4px', background: `${s.color}15`, borderRadius: 8 }}>
+                                <Text strong style={{ color: s.color, fontSize: 18, display: 'block' }}>{s.value}</Text>
+                                <Text type="secondary" style={{ fontSize: 11 }}>{s.label}</Text>
+                              </div>
+                            </Col>
+                          ))}
+                        </Row>
+                        <div style={{ marginTop: 10, fontSize: 12, color: '#8c8c8c' }}>
+                          <CalendarOutlined style={{ marginRight: 4 }} />
+                          {dayjs(activeSprint.startDate).format('DD/MM')} – {dayjs(activeSprint.endDate).format('DD/MM/YYYY')}
+                        </div>
+                      </Card>
+                    ) : (
+                      <Card style={{ height: '100%' }}>
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không có sprint đang chạy" style={{ padding: '20px 0' }} />
+                      </Card>
+                    )}
+                  </Col>
+                  <Col xs={24} md={10}>
+                    <Card title={<Space><BarChartOutlined style={{ color: '#f59e0b' }} />Phân bổ độ ưu tiên</Space>} style={{ height: '100%' }}>
+                      {priorityRows.map((r) => (
+                        <div key={r.label} style={{ marginBottom: 8 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                            <Space size={6}>
+                              <div style={{ width: 10, height: 10, borderRadius: 2, background: r.color }} />
+                              <Text style={{ fontSize: 13 }}>{r.label}</Text>
+                            </Space>
+                            <Text strong style={{ fontSize: 13 }}>{r.value}</Text>
+                          </div>
+                          <Progress percent={Math.round((r.value / ov.total) * 100)} strokeColor={r.color} showInfo={false} size="small" />
+                        </div>
+                      ))}
+                      {ov.unassigned > 0 && (
+                        <div style={{ marginTop: 10, padding: '6px 10px', background: '#fffbe6', borderRadius: 6, border: '1px solid #ffe58f' }}>
+                          <Text style={{ fontSize: 12, color: '#d46b08' }}>
+                            <WarningOutlined style={{ marginRight: 4 }} />
+                            {ov.unassigned} task chưa được phân công
+                          </Text>
+                        </div>
+                      )}
+                    </Card>
+                  </Col>
+                </Row>
+
+                {/* Xu hướng 30 ngày */}
+                <Card
+                  title={<Space><RiseOutlined style={{ color: '#10b981' }} />Xu hướng hoàn thành (30 ngày gần nhất)</Space>}
+                  style={{ marginBottom: 16 }}
+                >
+                  <ResponsiveContainer width="100%" height={200}>
+                    <AreaChart data={trendData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+                      <defs>
+                        <linearGradient id="gDone" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="gCreated" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#94a3b8" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={4} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <ReTooltip />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Area type="monotone" dataKey="Hoàn thành" stroke="#10b981" fill="url(#gDone)" strokeWidth={2} dot={false} />
+                      <Area type="monotone" dataKey="Tạo mới" stroke="#94a3b8" fill="url(#gCreated)" strokeWidth={2} dot={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </Card>
+
+                {/* Thành viên */}
+                {memberStats.length > 0 && (
+                  <Card
+                    title={<Space><TeamOutlined style={{ color: '#4361ee' }} />Phân bổ task theo thành viên</Space>}
+                    style={{ marginBottom: 16 }}
+                  >
+                    <Table dataSource={memberStats} columns={memberCols} rowKey="userId" size="small" pagination={false}
+                      rowClassName={(r: MemberTaskStats) => r.overdue > 0 ? 'row-stat-overdue' : ''} />
+                  </Card>
+                )}
+
+                {/* Cảnh báo */}
+                <Row gutter={[12, 12]}>
+                  <Col xs={24} lg={12}>
+                    <Card title={
+                      <Space>
+                        <WarningOutlined style={{ color: '#ef4444' }} />
+                        Task quá hạn
+                        {overdueTasks.length > 0 && <Badge count={overdueTasks.length} style={{ backgroundColor: '#ef4444' }} />}
+                      </Space>
+                    }>
+                      {overdueTasks.length === 0
+                        ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không có task quá hạn" style={{ padding: '12px 0' }} />
+                        : <Table dataSource={overdueTasks} columns={alertCols('overdue')} rowKey="id" size="small"
+                            scroll={{ x: 500 }} pagination={{ pageSize: 5, size: 'small', showSizeChanger: false }}
+                            rowClassName={() => 'row-alert-overdue'} />
+                      }
+                    </Card>
+                  </Col>
+                  <Col xs={24} lg={12}>
+                    <Card title={
+                      <Space>
+                        <CalendarOutlined style={{ color: '#f59e0b' }} />
+                        Sắp đến hạn (7 ngày tới)
+                        {upcomingTasks.length > 0 && <Badge count={upcomingTasks.length} style={{ backgroundColor: '#f59e0b' }} />}
+                      </Space>
+                    }>
+                      {upcomingTasks.length === 0
+                        ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không có task sắp đến hạn" style={{ padding: '12px 0' }} />
+                        : <Table dataSource={upcomingTasks} columns={alertCols('upcoming')} rowKey="id" size="small"
+                            scroll={{ x: 500 }} pagination={{ pageSize: 5, size: 'small', showSizeChanger: false }}
+                            rowClassName={() => 'row-alert-upcoming'} />
+                      }
+                    </Card>
+                  </Col>
+                </Row>
+
+                <style>{`
+                  .row-stat-overdue td { background: #fff1f0 !important; }
+                  .row-stat-overdue:hover td { background: #ffccc7 !important; }
+                  .row-alert-overdue td { background: #fff1f0 !important; }
+                  .row-alert-overdue:hover td { background: #ffccc7 !important; }
+                  .row-alert-upcoming td { background: #fffbe6 !important; }
+                  .row-alert-upcoming:hover td { background: #fff1b8 !important; }
+                `}</style>
+              </>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Modal thêm thành viên */}
       <Modal title={<Space><UserAddOutlined />Thêm thành viên</Space>}

@@ -1103,3 +1103,77 @@ export interface AiConfirmResponse {
   tasksCreated: number;
   subTasksCreated: number;
 }
+
+// ============================================================
+// PROJECT STATS (Section 27)
+// ============================================================
+
+export interface TaskOverviewStats {
+  total: number;
+  todo: number;
+  inProgress: number;
+  inReview: number;
+  resolved: number;
+  done: number;
+  cancelled: number;
+  overdue: number;
+  completionRate: number;
+  low: number;
+  medium: number;
+  high: number;
+  urgent: number;
+  unassigned: number;
+}
+
+export interface DailyCompletionStats {
+  date: string;
+  completed: number;
+  created: number;
+}
+
+export interface MemberTaskStats {
+  userId: string;
+  fullName: string;
+  avatarUrl: string | null;
+  total: number;
+  inProgress: number;
+  done: number;
+  overdue: number;
+}
+
+export interface ActiveSprintStats {
+  sprintId: string;
+  sprintName: string;
+  startDate: string;
+  endDate: string;
+  daysRemaining: number;
+  totalTasks: number;
+  doneTasks: number;
+  inProgressTasks: number;
+  todoTasks: number;
+  completionRate: number;
+}
+
+export interface TaskAlertItem {
+  id: string;
+  taskKey: string;
+  title: string;
+  priority: TaskPriority;
+  status: TaskStatus;
+  dueDate: string;
+  daysFromNow: number;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  assigneeAvatarUrl: string | null;
+}
+
+export interface ProjectStatsResponse {
+  projectId: string;
+  projectName: string;
+  taskOverview: TaskOverviewStats;
+  completionTrend: DailyCompletionStats[];
+  memberStats: MemberTaskStats[];
+  activeSprint: ActiveSprintStats | null;
+  overdueTasks: TaskAlertItem[];
+  upcomingTasks: TaskAlertItem[];
+}

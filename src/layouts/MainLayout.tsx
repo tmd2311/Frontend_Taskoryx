@@ -206,6 +206,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       label: 'Hoạt động',
       onClick: () => navTo(`/projects/${currentProject.id}?tab=activity`),
     },
+    {
+      key: 'stats',
+      icon: <BarChartOutlined />,
+      label: 'Thống kê',
+      onClick: () => navTo(`/projects/${currentProject.id}?tab=stats`),
+    },
   ] : [];
 
   const userMenuItems = [

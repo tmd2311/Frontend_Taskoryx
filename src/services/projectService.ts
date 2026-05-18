@@ -108,4 +108,10 @@ export const projectService = {
   deleteLabel: async (labelId: string): Promise<void> => {
     await api.delete(`/labels/${labelId}`);
   },
+
+  /** GET /projects/:projectId/stats */
+  getStats: async (projectId: string): Promise<import('../types').ProjectStatsResponse> => {
+    const response: any = await api.get(`/projects/${projectId}/stats`);
+    return response.data ?? response;
+  },
 };

@@ -19,3 +19,4 @@ export { watcherService } from './watcherService';
 export { dashboardService } from './dashboardService';
 export { templateService } from './templateService';
 export { websocketService } from './websocketService';
+export { aiService } from './aiService';

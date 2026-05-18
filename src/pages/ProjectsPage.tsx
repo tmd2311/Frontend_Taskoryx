@@ -33,6 +33,7 @@ import {
   ReloadOutlined,
   CrownOutlined,
   AppstoreOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { useProjectStore } from '../stores/projectStore';
 import { usePermissionStore } from '../stores/permissionStore';
@@ -40,7 +41,6 @@ import { adminService } from '../services/adminService';
 import { templateService } from '../services/templateService';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
-import { ExclamationCircleOutlined } from '@ant-design/icons';
 import type { Project, CreateProjectRequest, ProjectTemplate } from '../types';
 
 const BLANK_TEMPLATE_ID = '__blank__';
@@ -48,10 +48,6 @@ const BLANK_TEMPLATE_ID = '__blank__';
 const { Title, Text, Paragraph } = Typography;
 const { Search } = Input;
 
-const PROJECT_COLORS = [
-  '#1890ff', '#52c41a', '#fa8c16', '#eb2f96',
-  '#722ed1', '#13c2c2', '#f5222d', '#faad14',
-];
 
 const getRoleColor = (role?: string) => {
   switch (role) {
