@@ -130,7 +130,7 @@ const LogTimeTab: React.FC = () => {
     try {
       const tasks = await taskService.getMyTasks();
       // Lọc bỏ task đã hoàn thành
-      setMyTasks(tasks.filter((t) => t.status !== 'DONE' && t.status !== 'CLOSED'));
+      setMyTasks(tasks.filter((t) => t.status !== 'DONE' && t.status !== 'CANCELLED'));
     } catch {
       message.error('Không thể tải danh sách task');
     } finally {

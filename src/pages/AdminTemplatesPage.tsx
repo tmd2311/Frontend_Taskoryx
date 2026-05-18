@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Typography, Table, Button, Space, Tag, Modal, Form, Input, Switch,
   Select, Tooltip, Popconfirm, message, Badge, ColorPicker, Divider,
-  Empty, InputNumber, Row, Col, Alert,
+  Empty, Row, Col, Alert,
 } from 'antd';
 import type { TableColumnsType } from 'antd';
 type ColumnsType<T> = TableColumnsType<T>;
