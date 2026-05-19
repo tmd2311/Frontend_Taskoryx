@@ -21,7 +21,9 @@ import {
   Steps,
   Divider,
   ColorPicker,
+  Dropdown,
 } from 'antd';
+import type { MenuProps } from 'antd';
 import {
   PlusOutlined,
   FolderOutlined,
@@ -34,6 +36,8 @@ import {
   CrownOutlined,
   AppstoreOutlined,
   ExclamationCircleOutlined,
+  EditOutlined,
+  EllipsisOutlined,
 } from '@ant-design/icons';
 import { useProjectStore } from '../stores/projectStore';
 import { usePermissionStore } from '../stores/permissionStore';
@@ -41,7 +45,7 @@ import { adminService } from '../services/adminService';
 import { templateService } from '../services/templateService';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
-import type { Project, CreateProjectRequest, ProjectTemplate } from '../types';
+import type { Project, CreateProjectRequest, ProjectTemplate, UpdateProjectRequest } from '../types';
 
 const BLANK_TEMPLATE_ID = '__blank__';
 
@@ -72,19 +76,46 @@ const getRoleLabel = (role?: string) => {
 const ProjectCard: React.FC<{
   project: Project;
   isAdmin: boolean;
-  currentUserId?: string;
   onDelete: (id: string) => void;
-}> = ({ project, isAdmin, currentUserId, onDelete }) => {
+  onEdit: (project: Project) => void;
+}> = ({ project, isAdmin, onDelete, onEdit }) => {
   const navigate = useNavigate();
   const { setCurrentProject } = useProjectStore();
+  const { hasPermission } = usePermissionStore();
   const color = project.color || '#1890ff';
   const initial = project.name.charAt(0).toUpperCase();
-  const canDelete = isAdmin || project.ownerId === currentUserId || project.currentUserRole === 'OWNER';
+  const canManage = isAdmin || hasPermission('PROJECT_UPDATE') || hasPermission('PROJECT_DELETE');
 
   const handleProjectClick = () => {
     setCurrentProject(project);
     navigate(`/projects/${project.id}`);
   };
+
+  const menuItems: MenuProps['items'] = [
+    ...(canManage ? [{
+      key: 'edit',
+      icon: <EditOutlined />,
+      label: 'Chỉnh sửa',
+      onClick: ({ domEvent }: any) => { domEvent.stopPropagation(); onEdit(project); },
+    }] : []),
+    ...(canManage ? [{
+      key: 'delete',
+      icon: <DeleteOutlined />,
+      label: 'Xóa dự án',
+      danger: true,
+      onClick: ({ domEvent }: any) => {
+        domEvent.stopPropagation();
+        Modal.confirm({
+          title: 'Xóa dự án?',
+          content: 'Hành động này không thể hoàn tác.',
+          okText: 'Xóa',
+          cancelText: 'Hủy',
+          okButtonProps: { danger: true },
+          onOk: () => onDelete(project.id),
+        });
+      },
+    }] : []),
+  ];
 
   return (
     <Card
@@ -130,6 +161,17 @@ const ProjectCard: React.FC<{
           )}
           {project.isArchived && (
             <Tag color="orange" style={{ margin: 0 }}>Đã lưu trữ</Tag>
+          )}
+          {canManage && (
+            <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+              <Button
+                type="text"
+                size="small"
+                icon={<EllipsisOutlined style={{ color: 'rgba(255,255,255,0.9)', fontSize: 18 }} />}
+                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 6, padding: '0 6px' }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </Dropdown>
           )}
         </Space>
       </div>
@@ -179,25 +221,6 @@ const ProjectCard: React.FC<{
               </Tooltip>
             )}
           </Space>
-
-          {canDelete && (
-            <Popconfirm
-              title="Xóa project?"
-              description="Hành động này không thể hoàn tác."
-              onConfirm={() => onDelete(project.id)}
-              okText="Xóa"
-              cancelText="Hủy"
-              okButtonProps={{ danger: true }}
-            >
-              <Button
-                type="text"
-                danger
-                size="small"
-                icon={<DeleteOutlined />}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </Popconfirm>
-          )}
         </div>
       </div>
     </Card>
@@ -206,10 +229,10 @@ const ProjectCard: React.FC<{
 
 const ProjectsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isAdmin: authIsAdmin } = useAuthStore();
+  const { isAdmin: authIsAdmin } = useAuthStore();
   const { hasPermission } = usePermissionStore();
   const canCreateProject = hasPermission('CREATE_PROJECT') || authIsAdmin === true;
-  const { projects, isLoading, error, fetchProjects, createProject, deleteProject } = useProjectStore();
+  const { projects, isLoading, error, fetchProjects, createProject, deleteProject, updateProject } = useProjectStore();
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminProjects, setAdminProjects] = useState<Project[]>([]);
@@ -224,6 +247,12 @@ const ProjectsPage: React.FC = () => {
   const [apiTemplates, setApiTemplates] = useState<ProjectTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(BLANK_TEMPLATE_ID);
+
+  // Edit modal
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Project | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editForm] = Form.useForm<UpdateProjectRequest>();
 
   // Phát hiện admin & tải projects
   useEffect(() => {
@@ -305,6 +334,35 @@ const ProjectsPage: React.FC = () => {
     }
   };
 
+  const openEditModal = (project: Project) => {
+    setEditTarget(project);
+    editForm.setFieldsValue({
+      name: project.name,
+      description: project.description,
+      color: project.color,
+      isPublic: project.isPublic,
+      isArchived: project.isArchived,
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleEdit = async (values: UpdateProjectRequest) => {
+    if (!editTarget) return;
+    setEditSubmitting(true);
+    try {
+      const updated = await updateProject(editTarget.id, values);
+      if (isAdmin) {
+        setAdminProjects((prev) => prev.map((p) => p.id === updated.id ? updated : p));
+      }
+      message.success('Đã cập nhật dự án');
+      setEditModalOpen(false);
+    } catch (e: any) {
+      message.error(e.message || 'Cập nhật thất bại');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
   const openCreateModal = () => {
     form.resetFields();
     setCreateStep(0);
@@ -319,7 +377,6 @@ const ProjectsPage: React.FC = () => {
       const selectedApiTemplate = apiTemplates.find((t) => t.id === selectedTemplateId);
 
       if (selectedApiTemplate) {
-        // Dùng API template → POST /templates/{id}/use
         newProject = await templateService.useTemplate(selectedApiTemplate.id, {
           name: values.name,
           key: values.key,
@@ -329,7 +386,6 @@ const ProjectsPage: React.FC = () => {
         });
         message.success(`Đã tạo dự án từ template "${selectedApiTemplate.name}"`);
       } else {
-        // Blank: tạo project trống
         newProject = await createProject({
           name: values.name,
           key: values.key,
@@ -462,14 +518,78 @@ const ProjectsPage: React.FC = () => {
                 <ProjectCard
                   project={project}
                   isAdmin={isAdmin}
-                  currentUserId={user?.id}
                   onDelete={handleDelete}
+                  onEdit={openEditModal}
                 />
               </Col>
             ))}
           </Row>
         )}
       </Spin>
+
+      {/* Edit Modal */}
+      <Modal
+        title={
+          <Space>
+            <EditOutlined style={{ color: '#4361ee' }} />
+            Chỉnh sửa dự án
+          </Space>
+        }
+        open={editModalOpen}
+        onCancel={() => setEditModalOpen(false)}
+        onOk={() => editForm.submit()}
+        okText="Lưu thay đổi"
+        cancelText="Hủy"
+        confirmLoading={editSubmitting}
+        destroyOnClose
+        width={520}
+      >
+        <Form
+          form={editForm}
+          layout="vertical"
+          onFinish={handleEdit}
+          style={{ marginTop: 12 }}
+        >
+          <Form.Item
+            name="name"
+            label="Tên dự án"
+            rules={[{ required: true, message: 'Nhập tên dự án' }]}
+          >
+            <Input placeholder="Tên dự án" />
+          </Form.Item>
+
+          <Form.Item name="description" label="Mô tả">
+            <Input.TextArea rows={3} placeholder="Mô tả ngắn về dự án..." />
+          </Form.Item>
+
+          <Form.Item
+            name="color"
+            label="Màu sắc"
+            getValueFromEvent={(c) => c.toHexString().slice(0, 7)}
+            getValueProps={(v) => ({ value: v })}
+          >
+            <ColorPicker format="hex" showText disabledAlpha />
+          </Form.Item>
+
+          <Form.Item name="isPublic" label="Phạm vi">
+            <Select>
+              <Select.Option value={false}>
+                <Space><LockOutlined />Private – chỉ thành viên được mời</Space>
+              </Select.Option>
+              <Select.Option value={true}>
+                <Space><GlobalOutlined />Public – mọi người có thể xem</Space>
+              </Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item name="isArchived" label="Trạng thái">
+            <Select>
+              <Select.Option value={false}>Đang hoạt động</Select.Option>
+              <Select.Option value={true}>Lưu trữ</Select.Option>
+            </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
 
       {/* Create Modal */}
       <Modal

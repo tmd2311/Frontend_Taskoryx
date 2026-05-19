@@ -20,6 +20,7 @@ import {
   ClockCircleOutlined,
   AppstoreAddOutlined,
   RobotOutlined,
+  TagOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
@@ -48,7 +49,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const { hasPermission, fetchMyPermissions, loaded: permLoaded } = usePermissionStore();
   const { fetchUnreadCount, fetchNotifications } = useNotificationStore();
   const { isDark, toggle: toggleTheme } = useThemeStore();
-  const { currentProject, setCurrentProject } = useProjectStore();
+  const { currentProject, setCurrentProject, forbiddenTabs } = useProjectStore();
   const [notifApi, notifContextHolder] = notification.useNotification();
 
   // Detect active project tab from URL
@@ -74,7 +75,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   useEffect(() => {
     if (isAdmin === null) checkAdminAccess();
-    if (user?.id && !permLoaded) fetchMyPermissions(user.id);
+    if (!permLoaded) fetchMyPermissions();
     fetchUnreadCount();
 
     websocketService.connect({
@@ -121,31 +122,31 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       label: 'Dashboard',
       onClick: () => { navTo('/dashboard'); setCurrentProject(null); },
     },
-    {
+    ...(isAdmin || hasPermission('PROJECT_VIEW') ? [{
       key: '/projects',
       icon: <FolderOutlined />,
       label: 'Dự án',
       onClick: () => { navTo('/projects'); setCurrentProject(null); },
-    },
-    {
+    }] : []),
+    ...(isAdmin || hasPermission('TASK_VIEW') ? [{
       key: '/tasks',
       icon: <CheckSquareOutlined />,
       label: 'Đầu việc của tôi',
       onClick: () => { navTo('/tasks'); setCurrentProject(null); },
-    },
-    {
+    }] : []),
+    ...(isAdmin || hasPermission('REPORT_VIEW') ? [{
       key: '/time-report',
       icon: <ClockCircleOutlined />,
       label: 'Báo cáo giờ',
       onClick: () => { navTo('/time-report'); setCurrentProject(null); },
-    },
+    }] : []),
     ...(hasPermission('CREATE_PROJECT') || isAdmin ? [{
       key: '/ai-project',
       icon: <RobotOutlined />,
       label: 'Tạo dự án AI',
       onClick: () => { navTo('/ai-project'); setCurrentProject(null); },
     }] : []),
-    ...(isAdmin ? [
+    ...(isAdmin || hasPermission('USER_VIEW') || hasPermission('USER_CREATE') || hasPermission('USER_UPDATE') || hasPermission('USER_DELETE') ? [
       { type: 'divider' as const },
       {
         key: '/admin/users',
@@ -153,10 +154,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         label: 'Quản lý người dùng',
         onClick: () => navTo('/admin/users'),
       },
+    ] : []),
+    ...(isAdmin ? [
       {
         key: '/admin/roles',
         icon: <SafetyCertificateOutlined />,
-        label: 'Quản lý Role',
+        label: 'Quản lý vai trò',
         onClick: () => navTo('/admin/roles'),
       },
       {
@@ -170,6 +173,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   // ── Project nav items ──
   const projectNavItems = currentProject ? [
+    ...(isAdmin || hasPermission('REPORT_VIEW') ? [{
+      key: 'stats',
+      icon: <BarChartOutlined />,
+      label: 'Thống kê',
+      onClick: () => navTo(`/projects/${currentProject.id}?tab=stats`),
+    }] : []),
     {
       key: 'tasks',
       icon: <CheckSquareOutlined />,
@@ -182,17 +191,23 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       label: 'Sprints',
       onClick: () => navTo(`/projects/${currentProject.id}?tab=sprints`),
     },
-    {
+    ...(isAdmin || hasPermission('PROJECT_MANAGE_MEMBERS') ? [{
       key: 'members',
       icon: <TeamOutlined />,
       label: 'Thành viên',
       onClick: () => navTo(`/projects/${currentProject.id}?tab=members`),
-    },
+    }] : []),
     {
       key: 'categories',
       icon: <AppstoreAddOutlined />,
       label: 'Danh mục',
       onClick: () => navTo(`/projects/${currentProject.id}?tab=categories`),
+    },
+    {
+      key: 'labels',
+      icon: <TagOutlined />,
+      label: 'Nhãn',
+      onClick: () => navTo(`/projects/${currentProject.id}?tab=labels`),
     },
     {
       key: 'gantt',
@@ -206,13 +221,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       label: 'Hoạt động',
       onClick: () => navTo(`/projects/${currentProject.id}?tab=activity`),
     },
-    {
-      key: 'stats',
-      icon: <BarChartOutlined />,
-      label: 'Thống kê',
-      onClick: () => navTo(`/projects/${currentProject.id}?tab=stats`),
-    },
-  ] : [];
+  ].filter((item) => !forbiddenTabs.has(item.key)) : [];
 
   const userMenuItems = [
     {

@@ -78,7 +78,7 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: null,
           });
-          usePermissionStore.getState().fetchMyPermissions(res.userId);
+          usePermissionStore.getState().fetchMyPermissions();
           return {};
         } catch (error: any) {
           set({ error: error.message || 'Đăng nhập thất bại', isLoading: false });
@@ -111,7 +111,7 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: null,
           });
-          usePermissionStore.getState().fetchMyPermissions(res.userId);
+          usePermissionStore.getState().fetchMyPermissions();
         } catch (error: any) {
           set({ error: error.message || 'Đăng ký thất bại', isLoading: false });
           throw error;
@@ -137,8 +137,8 @@ export const useAuthStore = create<AuthState>()(
         try {
           const user = await userService.getMe();
           set({ user, isAuthenticated: true, isLoading: false });
-          if (user.id && !usePermissionStore.getState().loaded) {
-            usePermissionStore.getState().fetchMyPermissions(user.id);
+          if (!usePermissionStore.getState().loaded) {
+            usePermissionStore.getState().fetchMyPermissions();
           }
         } catch (error: any) {
           set({ error: error.message || 'Không thể tải thông tin người dùng', isLoading: false });

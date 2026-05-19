@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Typography, Button, Table, Tag, Space, Input, Select,
   Avatar, Empty, Tooltip, Modal, Form, Popconfirm, message, Spin,
-  DatePicker, Card, Progress, List, Row, Col, Alert, Statistic, Badge,
+  DatePicker, Card, Progress, List, Row, Col, Alert, Statistic, Badge, ColorPicker, theme,
 } from 'antd';
 import {
   CheckSquareOutlined, TeamOutlined, ExclamationCircleOutlined,
@@ -13,7 +13,7 @@ import {
   PlayCircleOutlined, CheckCircleOutlined, EditOutlined,
   DownloadOutlined, RightOutlined, DownOutlined, HistoryOutlined,
   WarningOutlined, RiseOutlined, CalendarOutlined, LinkOutlined,
-  BarChartOutlined,
+  BarChartOutlined, TagOutlined,
 } from '@ant-design/icons';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -36,7 +36,7 @@ import { useAuthStore } from '../stores/authStore';
 import type {
   TaskSummary, ProjectMember, Sprint, IssueCategory, ActivityLog, GanttTask,
   CreateTaskRequest, TaskFilterState, Version, ProjectStatsResponse,
-  TaskAlertItem, MemberTaskStats,
+  TaskAlertItem, MemberTaskStats, Label,
 } from '../types';
 import { TaskPriority, ProjectRole, TaskStatus, SprintStatus } from '../types';
 import SprintKanbanView from '../components/SprintKanbanView';
@@ -218,12 +218,12 @@ const buildTaskColumns = (
       <Space size={8}>
         {(record.commentCount ?? 0) > 0 && (
           <Tooltip title={`${record.commentCount} bình luận`}>
-            <span style={{ color: '#8c8c8c', fontSize: 12 }}><CommentOutlined /> {record.commentCount}</span>
+            <span style={{ color: token.colorTextSecondary, fontSize: 12 }}><CommentOutlined /> {record.commentCount}</span>
           </Tooltip>
         )}
         {(record.attachmentCount ?? 0) > 0 && (
           <Tooltip title={`${record.attachmentCount} tệp đính kèm`}>
-            <span style={{ color: '#8c8c8c', fontSize: 12 }}><PaperClipOutlined /> {record.attachmentCount}</span>
+            <span style={{ color: token.colorTextSecondary, fontSize: 12 }}><PaperClipOutlined /> {record.attachmentCount}</span>
           </Tooltip>
         )}
       </Space>
@@ -233,11 +233,12 @@ const buildTaskColumns = (
 
 // ─── ProjectDetailPage ───────────────────────────────────────
 const ProjectDetailPage: React.FC = () => {
+  const { token } = theme.useToken();
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const { currentProject, members, fetchProjectById, fetchMembers, deleteProject } = useProjectStore();
+  const { currentProject, members, fetchProjectById, fetchMembers, deleteProject, setForbiddenTab, clearForbiddenTabs } = useProjectStore();
   const {
     projectTasks, isLoading, fetchProjectTasks,
   } = useTaskStore();
@@ -303,6 +304,14 @@ const ProjectDetailPage: React.FC = () => {
   const [catForm] = Form.useForm();
   const [catSaving, setCatSaving] = useState(false);
 
+  // Labels
+  const [projectLabels, setProjectLabels] = useState<Label[]>([]);
+  const [labelsLoading, setLabelsLoading] = useState(false);
+  const [labelModal, setLabelModal] = useState(false);
+  const [labelForm] = Form.useForm();
+  const [labelSaving, setLabelSaving] = useState(false);
+  const [labelColor, setLabelColor] = useState<string>('#1890ff');
+
   // Activity
   const [activity, setActivity] = useState<ActivityLog[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -320,6 +329,7 @@ const ProjectDetailPage: React.FC = () => {
 
   useEffect(() => {
     if (!projectId) return;
+    clearForbiddenTabs();
     fetchProjectById(projectId);
     fetchMembers(projectId);
     fetchRoles().catch(() => { });
@@ -363,7 +373,9 @@ const ProjectDetailPage: React.FC = () => {
     try {
       const data = await sprintService.getSprints(projectId);
       setSprints(data);
-    } catch { /* ignore */ } finally {
+    } catch (e: any) {
+      if (e?.status === 403) setForbiddenTab('sprints');
+    } finally {
       setSprintsLoading(false);
     }
   }, [projectId]);
@@ -375,8 +387,24 @@ const ProjectDetailPage: React.FC = () => {
     try {
       const data = await categoryService.getCategories(projectId);
       setCategories(data);
-    } catch { /* ignore */ } finally {
+    } catch (e: any) {
+      if (e?.status === 403) setForbiddenTab('categories');
+    } finally {
       setCatsLoading(false);
+    }
+  }, [projectId]);
+
+  // Fetch labels
+  const fetchLabels = useCallback(async () => {
+    if (!projectId) return;
+    setLabelsLoading(true);
+    try {
+      const data = await projectService.getLabels(projectId);
+      setProjectLabels(data);
+    } catch (e: any) {
+      if (e?.status === 403) setForbiddenTab('labels');
+    } finally {
+      setLabelsLoading(false);
     }
   }, [projectId]);
 
@@ -389,7 +417,9 @@ const ProjectDetailPage: React.FC = () => {
       setActivity(data.content ?? []);
       setActivityTotal(data.totalElements ?? 0);
       setActivityPage(pg);
-    } catch { /* ignore */ } finally {
+    } catch (e: any) {
+      if (e?.status === 403) setForbiddenTab('activity');
+    } finally {
       setActivityLoading(false);
     }
   }, [projectId]);
@@ -403,7 +433,8 @@ const ProjectDetailPage: React.FC = () => {
       const data = await taskService.getGantt(projectId);
       setGanttTasks(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      setGanttError(e.message || 'Không thể tải dữ liệu Gantt');
+      if (e?.status === 403) setForbiddenTab('gantt');
+      else setGanttError(e.message || 'Không thể tải dữ liệu Gantt');
     } finally {
       setGanttLoading(false);
     }
@@ -415,8 +446,8 @@ const ProjectDetailPage: React.FC = () => {
     try {
       const data = await projectService.getStats(projectId);
       setProjectStats(data);
-    } catch {
-      // giữ data cũ nếu có
+    } catch (e: any) {
+      if (e?.status === 403) setForbiddenTab('stats');
     } finally {
       setStatsLoading(false);
     }
@@ -425,6 +456,7 @@ const ProjectDetailPage: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'sprints') fetchSprints();
     if (activeTab === 'categories') fetchCategories();
+    if (activeTab === 'labels') fetchLabels();
     if (activeTab === 'activity') fetchActivity(0);
     if (activeTab === 'gantt') fetchGantt();
     if (activeTab === 'stats') fetchStats();
@@ -679,10 +711,19 @@ const ProjectDetailPage: React.FC = () => {
     setCatSaving(true);
     try {
       if (editCat) {
-        await categoryService.update(editCat.id, { name: values.name });
+        const updateData: any = { name: values.name };
+        if (values.defaultAssigneeId) {
+          updateData.defaultAssigneeId = values.defaultAssigneeId;
+        } else {
+          updateData.clearDefaultAssignee = true;
+        }
+        await categoryService.update(editCat.id, updateData);
         message.success('Đã cập nhật danh mục');
       } else {
-        await categoryService.create(projectId, { name: values.name });
+        await categoryService.create(projectId, {
+          name: values.name,
+          defaultAssigneeId: values.defaultAssigneeId || undefined,
+        });
         message.success('Đã tạo danh mục');
       }
       setCatModal(false);
@@ -703,6 +744,38 @@ const ProjectDetailPage: React.FC = () => {
       fetchCategories();
     } catch (e: any) {
       message.error(e.message || 'Xóa thất bại');
+    }
+  };
+
+  // ── Labels ────────────────────────────────────────────────
+  const handleCreateLabel = async (values: any) => {
+    if (!projectId) return;
+    setLabelSaving(true);
+    try {
+      await projectService.createLabel(projectId, {
+        name: values.name,
+        color: labelColor,
+        description: values.description || undefined,
+      });
+      message.success('Đã tạo nhãn');
+      setLabelModal(false);
+      labelForm.resetFields();
+      setLabelColor('#1890ff');
+      fetchLabels();
+    } catch (e: any) {
+      message.error(e.message || 'Tạo nhãn thất bại');
+    } finally {
+      setLabelSaving(false);
+    }
+  };
+
+  const handleDeleteLabel = async (id: string) => {
+    try {
+      await projectService.deleteLabel(id);
+      message.success('Đã xóa nhãn');
+      fetchLabels();
+    } catch (e: any) {
+      message.error(e.message || 'Xóa nhãn thất bại');
     }
   };
 
@@ -993,7 +1066,7 @@ const ProjectDetailPage: React.FC = () => {
                               <Statistic title="Tổng" value={total} valueStyle={{ fontSize: 18 }} />
                             </Col>
                             <Col span={6}>
-                              <Statistic title="Chưa xong" value={total - completed} valueStyle={{ fontSize: 18, color: '#8c8c8c' }} />
+                              <Statistic title="Chưa xong" value={total - completed} valueStyle={{ fontSize: 18, color: token.colorTextSecondary }} />
                             </Col>
                             <Col span={6}>
                               <Statistic title="Tiến độ" value={`${pct}%`} valueStyle={{ fontSize: 18, color: '#1890ff' }} />
@@ -1016,7 +1089,7 @@ const ProjectDetailPage: React.FC = () => {
 
                       {/* Dates (non-active sprints) */}
                       {!isActive && (sprint.startDate || sprint.endDate) && (
-                        <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8 }}>
+                        <div style={{ fontSize: 12, color: token.colorTextSecondary, marginBottom: 8 }}>
                           {sprint.startDate && `${dayjs(sprint.startDate).format('DD/MM/YYYY')}`}
                           {sprint.startDate && sprint.endDate && ' → '}
                           {sprint.endDate && `${dayjs(sprint.endDate).format('DD/MM/YYYY')}`}
@@ -1135,7 +1208,7 @@ const ProjectDetailPage: React.FC = () => {
               {incompleteTasksForSprint.map((t) => (
                 <div key={t.id} style={{
                   display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '6px 10px', background: '#fffbe6', borderRadius: 4,
+                  padding: '6px 10px', background: token.colorFillAlter, borderRadius: 4,
                 }}>
                   <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{t.taskKey}</Tag>
                   <Text style={{ flex: 1, fontSize: 13 }}>{t.title}</Text>
@@ -1143,7 +1216,7 @@ const ProjectDetailPage: React.FC = () => {
                 </div>
               ))}
             </div>
-            <div style={{ marginTop: 16, color: '#8c8c8c', fontSize: 13 }}>
+            <div style={{ marginTop: 16, color: token.colorTextSecondary, fontSize: 13 }}>
               <b>Gỡ task & Hoàn thành</b>: Các task chưa xong sẽ bị gỡ khỏi sprint.<br />
               <b>Hoàn thành (giữ)</b>: Các task vẫn nằm trong sprint đã hoàn thành.
             </div>
@@ -1173,20 +1246,71 @@ const ProjectDetailPage: React.FC = () => {
                     <Button key="edit" size="small" icon={<EditOutlined />}
                       onClick={() => {
                         setEditCat(cat);
-                        catForm.setFieldsValue({ name: cat.name });
+                        catForm.setFieldsValue({ name: cat.name, defaultAssigneeId: cat.defaultAssigneeId });
                         setCatModal(true);
                       }} />,
-                    <Popconfirm key="del" title="Xóa danh mục này?"
-                      onConfirm={() => handleDeleteCategory(cat.id)}
+                    cat.taskCount > 0 ? (
+                      <Tooltip key="del" title={`Không thể xóa: danh mục có ${cat.taskCount} task`}>
+                        <Button size="small" danger icon={<DeleteOutlined />} disabled />
+                      </Tooltip>
+                    ) : (
+                      <Popconfirm key="del" title="Xóa danh mục này?"
+                        onConfirm={() => handleDeleteCategory(cat.id)}
+                        okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
+                        <Button size="small" danger icon={<DeleteOutlined />} />
+                      </Popconfirm>
+                    ),
+                  ]}
+                >
+                  <List.Item.Meta
+                    avatar={<Avatar icon={<AppstoreAddOutlined />} style={{ background: '#722ed1' }} />}
+                    title={
+                      <Space size={6}>
+                        <Text strong>{cat.name}</Text>
+                        {cat.taskCount > 0 && (
+                          <Badge count={cat.taskCount} size="small" style={{ background: '#722ed1' }} />
+                        )}
+                      </Space>
+                    }
+                    description={cat.defaultAssigneeName && `Mặc định: ${cat.defaultAssigneeName}`}
+                  />
+                </List.Item>
+              )}
+            />
+          )}
+        </>
+      )}
+
+      {activeTab === 'labels' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text type="secondary">{projectLabels.length} nhãn</Text>
+            <Button type="primary" icon={<PlusOutlined />}
+              onClick={() => { labelForm.resetFields(); setLabelColor('#1890ff'); setLabelModal(true); }}>
+              Thêm nhãn
+            </Button>
+          </div>
+          {labelsLoading ? (
+            <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
+          ) : projectLabels.length === 0 ? (
+            <Empty description="Chưa có nhãn nào" style={{ padding: '40px 0' }} />
+          ) : (
+            <List
+              dataSource={projectLabels}
+              renderItem={(lbl) => (
+                <List.Item
+                  actions={[
+                    <Popconfirm key="del" title="Xóa nhãn này?"
+                      onConfirm={() => handleDeleteLabel(lbl.id)}
                       okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
                       <Button size="small" danger icon={<DeleteOutlined />} />
                     </Popconfirm>,
                   ]}
                 >
                   <List.Item.Meta
-                    avatar={<Avatar icon={<AppstoreAddOutlined />} style={{ background: '#722ed1' }} />}
-                    title={<Text strong>{cat.name}</Text>}
-                    description={cat.defaultAssigneeName && `Mặc định: ${cat.defaultAssigneeName}`}
+                    avatar={<Avatar icon={<TagOutlined />} style={{ background: lbl.color || '#1890ff' }} />}
+                    title={<Tag color={lbl.color} style={{ fontSize: 13 }}>{lbl.name}</Tag>}
+                    description={lbl.description}
                   />
                 </List.Item>
               )}
@@ -1213,7 +1337,7 @@ const ProjectDetailPage: React.FC = () => {
               <div>
                 <div style={{ fontWeight: 600, fontSize: 14, lineHeight: 1.2 }}>Nhật ký hoạt động</div>
                 {activityTotal > 0 && (
-                  <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 1 }}>
+                  <div style={{ fontSize: 11, color: token.colorTextSecondary, marginTop: 1 }}>
                     {activityTotal} sự kiện được ghi lại
                   </div>
                 )}
@@ -1326,7 +1450,7 @@ const ProjectDetailPage: React.FC = () => {
                         {/* Timestamp — pushed right */}
                         <span style={{
                           marginLeft: 'auto', fontSize: 11,
-                          color: '#8c8c8c', whiteSpace: 'nowrap',
+                          color: token.colorTextSecondary, whiteSpace: 'nowrap',
                         }}>
                           {dayjs(a.createdAt).fromNow()}
                         </span>
@@ -1591,14 +1715,14 @@ const ProjectDetailPage: React.FC = () => {
                             { label: 'Xong', value: activeSprint.doneTasks, color: '#10b981' },
                           ].map((s) => (
                             <Col span={8} key={s.label}>
-                              <div style={{ textAlign: 'center', padding: '6px 4px', background: `${s.color}15`, borderRadius: 8 }}>
+                              <div style={{ textAlign: 'center', padding: '6px 4px', background: token.colorFillAlter, borderRadius: 8 }}>
                                 <Text strong style={{ color: s.color, fontSize: 18, display: 'block' }}>{s.value}</Text>
                                 <Text type="secondary" style={{ fontSize: 11 }}>{s.label}</Text>
                               </div>
                             </Col>
                           ))}
                         </Row>
-                        <div style={{ marginTop: 10, fontSize: 12, color: '#8c8c8c' }}>
+                        <div style={{ marginTop: 10, fontSize: 12, color: token.colorTextSecondary }}>
                           <CalendarOutlined style={{ marginRight: 4 }} />
                           {dayjs(activeSprint.startDate).format('DD/MM')} – {dayjs(activeSprint.endDate).format('DD/MM/YYYY')}
                         </div>
@@ -1624,8 +1748,8 @@ const ProjectDetailPage: React.FC = () => {
                         </div>
                       ))}
                       {ov.unassigned > 0 && (
-                        <div style={{ marginTop: 10, padding: '6px 10px', background: '#fffbe6', borderRadius: 6, border: '1px solid #ffe58f' }}>
-                          <Text style={{ fontSize: 12, color: '#d46b08' }}>
+                        <div style={{ marginTop: 10, padding: '6px 10px', background: token.colorWarningBg, borderRadius: 6, border: `1px solid ${token.colorWarningBorder}` }}>
+                          <Text style={{ fontSize: 12, color: token.colorWarning }}>
                             <WarningOutlined style={{ marginRight: 4 }} />
                             {ov.unassigned} task chưa được phân công
                           </Text>
@@ -1652,7 +1776,7 @@ const ProjectDetailPage: React.FC = () => {
                           <stop offset="95%" stopColor="#94a3b8" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={token.colorBorderSecondary} />
                       <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={4} />
                       <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                       <ReTooltip />
@@ -1711,12 +1835,12 @@ const ProjectDetailPage: React.FC = () => {
                 </Row>
 
                 <style>{`
-                  .row-stat-overdue td { background: #fff1f0 !important; }
-                  .row-stat-overdue:hover td { background: #ffccc7 !important; }
-                  .row-alert-overdue td { background: #fff1f0 !important; }
-                  .row-alert-overdue:hover td { background: #ffccc7 !important; }
-                  .row-alert-upcoming td { background: #fffbe6 !important; }
-                  .row-alert-upcoming:hover td { background: #fff1b8 !important; }
+                  .row-stat-overdue td { background: ${token.colorErrorBg} !important; }
+                  .row-stat-overdue:hover td { background: ${token.colorErrorBgHover} !important; }
+                  .row-alert-overdue td { background: ${token.colorErrorBg} !important; }
+                  .row-alert-overdue:hover td { background: ${token.colorErrorBgHover} !important; }
+                  .row-alert-upcoming td { background: ${token.colorWarningBg} !important; }
+                  .row-alert-upcoming:hover td { background: ${token.colorWarningBgHover} !important; }
                 `}</style>
               </>
             );
@@ -1896,9 +2020,50 @@ const ProjectDetailPage: React.FC = () => {
           <Form.Item name="name" label="Tên danh mục" rules={[{ required: true, message: 'Vui lòng nhập tên' }]}>
             <Input placeholder="VD: Bug, Feature, Improvement..." />
           </Form.Item>
+          <Form.Item name="defaultAssigneeId" label="Người thực hiện mặc định">
+            <Select
+              allowClear
+              placeholder="Chọn thành viên..."
+              options={members.map((m) => ({
+                value: m.userId,
+                label: (
+                  <Space size={6}>
+                    <Avatar src={resolveAvatarUrl(m.avatarUrl)} icon={<UserOutlined />} size={20} />
+                    <span>{m.fullName || m.username}</span>
+                  </Space>
+                ),
+              }))}
+            />
+          </Form.Item>
           <Space>
             <Button type="primary" htmlType="submit" loading={catSaving}>{editCat ? 'Cập nhật' : 'Thêm'}</Button>
             <Button onClick={() => { setCatModal(false); setEditCat(null); }}>Hủy</Button>
+          </Space>
+        </Form>
+      </Modal>
+
+      {/* Modal Label */}
+      <Modal
+        title={<Space><TagOutlined />Thêm nhãn</Space>}
+        open={labelModal} onCancel={() => { setLabelModal(false); labelForm.resetFields(); setLabelColor('#1890ff'); }}
+        footer={null} destroyOnHidden>
+        <Form form={labelForm} layout="vertical" onFinish={handleCreateLabel} style={{ marginTop: 8 }}>
+          <Form.Item name="name" label="Tên nhãn" rules={[{ required: true, message: 'Vui lòng nhập tên' }]}>
+            <Input placeholder="VD: Bug, Frontend, Backend..." />
+          </Form.Item>
+          <Form.Item label="Màu sắc">
+            <ColorPicker
+              value={labelColor}
+              onChange={(c) => setLabelColor(c.toHexString())}
+              showText
+            />
+          </Form.Item>
+          <Form.Item name="description" label="Mô tả">
+            <Input placeholder="Mô tả ngắn về nhãn..." />
+          </Form.Item>
+          <Space>
+            <Button type="primary" htmlType="submit" loading={labelSaving}>Thêm</Button>
+            <Button onClick={() => { setLabelModal(false); labelForm.resetFields(); setLabelColor('#1890ff'); }}>Hủy</Button>
           </Space>
         </Form>
       </Modal>

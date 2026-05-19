@@ -5,7 +5,7 @@ import { userService } from '../services/userService';
 interface PermissionState {
   permissions: string[];
   loaded: boolean;
-  fetchMyPermissions: (userId: string) => Promise<void>;
+  fetchMyPermissions: () => Promise<void>;
   hasPermission: (name: string) => boolean;
   clearPermissions: () => void;
 }
@@ -16,8 +16,8 @@ export const usePermissionStore = create<PermissionState>()(
       permissions: [],
       loaded: false,
 
-      fetchMyPermissions: async (userId: string) => {
-        const perms = await userService.getMyPermissions(userId);
+      fetchMyPermissions: async () => {
+        const perms = await userService.getMyPermissions();
         set({ permissions: perms, loaded: true });
       },
 

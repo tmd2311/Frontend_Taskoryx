@@ -122,7 +122,7 @@ function App() {
           <Route
             path="/tasks"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredPermission="TASK_VIEW">
                 <MainLayout>
                   <TasksPage />
                 </MainLayout>
@@ -132,7 +132,7 @@ function App() {
           <Route
             path="/tasks/:taskKey"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredPermission="TASK_VIEW">
                 <MainLayout>
                   <TaskDetailPage />
                 </MainLayout>
@@ -142,7 +142,7 @@ function App() {
           <Route
             path="/projects"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredPermission="PROJECT_VIEW">
                 <MainLayout>
                   <ProjectsPage />
                 </MainLayout>
@@ -153,7 +153,7 @@ function App() {
           <Route
             path="/projects/:projectId"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredPermission="PROJECT_VIEW">
                 <MainLayout>
                   <ProjectDetailPage />
                 </MainLayout>
@@ -163,7 +163,7 @@ function App() {
           <Route
             path="/boards"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredPermission="BOARD_VIEW">
                 <MainLayout>
                   <BoardsPage />
                 </MainLayout>
@@ -184,7 +184,7 @@ function App() {
           <Route
             path="/time-report"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredPermission="REPORT_VIEW">
                 <MainLayout>
                   <TimeReportPage />
                 </MainLayout>
@@ -195,7 +195,7 @@ function App() {
           <Route
             path="/admin/users"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredPermission={['ADMIN_ACCESS', 'USER_VIEW', 'USER_CREATE', 'USER_UPDATE', 'USER_DELETE', 'USER_ASSIGN_ROLE', 'USER_RESET_PASSWORD']}>
                 <MainLayout>
                   <AdminUsersPage />
                 </MainLayout>
@@ -206,7 +206,7 @@ function App() {
           <Route
             path="/admin/roles"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredPermission="ADMIN_ACCESS">
                 <MainLayout>
                   <AdminRolesPage />
                 </MainLayout>
@@ -217,7 +217,7 @@ function App() {
           <Route
             path="/admin/templates"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredPermission="ADMIN_ACCESS">
                 <MainLayout>
                   <AdminTemplatesPage />
                 </MainLayout>
@@ -228,7 +228,7 @@ function App() {
           <Route
             path="/ai-project"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredPermission="CREATE_PROJECT">
                 <MainLayout>
                   <AiProjectPage />
                 </MainLayout>

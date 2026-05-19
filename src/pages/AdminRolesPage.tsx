@@ -170,7 +170,7 @@ const AdminRolesPage: React.FC = () => {
           <Space size={6}>
             <Text strong style={{ fontSize: 13 }}>{getRoleLabel(r)}</Text>
             {r.isSystemRole && (
-              <Tag icon={<LockOutlined />} color="red" style={{ fontSize: 11 }}>System</Tag>
+              <Tag icon={<LockOutlined />} color="red" style={{ fontSize: 11 }}>Hệ thống</Tag>
             )}
           </Space>
           <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>{r.name}</Text>
@@ -295,7 +295,7 @@ const AdminRolesPage: React.FC = () => {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <Title level={3} style={{ margin: 0 }}>Quản lý Role</Title>
+          <Title level={3} style={{ margin: 0 }}>Quản lý hệ thống</Title>
           <Text type="secondary">Tổng cộng {roles.length} role trong hệ thống</Text>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
@@ -383,7 +383,7 @@ const AdminRolesPage: React.FC = () => {
               <Text strong style={{ fontSize: 15 }}>{getRoleLabel(targetRole)}</Text>
               <Text code style={{ fontSize: 12 }}>{targetRole.name}</Text>
               {targetRole.isSystemRole && (
-                <Tag icon={<LockOutlined />} color="red">System Role</Tag>
+                <Tag icon={<LockOutlined />} color="red">Vai trò hệ thống</Tag>
               )}
             </Space>
             {targetRole.description && (

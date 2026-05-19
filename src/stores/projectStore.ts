@@ -19,6 +19,7 @@ interface ProjectState {
   isLoading: boolean;
   membersLoading: boolean;
   error: string | null;
+  forbiddenTabs: Set<string>;
 
   fetchProjects: () => Promise<void>;
   fetchProjectById: (id: string) => Promise<void>;
@@ -36,6 +37,8 @@ interface ProjectState {
   createLabel: (projectId: string, data: CreateLabelRequest) => Promise<Label>;
   deleteLabel: (labelId: string) => Promise<void>;
 
+  setForbiddenTab: (tab: string) => void;
+  clearForbiddenTabs: () => void;
   clearError: () => void;
 }
 
@@ -47,6 +50,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   isLoading: false,
   membersLoading: false,
   error: null,
+  forbiddenTabs: new Set(),
 
   fetchProjects: async () => {
     set({ isLoading: true, error: null });
@@ -160,5 +164,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
     set((state) => ({ labels: state.labels.filter((l) => l.id !== labelId) }));
   },
 
+  setForbiddenTab: (tab) => set((state) => ({ forbiddenTabs: new Set([...state.forbiddenTabs, tab]) })),
+  clearForbiddenTabs: () => set({ forbiddenTabs: new Set() }),
   clearError: () => set({ error: null }),
 }));

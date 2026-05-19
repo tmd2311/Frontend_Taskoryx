@@ -3,6 +3,7 @@ import {
   Typography, Card, Row, Col, Statistic, DatePicker, Select, Space, Spin,
   Table, Progress, Tabs, Button, Tag, Avatar, Segmented, Modal, Form,
   Input, InputNumber, Popconfirm, message, Empty, Tooltip, Divider, Badge,
+  theme,
 } from 'antd';
 import {
   ClockCircleOutlined, CalendarOutlined, ReloadOutlined, UserOutlined,
@@ -34,6 +35,7 @@ const COLORS = ['#4361ee', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'
 
 // ─── Biểu đồ cột theo ngày ──────────────────────────────────
 const DailyBarChart: React.FC<{ data: DailyTimeStats[] }> = ({ data }) => {
+  const { token } = theme.useToken();
   const chartData = data.map((d) => ({
     name: d.date.slice(5),
     hours: Number(d.totalHours),
@@ -42,7 +44,7 @@ const DailyBarChart: React.FC<{ data: DailyTimeStats[] }> = ({ data }) => {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={token.colorBorderSecondary} />
         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
         <YAxis unit="h" tick={{ fontSize: 11 }} />
         <ReTooltip
@@ -57,6 +59,7 @@ const DailyBarChart: React.FC<{ data: DailyTimeStats[] }> = ({ data }) => {
 
 // ─── Biểu đồ theo tuần ──────────────────────────────────────
 const WeeklyBarChart: React.FC<{ data: WeeklyTimeStats[] }> = ({ data }) => {
+  const { token } = theme.useToken();
   const chartData = data.map((w) => ({
     name: w.weekLabel.split(' (')[0],
     hours: Number(w.totalHours),
@@ -64,7 +67,7 @@ const WeeklyBarChart: React.FC<{ data: WeeklyTimeStats[] }> = ({ data }) => {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={token.colorBorderSecondary} />
         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
         <YAxis unit="h" tick={{ fontSize: 11 }} />
         <ReTooltip formatter={(v: any) => [`${v}h`, 'Giờ làm']} />
@@ -76,6 +79,7 @@ const WeeklyBarChart: React.FC<{ data: WeeklyTimeStats[] }> = ({ data }) => {
 
 // ─── Biểu đồ theo tháng trong năm ───────────────────────────
 const MonthlyLineChart: React.FC<{ data: MonthlyTimeStats[] }> = ({ data }) => {
+  const { token } = theme.useToken();
   const chartData = data.map((m) => ({
     name: `T${m.month}`,
     hours: Number(m.totalHours),
@@ -83,7 +87,7 @@ const MonthlyLineChart: React.FC<{ data: MonthlyTimeStats[] }> = ({ data }) => {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <LineChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+        <CartesianGrid strokeDasharray="3 3" stroke={token.colorBorderSecondary} />
         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
         <YAxis unit="h" tick={{ fontSize: 11 }} />
         <ReTooltip formatter={(v: any) => [`${v}h`, 'Giờ làm']} />
@@ -112,6 +116,7 @@ const ProjectPieChart: React.FC<{ data: TimeStatsByProject[] }> = ({ data }) => 
 
 // ─── Tab ghi giờ làm việc ────────────────────────────────────
 const LogTimeTab: React.FC = () => {
+  const { token } = theme.useToken();
   const navigate = useNavigate();
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
@@ -294,7 +299,7 @@ const LogTimeTab: React.FC = () => {
             {/* Quick-log buttons */}
             <div style={{ marginBottom: 16, marginTop: -8 }}>
               <Space size={6} wrap>
-                <span style={{ fontSize: 12, color: '#888' }}>Nhanh:</span>
+                <span style={{ fontSize: 12, color: token.colorTextSecondary }}>Nhanh:</span>
                 {QUICK_HOURS.map((h) => (
                   <Button
                     key={h}
@@ -378,8 +383,8 @@ const LogTimeTab: React.FC = () => {
                     style={{
                       padding: '10px 12px',
                       borderRadius: 8,
-                      border: '1px solid #f0f0f0',
-                      background: '#fafafa',
+                      border: `1px solid ${token.colorBorderSecondary}`,
+                      background: token.colorFillAlter,
                       display: 'flex',
                       alignItems: 'flex-start',
                       gap: 10,
@@ -388,7 +393,7 @@ const LogTimeTab: React.FC = () => {
                     {/* Giờ */}
                     <div style={{
                       minWidth: 48, textAlign: 'center', padding: '4px 8px',
-                      background: '#eef2ff', borderRadius: 6,
+                      background: token.colorPrimaryBg, borderRadius: 6,
                     }}>
                       <Text strong style={{ color: '#4361ee', fontSize: 14, display: 'block' }}>
                         {entry.formattedHours ?? `${entry.hours}h`}
@@ -442,7 +447,7 @@ const LogTimeTab: React.FC = () => {
         {/* Tips */}
         <Card
           size="small"
-          style={{ marginTop: 12, borderRadius: 10, background: '#f0f5ff', border: '1px solid #d6e4ff' }}
+          style={{ marginTop: 12, borderRadius: 10, background: token.colorPrimaryBg, border: `1px solid ${token.colorPrimaryBorder}` }}
         >
           <Text type="secondary" style={{ fontSize: 12 }}>
             <strong>Mẹo:</strong> Ghi giờ mỗi ngày giúp báo cáo chính xác hơn.
@@ -456,6 +461,7 @@ const LogTimeTab: React.FC = () => {
 
 // ─── Tab lịch sử time entries ────────────────────────────────
 const MyEntriesTab: React.FC = () => {
+  const { token } = theme.useToken();
   const navigate = useNavigate();
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [total, setTotal] = useState(0);
@@ -630,7 +636,7 @@ const MyEntriesTab: React.FC = () => {
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           marginBottom: 12, padding: '8px 12px',
-          background: '#f0f5ff', borderRadius: 8,
+          background: token.colorPrimaryBg, borderRadius: 8,
         }}>
           <Text type="secondary" style={{ fontSize: 13 }}>
             Hiển thị {entries.length} / {total} bản ghi
@@ -715,8 +721,8 @@ const MyEntriesTab: React.FC = () => {
       </Modal>
 
       <style>{`
-        .row-weekend td { background: #fffbe6 !important; }
-        .row-weekend:hover td { background: #fff7cc !important; }
+        .row-weekend td { background: ${token.colorWarningBg} !important; }
+        .row-weekend:hover td { background: ${token.colorWarningBgHover} !important; }
       `}</style>
     </>
   );
@@ -724,6 +730,7 @@ const MyEntriesTab: React.FC = () => {
 
 // ─── Main page ───────────────────────────────────────────────
 const TimeReportPage: React.FC = () => {
+  const { token } = theme.useToken();
   const [activeTab, setActiveTab] = useState<string>('log');
   const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
@@ -912,7 +919,7 @@ const TimeReportPage: React.FC = () => {
         {((viewMode === 'daily' && dailyStats.length === 0) ||
           (viewMode === 'weekly' && weeklyStats.length === 0) ||
           (viewMode === 'monthly' && monthlyStats.length === 0)) && (
-          <div style={{ textAlign: 'center', padding: 40, color: '#bfbfbf' }}>Không có dữ liệu</div>
+          <div style={{ textAlign: 'center', padding: 40, color: token.colorTextDisabled }}>Không có dữ liệu</div>
         )}
       </Card>
 
@@ -926,7 +933,7 @@ const TimeReportPage: React.FC = () => {
                 {summary.byProject.map((p, i) => (
                   <div key={p.projectId} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '6px 0', borderBottom: '1px solid #f5f5f5',
+                    padding: '6px 0', borderBottom: `1px solid ${token.colorBorderSecondary}`,
                   }}>
                     <Space>
                       <div style={{ width: 10, height: 10, borderRadius: 2, background: COLORS[i % COLORS.length] }} />

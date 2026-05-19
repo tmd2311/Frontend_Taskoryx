@@ -20,13 +20,14 @@ import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
 import { taskService } from '../services/taskService';
 import { projectService } from '../services/projectService';
+import { categoryService } from '../services/categoryService';
 import { timeTrackingService } from '../services/timeTrackingService';
 import { dependencyService } from '../services/dependencyService';
 import { watcherService } from '../services/watcherService';
 import QuillCommentEditor from '../components/QuillCommentEditor';
 import type {
   Task, ProjectMember, Comment,
-  TimeEntry, TaskDependency, MentionedUser,
+  TimeEntry, TaskDependency, MentionedUser, IssueCategory,
 } from '../types';
 import { TaskPriority, TaskStatus, DependencyType } from '../types';
 import StatusSelect from '../components/StatusSelect';
@@ -228,6 +229,10 @@ const TaskDetailPage: React.FC = () => {
 
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [projectLabels, setProjectLabels] = useState<import('../types').Label[]>([]);
+  const [labelsLoading, setLabelsLoading] = useState(false);
+  const [projectCategories, setProjectCategories] = useState<IssueCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
 
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [commentSending, setCommentSending] = useState(false);
@@ -294,13 +299,21 @@ const TaskDetailPage: React.FC = () => {
   }, [task?.id]);
 
 
-  // Load members khi task có projectId
+  // Load members, labels, và categories khi task có projectId
   useEffect(() => {
     if (!task?.projectId) return;
     setMembersLoading(true);
     projectService.getMembers(task.projectId)
       .then(setMembers).catch(() => { })
       .finally(() => setMembersLoading(false));
+    setLabelsLoading(true);
+    projectService.getLabels(task.projectId)
+      .then(setProjectLabels).catch(() => { })
+      .finally(() => setLabelsLoading(false));
+    setCategoriesLoading(true);
+    categoryService.getCategories(task.projectId)
+      .then(setProjectCategories).catch(() => { })
+      .finally(() => setCategoriesLoading(false));
   }, [task?.projectId]);
 
   const fetchWatchStatus = async (id: string) => {
@@ -340,6 +353,8 @@ const TaskDetailPage: React.FC = () => {
       dueDate: task.dueDate ? dayjs(task.dueDate) : null,
       startDate: task.startDate ? dayjs(task.startDate) : null,
       estimatedHours: task.estimatedHours,
+      labelIds: task.labels?.map((l) => l.id) ?? [],
+      categoryId: task.categoryId ?? null,
     });
     setEditMode(true);
   };
@@ -355,6 +370,9 @@ const TaskDetailPage: React.FC = () => {
         dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
         startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : undefined,
         estimatedHours: values.estimatedHours,
+        labelIds: values.labelIds ?? [],
+        categoryId: values.categoryId || undefined,
+        clearCategory: !values.categoryId && !!task.categoryId,
       });
       setTask(updated);
       message.success('Đã cập nhật task');
@@ -729,6 +747,38 @@ const TaskDetailPage: React.FC = () => {
                     </Space>
                     <Form.Item name="estimatedHours" label="Giờ ước tính">
                       <InputNumber min={0} step={0.5} style={{ width: '100%' }} placeholder="VD: 8" />
+                    </Form.Item>
+                    <Form.Item name="labelIds" label="Nhãn">
+                      <Select
+                        mode="multiple"
+                        allowClear
+                        placeholder="Chọn nhãn..."
+                        loading={labelsLoading}
+                        options={projectLabels.map((l) => ({ value: l.id, label: l.name, color: l.color }))}
+                        optionRender={(opt) => (
+                          <Space size={6}>
+                            <Tag color={(opt.data as any).color} style={{ margin: 0 }}>{opt.label}</Tag>
+                          </Space>
+                        )}
+                        tagRender={(props) => {
+                          const lbl = projectLabels.find((l) => l.id === props.value);
+                          return <Tag color={lbl?.color} closable={props.closable} onClose={props.onClose} style={{ marginRight: 3 }}>{props.label}</Tag>;
+                        }}
+                      />
+                    </Form.Item>
+                    <Form.Item name="categoryId" label="Danh mục">
+                      <Select
+                        allowClear
+                        placeholder="Chọn danh mục..."
+                        loading={categoriesLoading}
+                        options={projectCategories.map((c) => ({ value: c.id, label: c.name }))}
+                        onChange={(val) => {
+                          const cat = projectCategories.find((c) => c.id === val);
+                          if (cat?.defaultAssigneeId && !form.getFieldValue('assigneeId')) {
+                            form.setFieldValue('assigneeId', cat.defaultAssigneeId);
+                          }
+                        }}
+                      />
                     </Form.Item>
                   </Form>
                 ) : (
@@ -1207,6 +1257,14 @@ const TaskDetailPage: React.FC = () => {
                         <Tag key={label.id} color={label.color} style={{ margin: 0, fontSize: 11 }}>{label.name}</Tag>
                       ))}
                     </Space>
+                  </div>
+                )}
+
+                {/* Danh mục */}
+                {task.categoryName && (
+                  <div style={{ padding: '10px 14px', borderBottom: `1px solid ${borderColor}` }}>
+                    <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Danh mục</Text>
+                    <Tag icon={<AppstoreOutlined />} color="purple">{task.categoryName}</Tag>
                   </div>
                 )}
 

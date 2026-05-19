@@ -301,8 +301,8 @@ const AdminUsersPage: React.FC = () => {
             u.roles.map((r: any) => (
               <Popconfirm
                 key={r.id}
-                title={`Xóa vai trò "${r.name}" khỏi người dùng này?`}
-                onConfirm={() => handleRemoveRole(u.id, r.id, r.name)}
+                title={`Xóa vai trò "${r.displayName || r.name}" khỏi người dùng này?`}
+                onConfirm={() => handleRemoveRole(u.id, r.id, r.displayName || r.name)}
                 okText="Xóa"
                 cancelText="Hủy"
                 okButtonProps={{ danger: true }}
@@ -313,7 +313,7 @@ const AdminUsersPage: React.FC = () => {
                   style={{ cursor: r.isSystemRole ? 'default' : 'pointer' }}
                   title={r.isSystemRole ? 'Vai trò hệ thống, không thể xóa' : 'Nhấn để xóa vai trò'}
                 >
-                  {r.name}
+                  {r.displayName || r.name}
                 </Tag>
               </Popconfirm>
             ))
@@ -440,7 +440,7 @@ const AdminUsersPage: React.FC = () => {
           style={{ width: 200 }}
           value={filterRole}
           onChange={(v) => { setFilterRole(v); setPage(1); }}
-          options={roles.map((r) => ({ label: r.name, value: r.id }))}
+          options={roles.map((r) => ({ label: r.displayName || r.name, value: r.id }))}
         />
         <Select
           placeholder="Trạng thái"
@@ -602,7 +602,7 @@ const AdminUsersPage: React.FC = () => {
               <Text type="secondary" style={{ fontSize: 13 }}>Vai trò hiện tại:</Text>
               <div style={{ marginTop: 6 }}>
                 {roleTargetUser.roles.map((r) => (
-                  <Tag key={r.id} color="blue">{r.name}</Tag>
+                  <Tag key={r.id} color="blue">{r.displayName || r.name}</Tag>
                 ))}
               </div>
             </div>
@@ -614,7 +614,7 @@ const AdminUsersPage: React.FC = () => {
             onChange={(v) => setSelectedRoleId(v)}
             options={roles
               .filter((r) => !roleTargetUser?.roles?.some((ur) => ur.id === r.id))
-              .map((r) => ({ label: r.name, value: r.id }))}
+              .map((r) => ({ label: r.displayName || r.name, value: r.id }))}
             notFoundContent={<Text type="secondary">Người dùng đã có tất cả vai trò</Text>}
           />
         </div>

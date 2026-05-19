@@ -286,6 +286,8 @@ export interface Task extends TaskSummary {
   parentTaskKey?: string;
   parentTaskTitle?: string;
   watcherCount?: number;
+  categoryId?: string;
+  categoryName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -322,6 +324,8 @@ export interface UpdateTaskRequest {
   clearParent?: boolean;
   sprintId?: string;
   clearSprint?: boolean;
+  categoryId?: string;
+  clearCategory?: boolean;
 }
 
 export interface MoveTaskRequest {
@@ -880,6 +884,7 @@ export interface IssueCategory {
   name: string;
   defaultAssigneeId?: string;
   defaultAssigneeName?: string;
+  taskCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -892,6 +897,7 @@ export interface CreateIssueCategoryRequest {
 export interface UpdateIssueCategoryRequest {
   name?: string;
   defaultAssigneeId?: string;
+  clearDefaultAssignee?: boolean;
 }
 
 // ============================================================
