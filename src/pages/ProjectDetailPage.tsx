@@ -41,6 +41,7 @@ import type {
 import { TaskPriority, ProjectRole, TaskStatus, SprintStatus } from '../types';
 import SprintKanbanView from '../components/SprintKanbanView';
 import TaskFilterPanel, { DEFAULT_FILTER } from '../components/TaskFilterPanel';
+import BoardTab from './tabs/BoardTab';
 import dayjs from 'dayjs';
 
 const { TextArea } = Input;
@@ -1559,6 +1560,10 @@ const ProjectDetailPage: React.FC = () => {
         </>
       )}
 
+
+      {activeTab === 'board' && (
+        <BoardTab projectId={projectId!} />
+      )}
 
       {/* ── Tab thống kê dự án ── */}
       {activeTab === 'stats' && (
