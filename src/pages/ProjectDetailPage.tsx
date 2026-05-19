@@ -218,12 +218,12 @@ const buildTaskColumns = (
       <Space size={8}>
         {(record.commentCount ?? 0) > 0 && (
           <Tooltip title={`${record.commentCount} bình luận`}>
-            <span style={{ color: token.colorTextSecondary, fontSize: 12 }}><CommentOutlined /> {record.commentCount}</span>
+            <span style={{ color: '#8c8c8c', fontSize: 12 }}><CommentOutlined /> {record.commentCount}</span>
           </Tooltip>
         )}
         {(record.attachmentCount ?? 0) > 0 && (
           <Tooltip title={`${record.attachmentCount} tệp đính kèm`}>
-            <span style={{ color: token.colorTextSecondary, fontSize: 12 }}><PaperClipOutlined /> {record.attachmentCount}</span>
+            <span style={{ color: '#8c8c8c', fontSize: 12 }}><PaperClipOutlined /> {record.attachmentCount}</span>
           </Tooltip>
         )}
       </Space>
