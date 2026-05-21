@@ -41,9 +41,19 @@ import { useBoardStore } from '../stores/boardStore';
 import { useTaskStore } from '../stores/taskStore';
 import { useNavigate } from 'react-router-dom';
 import { StatusTag } from '../components/StatusSelect';
-import type { Board, KanbanColumn, TaskSummary } from '../types';
+import type { Board, KanbanColumn, TaskSummary, ProjectMember } from '../types';
 import { TaskPriority } from '../types';
+import { projectService } from '../services/projectService';
 import dayjs from 'dayjs';
+
+const MAPPED_STATUS_OPTIONS = [
+  { label: 'Cần làm (TODO)', value: 'TODO' },
+  { label: 'Đang làm (IN_PROGRESS)', value: 'IN_PROGRESS' },
+  { label: 'Đang review (IN_REVIEW)', value: 'IN_REVIEW' },
+  { label: 'Đã giải quyết (RESOLVED)', value: 'RESOLVED' },
+  { label: 'Hoàn thành (DONE)', value: 'DONE' },
+  { label: 'Đã huỷ (CANCELLED)', value: 'CANCELLED' },
+];
 
 const { Title, Text } = Typography;
 
@@ -311,6 +321,8 @@ const BoardsPage: React.FC = () => {
   const [targetColumn, setTargetColumn] = useState<KanbanColumn | null>(null);
   const [taskForm] = Form.useForm();
   const [taskSaving, setTaskSaving] = useState(false);
+  const [taskMembers, setTaskMembers] = useState<ProjectMember[]>([]);
+  const [taskMembersLoading, setTaskMembersLoading] = useState(false);
 
   useEffect(() => { if (projects.length === 0) fetchProjects(); }, []);
 
@@ -322,6 +334,7 @@ const BoardsPage: React.FC = () => {
     if (selectedProjectId) {
       fetchBoards(selectedProjectId);
       setActiveBoardId('');
+      setTaskMembers([]);
     }
   }, [selectedProjectId]);
 
@@ -345,7 +358,8 @@ const BoardsPage: React.FC = () => {
       return;
     }
 
-    const req = { targetColumnId: destination.droppableId, newPosition: destination.index };
+    const targetColId = destination.droppableId;
+    const req = { targetColumnId: targetColId, newPosition: destination.index };
     moveTaskOptimistic(draggableId, req);
     await syncMoveTask(draggableId, req);
   };
@@ -361,10 +375,10 @@ const BoardsPage: React.FC = () => {
     setBoardSaving(true);
     try {
       if (editingBoard) {
-        await updateBoard(editingBoard.id, values);
+        await updateBoard(editingBoard.id, { name: values.name, description: values.description });
         message.success('Đã cập nhật board');
       } else {
-        const created = await createBoard(selectedProjectId, values);
+        const created = await createBoard(selectedProjectId, { ...values, boardType: 'PERSONAL' });
         setActiveBoardId(created.id);
         message.success('Đã tạo board mới');
       }
@@ -384,17 +398,25 @@ const BoardsPage: React.FC = () => {
   const openCreateColumn = () => { setEditingCol(null); colForm.resetFields(); colForm.setFieldsValue({ color: '#1890ff' }); setColModalOpen(true); };
   const openEditColumn = (col: KanbanColumn) => {
     setEditingCol(col);
-    colForm.setFieldsValue({ name: col.name, color: col.color || '#1890ff', isCompleted: col.isCompleted ?? false, taskLimit: col.taskLimit ?? null });
+    colForm.setFieldsValue({
+      name: col.name,
+      color: col.color || '#1890ff',
+      isCompleted: col.isCompleted ?? false,
+      taskLimit: col.taskLimit ?? null,
+      mappedStatus: col.mappedStatus ?? undefined,
+    });
     setColModalOpen(true);
   };
   const handleColSubmit = async (values: any) => {
     if (!activeBoardId) return;
     setColSaving(true);
+    const isPersonal = activeBoard?.boardType === 'PERSONAL';
     const payload = {
       name: values.name,
       color: typeof values.color === 'string' ? values.color : values.color?.toHexString?.() ?? '#1890ff',
-      isCompleted: values.isCompleted ?? false,
+      isCompleted: isPersonal ? undefined : (values.isCompleted ?? false),
       taskLimit: values.taskLimit ?? undefined,
+      mappedStatus: isPersonal ? (values.mappedStatus ?? undefined) : undefined,
     };
     try {
       if (editingCol) { await updateColumn(editingCol.id, payload); message.success('Đã cập nhật cột'); }
@@ -408,7 +430,22 @@ const BoardsPage: React.FC = () => {
     catch (e: any) { message.error(e.message || 'Xóa cột thất bại'); }
   };
   // ── Add Task ────────────────────────────────────────────────
-  const openAddTask = (col: KanbanColumn) => { setTargetColumn(col); taskForm.resetFields(); setTaskModalOpen(true); };
+  const openAddTask = async (col: KanbanColumn) => {
+    setTargetColumn(col);
+    taskForm.resetFields();
+    taskForm.setFieldsValue({ priority: TaskPriority.MEDIUM });
+    setTaskModalOpen(true);
+    const pid = currentBoard?.projectId || selectedProjectId;
+    if (pid && taskMembers.length === 0) {
+      setTaskMembersLoading(true);
+      try {
+        const ms = await projectService.getMembers(pid);
+        setTaskMembers(ms);
+      } catch { /* silently ignore */ }
+      finally { setTaskMembersLoading(false); }
+    }
+  };
+
   const handleTaskSubmit = async (values: any) => {
     const projectId = currentBoard?.projectId || selectedProjectId;
     if (!projectId || !targetColumn || !activeBoardId) return;
@@ -419,6 +456,8 @@ const BoardsPage: React.FC = () => {
         description: values.description || undefined,
         priority: (values.priority as import('../types').TaskPriority) || TaskPriority.MEDIUM,
         dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
+        assigneeId: values.assigneeId || undefined,
+        estimatedHours: values.estimatedHours || undefined,
         boardId: activeBoardId,
         columnId: targetColumn.id,
       };
@@ -436,6 +475,9 @@ const BoardsPage: React.FC = () => {
       <span>
         {board.isDefault && <AppstoreOutlined style={{ marginRight: 4, color: '#1890ff' }} />}
         {board.name}
+        {board.boardType === 'PERSONAL' && !board.isDefault && (
+          <Tag color="purple" style={{ marginLeft: 4, fontSize: 10, verticalAlign: 'middle' }}>Cá nhân</Tag>
+        )}
       </span>
     ),
   }));
@@ -443,6 +485,9 @@ const BoardsPage: React.FC = () => {
   const activeBoard = boards.find((b) => b.id === activeBoardId);
   const columns = currentBoard?.boardId === activeBoardId ? currentBoard.columns : [];
   const sortedColumns = [...columns].sort((a, b) => a.position - b.position);
+  const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const taskFields = selectedProject?.projectConfig?.taskFields ?? [];
+  const isFieldRequired = (field: string) => taskFields.includes(field);
 
   return (
     <div>
@@ -564,15 +609,27 @@ const BoardsPage: React.FC = () => {
           <Form.Item name="name" label="Tên cột" rules={[{ required: true, message: 'Vui lòng nhập tên cột' }]}>
             <Input placeholder="VD: Việc cần làm, Đang làm, Hoàn thành..." maxLength={80} />
           </Form.Item>
+          {activeBoard?.boardType === 'PERSONAL' && (
+            <Form.Item
+              name="mappedStatus"
+              label="Trạng thái task"
+              tooltip="Khi task được kéo vào cột này, trạng thái task sẽ tự động được cập nhật"
+              rules={[{ required: !editingCol, message: 'Vui lòng chọn trạng thái' }]}
+            >
+              <Select placeholder="Chọn trạng thái tương ứng" options={MAPPED_STATUS_OPTIONS} />
+            </Form.Item>
+          )}
           <Form.Item name="color" label="Màu cột">
             <ColorPicker format="hex" />
           </Form.Item>
           <Form.Item name="taskLimit" label="Giới hạn WIP (tùy chọn)" tooltip="Work In Progress limit – cảnh báo khi cột vượt quá số task này">
             <InputNumber min={1} max={999} style={{ width: '100%' }} placeholder="Không giới hạn" />
           </Form.Item>
-          <Form.Item name="isCompleted" valuePropName="checked">
-            <Checkbox>Cột hoàn thành (task ở đây = Done)</Checkbox>
-          </Form.Item>
+          {activeBoard?.boardType !== 'PERSONAL' && (
+            <Form.Item name="isCompleted" valuePropName="checked">
+              <Checkbox>Cột hoàn thành (task ở đây = Done)</Checkbox>
+            </Form.Item>
+          )}
           <Form.Item style={{ marginBottom: 0 }}>
             <Space>
               <Button type="primary" htmlType="submit" loading={colSaving}>{editingCol ? 'Cập nhật' : 'Thêm cột'}</Button>
@@ -603,7 +660,11 @@ const BoardsPage: React.FC = () => {
           <Form.Item name="description" label="Mô tả">
             <Input.TextArea rows={3} placeholder="Mô tả chi tiết (tùy chọn)" maxLength={2000} />
           </Form.Item>
-          <Form.Item name="priority" label="Mức ưu tiên">
+          <Form.Item
+            name="priority"
+            label="Mức ưu tiên"
+            rules={[{ required: isFieldRequired('priority'), message: 'Vui lòng chọn mức ưu tiên' }]}
+          >
             <Select options={[
               { label: <Tag color="green">Thấp</Tag>, value: TaskPriority.LOW },
               { label: <Tag color="blue">Trung bình</Tag>, value: TaskPriority.MEDIUM },
@@ -611,9 +672,36 @@ const BoardsPage: React.FC = () => {
               { label: <Tag color="red">Khẩn cấp</Tag>, value: TaskPriority.URGENT },
             ]} />
           </Form.Item>
-          <Form.Item name="dueDate" label="Hạn chót">
+          <Form.Item
+            name="assigneeId"
+            label="Người thực hiện"
+            rules={[{ required: isFieldRequired('assignee'), message: 'Vui lòng chọn người thực hiện' }]}
+          >
+            <Select
+              allowClear
+              showSearch
+              loading={taskMembersLoading}
+              placeholder={taskMembersLoading ? 'Đang tải...' : 'Chọn người thực hiện'}
+              optionFilterProp="label"
+              options={taskMembers.map((m) => ({ label: m.fullName || m.username, value: m.userId }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="dueDate"
+            label="Hạn chót"
+            rules={[{ required: isFieldRequired('dueDate'), message: 'Vui lòng chọn hạn chót' }]}
+          >
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
+          {isFieldRequired('estimatedHours') && (
+            <Form.Item
+              name="estimatedHours"
+              label="Giờ ước tính"
+              rules={[{ required: true, message: 'Vui lòng nhập số giờ ước tính' }]}
+            >
+              <InputNumber min={0.5} max={9999} step={0.5} style={{ width: '100%' }} placeholder="VD: 8" />
+            </Form.Item>
+          )}
           <Form.Item style={{ marginBottom: 0 }}>
             <Space>
               <Button type="primary" htmlType="submit" loading={taskSaving}>Tạo task</Button>

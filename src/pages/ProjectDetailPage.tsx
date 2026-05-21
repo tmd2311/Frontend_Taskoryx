@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Typography, Button, Table, Tag, Space, Input, Select,
+  Typography, Button, Table, Tag, Space, Input, Select, InputNumber,
   Avatar, Empty, Tooltip, Modal, Form, Popconfirm, message, Spin,
   DatePicker, Card, Progress, List, Row, Col, Alert, Statistic, Badge, ColorPicker, theme,
 } from 'antd';
@@ -328,6 +328,10 @@ const ProjectDetailPage: React.FC = () => {
   const [projectStats, setProjectStats] = useState<ProjectStatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
+  // taskFields từ project config — dùng để render form tạo task động
+  const taskFields = currentProject?.projectConfig?.taskFields ?? [];
+  const isFieldRequired = (field: string) => taskFields.includes(field);
+
   useEffect(() => {
     if (!projectId) return;
     clearForbiddenTabs();
@@ -585,6 +589,8 @@ const ProjectDetailPage: React.FC = () => {
         status: values.status ?? TaskStatus.TODO,
         sprintId: createTaskSprintId,
         dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
+        assigneeId: values.assigneeId || undefined,
+        estimatedHours: values.estimatedHours || undefined,
         categoryId: values.categoryId || undefined,
       };
       await taskService.createTask(projectId, payload);
@@ -639,6 +645,8 @@ const ProjectDetailPage: React.FC = () => {
         sprintId: values.sprintId,
         parentTaskId: values.parentTaskId,
         dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
+        assigneeId: values.assigneeId || undefined,
+        estimatedHours: values.estimatedHours || undefined,
         categoryId: values.categoryId || undefined,
       };
       await taskService.createTask(projectId, payload);
@@ -1177,9 +1185,35 @@ const ProjectDetailPage: React.FC = () => {
                   />
                 </Form.Item>
               )}
-              <Form.Item name="dueDate" label="Hạn chót">
+              <Form.Item
+                name="assigneeId"
+                label="Người thực hiện"
+                rules={[{ required: isFieldRequired('assignee'), message: 'Vui lòng chọn người thực hiện' }]}
+              >
+                <Select
+                  allowClear
+                  showSearch
+                  placeholder="Chọn người thực hiện"
+                  optionFilterProp="label"
+                  options={members.map((m) => ({ label: m.fullName || m.username, value: m.userId }))}
+                />
+              </Form.Item>
+              <Form.Item
+                name="dueDate"
+                label="Hạn chót"
+                rules={[{ required: isFieldRequired('dueDate'), message: 'Vui lòng chọn hạn chót' }]}
+              >
                 <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
               </Form.Item>
+              {isFieldRequired('estimatedHours') && (
+                <Form.Item
+                  name="estimatedHours"
+                  label="Giờ ước tính"
+                  rules={[{ required: true, message: 'Vui lòng nhập số giờ ước tính' }]}
+                >
+                  <InputNumber min={0.5} max={9999} step={0.5} style={{ width: '100%' }} placeholder="VD: 8" />
+                </Form.Item>
+              )}
             </Form>
           </Modal>
 
@@ -1910,7 +1944,12 @@ const ProjectDetailPage: React.FC = () => {
             <TextArea rows={3} placeholder="Mô tả chi tiết (tùy chọn)" maxLength={5000} />
           </Form.Item>
 
-          <Form.Item name="priority" label="Mức ưu tiên" initialValue={TaskPriority.MEDIUM}>
+          <Form.Item
+            name="priority"
+            label="Mức ưu tiên"
+            initialValue={TaskPriority.MEDIUM}
+            rules={[{ required: isFieldRequired('priority'), message: 'Vui lòng chọn mức ưu tiên' }]}
+          >
             <Select
               options={[
                 { label: <Tag color="green">Thấp</Tag>, value: TaskPriority.LOW },
@@ -1918,6 +1957,20 @@ const ProjectDetailPage: React.FC = () => {
                 { label: <Tag color="orange">Cao</Tag>, value: TaskPriority.HIGH },
                 { label: <Tag color="red">Khẩn cấp</Tag>, value: TaskPriority.URGENT },
               ]}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="assigneeId"
+            label="Người thực hiện"
+            rules={[{ required: isFieldRequired('assignee'), message: 'Vui lòng chọn người thực hiện' }]}
+          >
+            <Select
+              allowClear
+              showSearch
+              placeholder="Chọn người thực hiện"
+              optionFilterProp="label"
+              options={members.map((m) => ({ label: m.fullName || m.username, value: m.userId }))}
             />
           </Form.Item>
 
@@ -1931,9 +1984,23 @@ const ProjectDetailPage: React.FC = () => {
             </Form.Item>
           )}
 
-          <Form.Item name="dueDate" label="Hạn chót">
+          <Form.Item
+            name="dueDate"
+            label="Hạn chót"
+            rules={[{ required: isFieldRequired('dueDate'), message: 'Vui lòng chọn hạn chót' }]}
+          >
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
+
+          {isFieldRequired('estimatedHours') && (
+            <Form.Item
+              name="estimatedHours"
+              label="Giờ ước tính"
+              rules={[{ required: true, message: 'Vui lòng nhập số giờ ước tính' }]}
+            >
+              <InputNumber min={0.5} max={9999} step={0.5} style={{ width: '100%' }} placeholder="VD: 8" />
+            </Form.Item>
+          )}
 
           <Form.Item
             name="sprintId"

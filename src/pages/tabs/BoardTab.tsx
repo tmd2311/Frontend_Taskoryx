@@ -38,11 +38,21 @@ import {
 import { useBoardStore } from '../../stores/boardStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { usePermissionStore } from '../../stores/permissionStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { useNavigate } from 'react-router-dom';
 import { StatusTag } from '../../components/StatusSelect';
 import type { Board, KanbanColumn, TaskSummary } from '../../types';
 import { TaskPriority } from '../../types';
 import dayjs from 'dayjs';
+
+const MAPPED_STATUS_OPTIONS = [
+  { label: 'Cần làm (TODO)', value: 'TODO' },
+  { label: 'Đang làm (IN_PROGRESS)', value: 'IN_PROGRESS' },
+  { label: 'Đang review (IN_REVIEW)', value: 'IN_REVIEW' },
+  { label: 'Đã giải quyết (RESOLVED)', value: 'RESOLVED' },
+  { label: 'Hoàn thành (DONE)', value: 'DONE' },
+  { label: 'Đã huỷ (CANCELLED)', value: 'CANCELLED' },
+];
 
 const { Text } = Typography;
 
@@ -324,6 +334,7 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
   } = useBoardStore();
   const { createTask } = useTaskStore();
   const { hasPermission } = usePermissionStore();
+  const { currentProject, members, membersLoading, fetchMembers } = useProjectStore();
 
   const canEditBoard = hasPermission('BOARD_UPDATE');
   const canCreateTask = hasPermission('TASK_CREATE');
@@ -342,6 +353,9 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
   const [targetColumn, setTargetColumn] = useState<KanbanColumn | null>(null);
   const [taskForm] = Form.useForm();
   const [taskSaving, setTaskSaving] = useState(false);
+
+  const taskFields = currentProject?.projectConfig?.taskFields ?? [];
+  const isFieldRequired = (field: string) => taskFields.includes(field);
 
   // Fetch boards on mount
   useEffect(() => {
@@ -376,34 +390,7 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
 
     if (!canMoveTask) return;
 
-    // Compute midpoint position
-    const targetColId = destination.droppableId;
-    const destIndex = destination.index;
-    const targetCol = columns.find((c) => c.id === targetColId);
-    const destTasks = targetCol ? [...targetCol.tasks] : [];
-
-    // Remove the task from source tasks temporarily for position calculation
-    let newPosition: number;
-    if (destTasks.length === 0) {
-      newPosition = 1.0;
-    } else {
-      const prevTask = destTasks[destIndex - 1];
-      const nextTask = destTasks[destIndex];
-      const prevPos = prevTask?.position ?? 0;
-      const nextPos = nextTask?.position ?? (prevTask?.position ?? 0) + 2;
-      if (!prevTask) {
-        // Dropped at beginning
-        newPosition = (nextPos) / 2;
-      } else if (!nextTask) {
-        // Dropped at end
-        newPosition = prevPos + 1;
-      } else {
-        // Midpoint
-        newPosition = (prevPos + nextPos) / 2;
-      }
-    }
-
-    const req = { targetColumnId: targetColId, newPosition: destIndex };
+    const req = { targetColumnId: destination.droppableId, newPosition: destination.index };
     moveTaskOptimistic(draggableId, req);
     await syncMoveTask(draggableId, req);
   };
@@ -423,6 +410,7 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
       color: col.color || '#1890ff',
       isCompleted: col.isCompleted ?? false,
       taskLimit: col.taskLimit ?? null,
+      mappedStatus: col.mappedStatus ?? undefined,
     });
     setColModalOpen(true);
   };
@@ -430,11 +418,13 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
   const handleColSubmit = async (values: any) => {
     if (!activeBoardId) return;
     setColSaving(true);
+    const isPersonal = activeBoard?.boardType === 'PERSONAL';
     const payload = {
       name: values.name,
       color: typeof values.color === 'string' ? values.color : (values.color?.toHexString?.() ?? '#1890ff'),
-      isCompleted: values.isCompleted ?? false,
+      isCompleted: isPersonal ? undefined : (values.isCompleted ?? false),
       taskLimit: values.taskLimit ?? undefined,
+      mappedStatus: isPersonal ? (values.mappedStatus ?? undefined) : undefined,
     };
     try {
       if (editingCol) {
@@ -465,7 +455,9 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
   const openAddTask = (col: KanbanColumn) => {
     setTargetColumn(col);
     taskForm.resetFields();
+    taskForm.setFieldsValue({ priority: TaskPriority.MEDIUM });
     setTaskModalOpen(true);
+    if (projectId && members.length === 0) fetchMembers(projectId);
   };
 
   const handleTaskSubmit = async (values: any) => {
@@ -477,6 +469,8 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
         description: values.description || undefined,
         priority: (values.priority as import('../../types').TaskPriority) || TaskPriority.MEDIUM,
         dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
+        assigneeId: values.assigneeId || undefined,
+        estimatedHours: values.estimatedHours || undefined,
         boardId: activeBoardId,
         columnId: targetColumn.id,
       };
@@ -506,20 +500,39 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
         {boards.length > 1 && (
           <Select
-            style={{ minWidth: 200, maxWidth: 320 }}
+            style={{ minWidth: 220, maxWidth: 340 }}
             value={activeBoardId || undefined}
             onChange={(v) => setActiveBoardId(v)}
             placeholder="Chọn board"
-            options={boards.map((b) => ({
-              label: (
-                <Space size={6}>
-                  {b.isDefault && <AppstoreOutlined style={{ color: '#1890ff' }} />}
-                  {b.name}
-                  {(b as any).isSprintBoard && <Tag style={{ fontSize: 10, margin: 0 }}>Sprint</Tag>}
-                </Space>
-              ),
-              value: b.id,
-            }))}
+            options={[
+              ...boards.filter((b) => b.isDefault).map((b) => ({
+                label: (
+                  <Space size={6}>
+                    <AppstoreOutlined style={{ color: '#1890ff' }} />
+                    {b.name}
+                  </Space>
+                ),
+                value: b.id,
+              })),
+              ...boards.filter((b) => b.boardType === 'PERSONAL').map((b) => ({
+                label: (
+                  <Space size={6}>
+                    {b.name}
+                    <Tag color="purple" style={{ fontSize: 10, margin: 0 }}>Cá nhân</Tag>
+                  </Space>
+                ),
+                value: b.id,
+              })),
+              ...boards.filter((b) => !b.isDefault && b.boardType !== 'PERSONAL').map((b) => ({
+                label: (
+                  <Space size={6}>
+                    {b.name}
+                    {(b as any).isSprintBoard && <Tag style={{ fontSize: 10, margin: 0 }}>Sprint</Tag>}
+                  </Space>
+                ),
+                value: b.id,
+              })),
+            ]}
           />
         )}
         {boards.length === 1 && (
@@ -635,6 +648,16 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
           >
             <Input placeholder="VD: Việc cần làm, Đang làm, Hoàn thành..." maxLength={80} />
           </Form.Item>
+          {activeBoard?.boardType === 'PERSONAL' && (
+            <Form.Item
+              name="mappedStatus"
+              label="Trạng thái task"
+              tooltip="Khi task được kéo vào cột này, trạng thái task sẽ tự động được cập nhật"
+              rules={[{ required: !editingCol, message: 'Vui lòng chọn trạng thái' }]}
+            >
+              <Select placeholder="Chọn trạng thái tương ứng" options={MAPPED_STATUS_OPTIONS} />
+            </Form.Item>
+          )}
           <Form.Item name="color" label="Màu cột">
             <ColorPicker format="hex" />
           </Form.Item>
@@ -645,9 +668,11 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
           >
             <InputNumber min={1} max={999} style={{ width: '100%' }} placeholder="Không giới hạn" />
           </Form.Item>
-          <Form.Item name="isCompleted" valuePropName="checked">
-            <Checkbox>Cột hoàn thành (task ở đây = Done)</Checkbox>
-          </Form.Item>
+          {activeBoard?.boardType !== 'PERSONAL' && (
+            <Form.Item name="isCompleted" valuePropName="checked">
+              <Checkbox>Cột hoàn thành (task ở đây = Done)</Checkbox>
+            </Form.Item>
+          )}
           <Form.Item style={{ marginBottom: 0 }}>
             <Space>
               <Button type="primary" htmlType="submit" loading={colSaving}>
@@ -696,7 +721,11 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
           <Form.Item name="description" label="Mô tả">
             <Input.TextArea rows={3} placeholder="Mô tả chi tiết (tùy chọn)" maxLength={2000} />
           </Form.Item>
-          <Form.Item name="priority" label="Mức ưu tiên">
+          <Form.Item
+            name="priority"
+            label="Mức ưu tiên"
+            rules={[{ required: isFieldRequired('priority'), message: 'Vui lòng chọn mức ưu tiên' }]}
+          >
             <Select
               options={[
                 { label: <Tag color="green">Thấp</Tag>, value: TaskPriority.LOW },
@@ -706,9 +735,36 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
               ]}
             />
           </Form.Item>
-          <Form.Item name="dueDate" label="Hạn chót">
+          <Form.Item
+            name="assigneeId"
+            label="Người thực hiện"
+            rules={[{ required: isFieldRequired('assignee'), message: 'Vui lòng chọn người thực hiện' }]}
+          >
+            <Select
+              allowClear
+              showSearch
+              loading={membersLoading}
+              placeholder={membersLoading ? 'Đang tải...' : 'Chọn người thực hiện'}
+              optionFilterProp="label"
+              options={members.map((m) => ({ label: m.fullName || m.username, value: m.userId }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="dueDate"
+            label="Hạn chót"
+            rules={[{ required: isFieldRequired('dueDate'), message: 'Vui lòng chọn hạn chót' }]}
+          >
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
+          {isFieldRequired('estimatedHours') && (
+            <Form.Item
+              name="estimatedHours"
+              label="Giờ ước tính"
+              rules={[{ required: true, message: 'Vui lòng nhập số giờ ước tính' }]}
+            >
+              <InputNumber min={0.5} max={9999} step={0.5} style={{ width: '100%' }} placeholder="VD: 8" />
+            </Form.Item>
+          )}
           <Form.Item style={{ marginBottom: 0 }}>
             <Space>
               <Button type="primary" htmlType="submit" loading={taskSaving}>Tạo task</Button>

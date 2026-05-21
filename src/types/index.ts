@@ -165,6 +165,12 @@ export interface RegisterRequest {
 // PROJECT
 // ============================================================
 
+export interface ProjectConfig {
+  taskFields?: string[];
+  enabledModules?: string[];
+  boardType?: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -179,6 +185,7 @@ export interface Project {
   memberCount?: number;
   taskCount?: number;
   currentUserRole?: ProjectRole;
+  projectConfig?: ProjectConfig;
   createdAt: string;
   updatedAt: string;
 }
@@ -384,6 +391,8 @@ export interface Board {
   description?: string;
   position?: number;
   isDefault?: boolean;
+  boardType?: 'KANBAN' | 'SCRUM' | 'PERSONAL';
+  ownerId?: string | null;
   columns?: Column[];
   createdAt?: string;
   updatedAt?: string;
@@ -397,6 +406,7 @@ export interface Column {
   isCompleted?: boolean;
   taskLimit?: number;
   taskCount?: number;
+  mappedStatus?: string | null;
   createdAt?: string;
 }
 
@@ -406,6 +416,8 @@ export interface KanbanBoard {
   boardName: string;
   projectId: string;
   projectKey: string;
+  boardType?: 'KANBAN' | 'SCRUM' | 'PERSONAL';
+  ownerId?: string | null;
   columns: KanbanColumn[];
 }
 
@@ -417,13 +429,14 @@ export interface KanbanColumn {
   isCompleted?: boolean;
   taskLimit?: number;
   taskCount?: number;
+  mappedStatus?: string | null;
   tasks: TaskSummary[];
 }
 
 export interface CreateBoardRequest {
   name: string;
   description?: string;
-  boardType?: 'KANBAN' | 'SCRUM';
+  boardType?: 'KANBAN' | 'SCRUM' | 'PERSONAL';
 }
 
 export interface UpdateBoardRequest {
@@ -436,6 +449,7 @@ export interface CreateColumnRequest {
   color?: string;
   isCompleted?: boolean;
   taskLimit?: number;
+  mappedStatus?: string;
 }
 
 export interface UpdateColumnRequest {
@@ -443,6 +457,7 @@ export interface UpdateColumnRequest {
   color?: string;
   isCompleted?: boolean;
   taskLimit?: number;
+  mappedStatus?: string;
 }
 
 export interface MoveColumnRequest {

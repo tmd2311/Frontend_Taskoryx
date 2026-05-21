@@ -105,6 +105,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
         color: column.color,
         isCompleted: column.isCompleted,
         taskLimit: column.taskLimit,
+        mappedStatus: column.mappedStatus,
         taskCount: 0,
         tasks: [],
       };
@@ -191,6 +192,12 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       });
 
       if (!movedTask) return {};
+
+      // Cập nhật status theo mappedStatus của cột đích (board PERSONAL)
+      const targetCol = state.currentBoard.columns.find((c) => c.id === targetColumnId);
+      if (targetCol?.mappedStatus) {
+        movedTask = { ...movedTask, status: targetCol.mappedStatus as TaskSummary['status'] };
+      }
 
       // Chèn task vào column đích đúng vị trí
       const finalCols = cols.map((col) => {

@@ -61,10 +61,12 @@ Spring Boot API (port 8080)
 | Tính năng | Mô tả |
 |-----------|-------|
 | **Bảng Kanban** | Kéo-thả task giữa các cột với Optimistic Update; kéo-thả sắp xếp cột |
+| **Board cá nhân (PERSONAL)** | Mỗi user có board riêng (boardType: `PERSONAL`); cột gắn `mappedStatus`, kéo task vào cột tự cập nhật trạng thái task |
 | **Backlog** | Danh sách task chưa vào board; chọn task để thêm vào Sprint |
 | **Sprint (Scrum)** | Tạo Sprint, giao task từ Backlog, bắt đầu / hoàn thành Sprint |
 | **Task chi tiết** | 6 tabs: Chi tiết · Checklist · Bình luận · Tệp đính kèm · Giờ làm · Liên kết |
 | **Task liên kết** | Dependency: `BLOCKS` hoặc `RELATES_TO`; phát hiện vòng tròn tự động |
+| **Form tạo task thông minh (taskFields)** | Mỗi dự án cấu hình `projectConfig.taskFields`; form tạo task tự động render đúng các trường bắt buộc (assignee, dueDate, priority, estimatedHours, labels, sprint) |
 | **Gantt Chart** | Xem tiến độ task theo timeline ngày tháng |
 | **Versions** | Quản lý phiên bản/milestone, theo dõi % hoàn thành |
 
@@ -120,6 +122,7 @@ Spring Boot API (port 8080)
 | **Gán / thu hồi Role** | Gán hoặc xóa role cho từng user |
 | **Quản lý Roles** | Tạo/sửa/xóa custom role; system role (`isSystemRole=true`) không thể xóa |
 | **Phân quyền** | Gán/thu hồi permissions cho role; nhóm theo resource; dùng `displayName` từ API |
+| **Quản lý Templates** | CRUD template dự án; admin tạo/sửa/xóa template công khai cho toàn hệ thống |
 
 ---
 
@@ -128,17 +131,17 @@ Spring Boot API (port 8080)
 | Thư viện | Phiên bản | Mục đích |
 |----------|-----------|----------|
 | [React](https://react.dev) | 19.x | UI Framework |
-| [TypeScript](https://typescriptlang.org) | 5.9.x | Static typing |
-| [Vite](https://vitejs.dev) | 7.x | Build tool & Dev server |
-| [Ant Design](https://ant.design) | 6.x | UI Component Library |
-| [Zustand](https://zustand-demo.pmnd.rs) | 5.x | State management (với persist middleware) |
-| [Axios](https://axios-http.com) | 1.x | HTTP client (interceptor auto-refresh token) |
-| [React Router DOM](https://reactrouter.com) | 7.x | Client-side routing |
-| [@hello-pangea/dnd](https://github.com/hello-pangea/dnd) | 18.x | Kéo-thả Kanban board |
-| [@stomp/stompjs](https://stomp-js.github.io) + sockjs-client | 7.x / 1.x | WebSocket realtime |
-| [react-quill-new](https://github.com/VaguelySerious/react-quill-new) + quill-mention | 3.x / 6.x | Rich-text editor + @mention autocomplete |
-| [Recharts](https://recharts.org) | 3.x | Biểu đồ thống kê |
-| [Day.js](https://day.js.org) | 1.x | Xử lý ngày giờ (locale vi) |
+| [TypeScript](https://typescriptlang.org) | ~5.9.3 | Static typing |
+| [Vite](https://vitejs.dev) | ^7.2.4 | Build tool & Dev server |
+| [Ant Design](https://ant.design) | ^6.2.1 | UI Component Library |
+| [Zustand](https://zustand-demo.pmnd.rs) | ^5.0.10 | State management (với persist middleware) |
+| [Axios](https://axios-http.com) | ^1.13.3 | HTTP client (interceptor auto-refresh token) |
+| [React Router DOM](https://reactrouter.com) | ^7.13.0 | Client-side routing |
+| [@hello-pangea/dnd](https://github.com/hello-pangea/dnd) | ^18.0.1 | Kéo-thả Kanban board |
+| [@stomp/stompjs](https://stomp-js.github.io) + sockjs-client | ^7.3.0 / ^1.6.1 | WebSocket realtime |
+| [react-quill-new](https://github.com/VaguelySerious/react-quill-new) + quill-mention | ^3.8.3 / ^6.1.1 | Rich-text editor + @mention autocomplete |
+| [Recharts](https://recharts.org) | ^3.7.0 | Biểu đồ thống kê |
+| [Day.js](https://day.js.org) | ^1.11.19 | Xử lý ngày giờ (locale vi) |
 
 ---
 
@@ -235,17 +238,20 @@ src/
 │   ├── ChangePasswordPage.tsx    # Buộc đổi mật khẩu (sau reset bởi admin)
 │   ├── DashboardPage.tsx         # Tổng quan: thống kê & biểu đồ Recharts
 │   ├── ProjectsPage.tsx          # Danh sách dự án (member + admin view)
-│   ├── ProjectDetailPage.tsx     # Chi tiết dự án (8 tabs: Task · Thành viên ·
-│   │                             #   Backlog · Sprint · Version · Danh mục ·
-│   │                             #   Hoạt động · Gantt)
-│   ├── BoardsPage.tsx            # Kanban board kéo-thả (drag & drop)
+│   ├── ProjectDetailPage.tsx     # Chi tiết dự án (9 tabs: Tasks · Sprints · Board ·
+│   │                             #   Thành viên · Danh mục · Nhãn · Gantt ·
+│   │                             #   Hoạt động · Thống kê)
+│   ├── BoardsPage.tsx            # Kanban board cá nhân (boardType: PERSONAL)
 │   ├── TasksPage.tsx             # Task được giao cho tôi (hỗ trợ ?openTask=)
 │   ├── TaskDetailPage.tsx        # Trang chi tiết task (standalone)
 │   ├── ProfilePage.tsx           # Hồ sơ cá nhân + bật/tắt 2FA
 │   ├── TimeReportPage.tsx        # Báo cáo thời gian (daily/weekly/monthly)
 │   ├── AiProjectPage.tsx         # Tạo dự án bằng AI
 │   ├── AdminUsersPage.tsx        # Quản trị: danh sách & quản lý user
-│   └── AdminRolesPage.tsx        # Quản trị: roles & permissions
+│   ├── AdminRolesPage.tsx        # Quản trị: roles & permissions
+│   ├── AdminTemplatesPage.tsx    # Quản trị: CRUD template dự án
+│   └── tabs/
+│       └── BoardTab.tsx          # Tab board Kanban trong ProjectDetailPage
 │
 ├── services/                     # Tầng gọi API – 1 file = 1 domain
 │   ├── api.ts                    # Axios instance: auto attach token, auto refresh 401
@@ -303,6 +309,7 @@ Tạo file `.env` tại thư mục gốc (tham khảo `.env.example`):
 │  DashboardPage · BoardsPage · TasksPage          │
 │  ProjectDetailPage · TimeReportPage              │
 │  AdminUsersPage · AdminRolesPage · AiProjectPage │
+│  AdminTemplatesPage                              │
 ├──────────────────────────────────────────────────┤
 │                  COMPONENTS                      │
 │  TaskDetailDrawer · NotificationDropdown         │
@@ -316,6 +323,7 @@ Tạo file `.env` tại thư mục gốc (tham khảo `.env.example`):
 │  authStore · taskStore · boardStore              │
 │  projectStore · notificationStore                │
 │  permissionStore · adminStore · themeStore       │
+│  searchStore                                     │
 ├──────────────────────────────────────────────────┤
 │               SERVICE LAYER                      │
 │  taskService · boardService · sprintService      │

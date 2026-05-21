@@ -99,6 +99,12 @@ npm run build     # đảm bảo build thành công
 - Tất cả types/interfaces đặt tại `src/types/index.ts`
 - Không dùng `any` nếu có thể tránh được
 - Đặt tên interface bắt đầu bằng chữ hoa: `TaskSummary`, `CreateTaskRequest`
+- `Project` có thêm field `projectConfig?: ProjectConfig`
+- `ProjectConfig` gồm `taskFields?: string[]`, `enabledModules?: string[]`, `boardType?: string`
+- `Board` có thêm `boardType?: 'KANBAN' | 'SCRUM' | 'PERSONAL'` và `ownerId?: string | null`
+- `Column` / `KanbanColumn` có thêm `mappedStatus?: string | null`
+- `CreateColumnRequest` / `UpdateColumnRequest` có thêm `mappedStatus?: string`
+- `CreateBoardRequest` hỗ trợ `boardType?: 'KANBAN' | 'SCRUM' | 'PERSONAL'`
 
 ### Component
 
@@ -117,6 +123,22 @@ npm run build     # đảm bảo build thành công
 - Chỉ render menu và trang Admin khi `user.permissions` chứa `ADMIN_ACCESS`
 - Dùng `displayName` từ `GET /admin/permissions` để hiển thị tên quyền trên UI, không hardcode
 - Disable thao tác "Vô hiệu hóa" nếu target user là chính mình (`user.id === currentUser.id`)
+- `AdminTemplatesPage` quản lý template công khai, tích hợp với endpoint `/templates`
+
+### Quy ước Board & Task Form
+
+#### Board cá nhân (PERSONAL board)
+
+- `BoardsPage` truyền `boardType: 'PERSONAL'` khi gọi API tạo board.
+- Khi thêm cột vào PERSONAL board, bắt buộc truyền `mappedStatus` trong request — thiếu field này sẽ gây lỗi phía backend.
+- Khi người dùng kéo task sang cột khác, store tự động cập nhật `task.status` bằng giá trị `mappedStatus` của cột đích (optimistic update) — không cần gọi thêm API cập nhật status riêng.
+
+#### Form tạo task động (taskFields)
+
+- Đọc danh sách field được bật từ `currentProject.projectConfig.taskFields` trong store.
+- Dùng helper `isFieldRequired(field: string): boolean` để xác định field nào bắt buộc và đánh dấu required trên form.
+- Áp dụng nhất quán ở: `BoardsPage`, `BoardTab`, `ProjectDetailPage` (cả 2 modal tạo/chỉnh sửa task).
+- Các field có thể required tuỳ cấu hình dự án: `assignee`, `dueDate`, `priority`, `estimatedHours`, `labels`, `sprint`.
 
 ### Style
 
