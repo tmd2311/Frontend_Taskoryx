@@ -20,6 +20,7 @@ import {
   Spin,
   Switch,
   Upload,
+  Tooltip,
 } from 'antd';
 import {
   UserOutlined,
@@ -31,6 +32,7 @@ import {
   SafetyCertificateOutlined,
   QrcodeOutlined,
   CameraOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 type RcFile = File;
 import { useAuthStore } from '../stores/authStore';
@@ -49,6 +51,7 @@ const ProfilePage: React.FC = () => {
   const [twoFaForm] = Form.useForm<{ code: string }>();
 
   const [avatarPreview, setAvatarPreview] = useState<string | undefined>(undefined);
+  const [avatarPreviewVisible, setAvatarPreviewVisible] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -197,14 +200,56 @@ const ProfilePage: React.FC = () => {
       <Card style={{ marginBottom: 24, borderRadius: 8 }}>
         <Row gutter={24} align="middle">
           <Col>
-            <Avatar
-              size={80}
-              src={avatarUrl}
-              icon={!avatarUrl ? <UserOutlined /> : undefined}
-              style={{ background: '#1890ff', fontSize: 32, flexShrink: 0 }}
-            >
-              {!avatarUrl && initial}
-            </Avatar>
+            <div style={{ position: 'relative', display: 'inline-block' }} className="summary-avatar-wrap">
+              {/* Ảnh ẩn để trigger Ant Design Image Preview (zoom/pan/rotate) */}
+              {avatarUrl && (
+                <Image
+                  src={avatarUrl}
+                  style={{ display: 'none' }}
+                  preview={{
+                    visible: avatarPreviewVisible,
+                    onVisibleChange: (v) => setAvatarPreviewVisible(v),
+                  }}
+                />
+              )}
+              <Avatar
+                size={80}
+                src={avatarUrl}
+                icon={!avatarUrl ? <UserOutlined /> : undefined}
+                style={{ background: '#1890ff', fontSize: 32, flexShrink: 0, display: 'block' }}
+              >
+                {!avatarUrl && initial}
+              </Avatar>
+              {/* Overlay: xem ảnh + upload */}
+              <div className="summary-avatar-overlay" style={{
+                position: 'absolute', inset: 0, borderRadius: '50%',
+                background: 'rgba(0,0,0,0.5)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: 8, opacity: 0, transition: 'opacity 0.2s',
+              }}>
+                {avatarUrl && (
+                  <Tooltip title="Xem ảnh">
+                    <EyeOutlined
+                      style={{ color: '#fff', fontSize: 16, cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); setAvatarPreviewVisible(true); }}
+                    />
+                  </Tooltip>
+                )}
+                <Upload
+                  accept="image/*"
+                  showUploadList={false}
+                  beforeUpload={handleAvatarUpload}
+                  disabled={avatarUploading}
+                >
+                  <Tooltip title="Đổi ảnh">
+                    {avatarUploading
+                      ? <Spin size="small" style={{ color: '#fff' }} />
+                      : <CameraOutlined style={{ color: '#fff', fontSize: 16, cursor: 'pointer' }} />}
+                  </Tooltip>
+                </Upload>
+              </div>
+            </div>
+            <style>{`.summary-avatar-wrap:hover .summary-avatar-overlay { opacity: 1 !important; }`}</style>
           </Col>
           <Col flex="auto">
             <Title level={4} style={{ margin: 0 }}>
@@ -229,6 +274,7 @@ const ProfilePage: React.FC = () => {
           </Col>
         </Row>
       </Card>
+
 
       {/* Modal thiết lập 2FA */}
       <Modal
@@ -369,41 +415,6 @@ const ProfilePage: React.FC = () => {
                         </Form.Item>
                       </Col>
                     </Row>
-
-                    <Form.Item label="Ảnh đại diện">
-                      <Upload
-                        accept="image/*"
-                        showUploadList={false}
-                        beforeUpload={handleAvatarUpload}
-                        disabled={avatarUploading}
-                      >
-                        <div style={{ position: 'relative', display: 'inline-block', cursor: 'pointer' }}
-                          className="avatar-upload-wrapper">
-                          <Avatar
-                            size={72}
-                            src={avatarUrl}
-                            icon={!avatarUrl ? <UserOutlined /> : undefined}
-                            style={{ background: '#1890ff', fontSize: 28, display: 'block' }}
-                          >
-                            {!avatarUrl && initial}
-                          </Avatar>
-                          <div style={{
-                            position: 'absolute', inset: 0, borderRadius: '50%',
-                            background: 'rgba(0,0,0,0.45)', display: 'flex',
-                            alignItems: 'center', justifyContent: 'center',
-                            opacity: avatarUploading ? 1 : 0,
-                            transition: 'opacity 0.2s',
-                          }}
-                            className="avatar-overlay"
-                          >
-                            {avatarUploading
-                              ? <Spin size="small" style={{ color: '#fff' }} />
-                              : <CameraOutlined style={{ color: '#fff', fontSize: 20 }} />}
-                          </div>
-                        </div>
-                      </Upload>
-                      <style>{`.avatar-upload-wrapper:hover .avatar-overlay { opacity: 1 !important; }`}</style>
-                    </Form.Item>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                       <Button
