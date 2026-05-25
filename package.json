@@ -9,7 +9,12 @@
     "start": "concurrently \"npm run api\" \"npm run dev\"",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:auth": "playwright test e2e/auth.setup.ts"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -28,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.60.0",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",

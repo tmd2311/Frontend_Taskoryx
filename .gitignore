@@ -34,4 +34,9 @@ dist-ssr
 AI/
 .mcp.json
 
+# Playwright
+playwright-report/
+test-results/
+e2e/.auth/
+
 docs
