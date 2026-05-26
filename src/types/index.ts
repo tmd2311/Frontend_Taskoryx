@@ -197,7 +197,8 @@ export interface ProjectMember {
   email: string;
   fullName?: string;
   avatarUrl?: string;
-  role: ProjectRole;
+  role: string;          // built-in hoặc custom role name
+  roleDescription?: string;
   joinedAt: string;
 }
 
@@ -221,11 +222,22 @@ export interface UpdateProjectRequest {
 
 export interface AddMemberRequest {
   email: string;
-  role?: ProjectRole;
+  role?: string;
 }
 
 export interface UpdateMemberRoleRequest {
-  role: ProjectRole;
+  role: string;
+}
+
+export interface CustomRole {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  isDefault: boolean;
+  permissions: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ============================================================
@@ -970,10 +982,12 @@ export interface ActivityLog {
   userId: string;
   username?: string;
   userFullName?: string;
+  userName?: string;       // API v3.1 field (maps to userFullName)
   userAvatar?: string;
   action: string;
   entityType?: string;
   entityId?: string;
+  entityTitle?: string;    // API v3.1: tên rút gọn đối tượng (VD: "TX-42 - Sửa bug")
   description: string;
   oldValue?: string | null;
   newValue?: string | null;

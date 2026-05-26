@@ -63,14 +63,18 @@ const DEP_TYPE_LABEL: Record<string, string> = {
 const ACTION_LABEL: Record<string, string> = {
   CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xóa',
   MOVE: 'Di chuyển', ASSIGN: 'Phân công', COMPLETE: 'Hoàn thành',
+  STATUS_CHANGE: 'Đổi trạng thái',
+  COMMENT_ADDED: 'Bình luận', COMMENT_UPDATED: 'Sửa BL', COMMENT_DELETED: 'Xóa BL',
+  MEMBER_ADDED: 'Thêm TV', MEMBER_REMOVED: 'Xóa TV',
+  SPRINT_STARTED: 'Bắt đầu Sprint', SPRINT_COMPLETED: 'Kết thúc Sprint',
 };
 const ACTION_COLOR: Record<string, string> = {
-  CREATE: '#22c55e', UPDATE: '#3b82f6', DELETE: '#ef4444',
+  CREATE: '#22c55e', UPDATE: '#4361ee', DELETE: '#ef4444',
   MOVE: '#f59e0b', ASSIGN: '#8b5cf6', COMPLETE: '#10b981',
-};
-const ACTION_TAG_COLOR: Record<string, string> = {
-  CREATE: 'success', UPDATE: 'processing', DELETE: 'error',
-  MOVE: 'warning', ASSIGN: 'purple', COMPLETE: 'cyan',
+  STATUS_CHANGE: '#0ea5e9',
+  COMMENT_ADDED: '#6366f1', COMMENT_UPDATED: '#6366f1', COMMENT_DELETED: '#ef4444',
+  MEMBER_ADDED: '#22c55e', MEMBER_REMOVED: '#f43f5e',
+  SPRINT_STARTED: '#4361ee', SPRINT_COMPLETED: '#10b981',
 };
 
 // ─── Icon file theo extension ────────────────────────────────
@@ -1374,60 +1378,166 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
             {/* ═══════════ LỊCH SỬ HOẠT ĐỘNG ═══════════ */}
             {activeTab === 'history' && (
               <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <Text type="secondary" style={{ fontSize: 13 }}>Lịch sử thay đổi task</Text>
-                  <Button size="small" icon={<ReloadOutlined />} onClick={() => taskId && fetchTaskActivity(taskId)} loading={activityLoading}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <HistoryOutlined style={{ color: '#4361ee', fontSize: 15 }} />
+                    <Text strong style={{ fontSize: 13 }}>Lịch sử hoạt động</Text>
+                  </div>
+                  <Button size="small" icon={<ReloadOutlined />} onClick={() => taskId && fetchTaskActivity(taskId)} loading={activityLoading} style={{ borderRadius: 6 }}>
                     Làm mới
                   </Button>
                 </div>
+
                 {activityLoading ? (
                   <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
                 ) : taskActivity.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '30px 0', color: '#bfbfbf' }}>
-                    <HistoryOutlined style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
-                    Chưa có lịch sử hoạt động
+                  <div style={{ textAlign: 'center', padding: '36px 0' }}>
+                    <div style={{
+                      width: 52, height: 52, borderRadius: 14, margin: '0 auto 10px',
+                      background: isDark ? '#252842' : '#f5f5f5',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: `1px solid ${borderColor}`,
+                    }}>
+                      <HistoryOutlined style={{ fontSize: 22, color: isDark ? '#555' : '#bfbfbf' }} />
+                    </div>
+                    <Text type="secondary" style={{ fontSize: 13 }}>Chưa có lịch sử hoạt động</Text>
                   </div>
                 ) : (
-                  <div style={{ borderLeft: `2px solid ${borderColor}`, paddingLeft: 16 }}>
-                    {taskActivity.map((log) => (
-                      <div key={log.id} style={{ marginBottom: 16, position: 'relative' }}>
-                        <div style={{
-                          position: 'absolute', left: -23, top: 4,
-                          width: 12, height: 12, borderRadius: '50%',
-                          background: ACTION_COLOR[log.action] ?? '#d9d9d9',
-                          border: `2px solid ${isDark ? '#1c1f2e' : '#fff'}`,
-                        }} />
-                        <Space size={8} align="start">
-                          <Avatar size={28} src={resolveAvatarUrl(log.userAvatar)} icon={<UserOutlined />} />
-                          <div style={{ flex: 1 }}>
-                            <Space size={4} wrap>
-                              <Text strong style={{ fontSize: 13 }}>{log.userFullName || log.username}</Text>
-                              <Tag color={ACTION_TAG_COLOR[log.action]} style={{ margin: 0, fontSize: 11 }}>
-                                {ACTION_LABEL[log.action] ?? log.action}
-                              </Tag>
-                              <Text type="secondary" style={{ fontSize: 11 }}>{dayjs(log.createdAt).fromNow()}</Text>
-                            </Space>
-                            {log.description && (
-                              <div style={{ fontSize: 12, color: subColor, marginTop: 2 }}>{log.description}</div>
-                            )}
-                            {(log.oldValue || log.newValue) && (() => {
-                              const parseVal = (v: string | null | undefined) => {
-                                if (!v) return null;
-                                try { return JSON.stringify(JSON.parse(v), null, 2); } catch { return v; }
+                  /* Timeline */
+                  <div style={{ position: 'relative', paddingLeft: 32 }}>
+                    {/* Vertical line */}
+                    <div style={{
+                      position: 'absolute', left: 11, top: 6, bottom: 6,
+                      width: 2,
+                      background: `linear-gradient(to bottom, ${borderColor} 0%, ${borderColor} 100%)`,
+                      borderRadius: 2,
+                    }} />
+
+                    {taskActivity.map((log, idx) => {
+                      const accentColor = ACTION_COLOR[log.action] ?? '#8c8c8c';
+                      const isLast = idx === taskActivity.length - 1;
+
+                      const parseVal = (v: string | null | undefined): string | null => {
+                        if (!v) return null;
+                        try {
+                          const parsed = JSON.parse(v);
+                          return Object.entries(parsed as Record<string, unknown>)
+                            .filter(([k, val]) => !['assigneeId','userId','taskId'].includes(k) && val !== null && val !== undefined && val !== '')
+                            .map(([k, val]) => {
+                              const labels: Record<string, string> = {
+                                status: 'Trạng thái', priority: 'Độ ưu tiên', assigneeName: 'Người phụ trách',
+                                title: 'Tiêu đề', columnName: 'Cột', sprintName: 'Sprint',
+                                fullName: 'Tên', email: 'Email', role: 'Vai trò', preview: 'Nội dung', taskKey: 'Task',
                               };
-                              const oldStr = parseVal(log.oldValue);
-                              const newStr = parseVal(log.newValue);
-                              return (
-                                <div style={{ marginTop: 4, fontSize: 11, fontFamily: 'monospace', lineHeight: 1.6 }}>
-                                  {oldStr && <div style={{ color: '#ff7875', background: isDark ? '#3d1f1f' : '#fff1f0', padding: '2px 6px', borderRadius: 3, marginBottom: 2 }}>- {oldStr}</div>}
-                                  {newStr && <div style={{ color: '#73d13d', background: isDark ? '#1a3022' : '#f6ffed', padding: '2px 6px', borderRadius: 3 }}>+ {newStr}</div>}
+                              return `${labels[k] ?? k}: ${val}`;
+                            }).join('  ·  ');
+                        } catch { return v; }
+                      };
+                      const oldStr = parseVal(log.oldValue);
+                      const newStr = parseVal(log.newValue);
+                      const hasDiff = !!(oldStr || newStr);
+
+                      return (
+                        <div key={log.id} style={{ position: 'relative', marginBottom: isLast ? 0 : 16 }}>
+                          {/* Dot */}
+                          <div style={{
+                            position: 'absolute', left: -26, top: 8,
+                            width: 16, height: 16, borderRadius: '50%',
+                            background: `${accentColor}20`,
+                            border: `2px solid ${accentColor}`,
+                            zIndex: 1,
+                          }} />
+
+                          {/* Card */}
+                          <div style={{
+                            borderRadius: 9,
+                            border: `1px solid ${borderColor}`,
+                            background: isDark ? '#1e2133' : '#fff',
+                            overflow: 'hidden',
+                            transition: 'border-color 0.15s',
+                          }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = accentColor + '55'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = borderColor; }}
+                          >
+                            {/* Top strip */}
+                            <div style={{ height: 3, background: `linear-gradient(90deg, ${accentColor}, ${accentColor}33)` }} />
+
+                            <div style={{ padding: '9px 12px' }}>
+                              {/* Row: avatar + name + badge + time */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                                <Avatar
+                                  size={24}
+                                  src={resolveAvatarUrl(log.userAvatar)}
+                                  icon={<UserOutlined />}
+                                  style={{ flexShrink: 0, border: `2px solid ${accentColor}30` }}
+                                />
+                                <Text strong style={{ fontSize: 12.5, color: isDark ? '#d4d7f0' : '#1a1a2e' }}>
+                                  {log.userName || log.userFullName || log.username}
+                                </Text>
+                                <span style={{
+                                  fontSize: 11, fontWeight: 700,
+                                  padding: '1px 8px', borderRadius: 20,
+                                  color: '#fff', background: accentColor,
+                                  lineHeight: '18px',
+                                }}>
+                                  {ACTION_LABEL[log.action] ?? log.action}
+                                </span>
+                                <Tooltip title={dayjs(log.createdAt).format('DD/MM/YYYY HH:mm:ss')}>
+                                  <Text type="secondary" style={{ marginLeft: 'auto', fontSize: 11, whiteSpace: 'nowrap' }}>
+                                    {dayjs(log.createdAt).fromNow()}
+                                  </Text>
+                                </Tooltip>
+                              </div>
+
+                              {/* Description */}
+                              {log.description && (
+                                <div style={{
+                                  fontSize: 12, marginTop: 7, lineHeight: 1.6,
+                                  color: isDark ? '#9397b0' : '#555',
+                                  padding: '5px 9px',
+                                  background: isDark ? '#252842' : '#f8f9fb',
+                                  borderRadius: 6,
+                                  borderLeft: `3px solid ${accentColor}`,
+                                }}>
+                                  {log.description}
                                 </div>
-                              );
-                            })()}
+                              )}
+
+                              {/* Diff pills */}
+                              {hasDiff && (
+                                <div style={{ marginTop: 7, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                                  {oldStr && (
+                                    <span style={{
+                                      padding: '2px 9px', borderRadius: 20,
+                                      background: isDark ? '#3d1f1f' : '#fff1f0',
+                                      color: isDark ? '#ff7875' : '#cf1322',
+                                      fontSize: 11, fontWeight: 500,
+                                      border: `1px solid ${isDark ? '#5c2020' : '#ffa39e'}`,
+                                    }}>
+                                      <span style={{ opacity: 0.6, marginRight: 3 }}>trước</span>{oldStr}
+                                    </span>
+                                  )}
+                                  {oldStr && newStr && (
+                                    <span style={{ color: subColor, fontSize: 13 }}>→</span>
+                                  )}
+                                  {newStr && (
+                                    <span style={{
+                                      padding: '2px 9px', borderRadius: 20,
+                                      background: isDark ? '#1a3022' : '#f6ffed',
+                                      color: isDark ? '#73d13d' : '#389e0d',
+                                      fontSize: 11, fontWeight: 500,
+                                      border: `1px solid ${isDark ? '#274d2a' : '#b7eb8f'}`,
+                                    }}>
+                                      <span style={{ opacity: 0.6, marginRight: 3 }}>sau</span>{newStr}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </Space>
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </>

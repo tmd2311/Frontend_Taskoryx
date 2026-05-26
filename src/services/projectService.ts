@@ -6,6 +6,7 @@ import type {
   ProjectMember,
   AddMemberRequest,
   UpdateMemberRoleRequest,
+  CustomRole,
   Label,
   CreateLabelRequest,
   MentionedUser,
@@ -72,13 +73,19 @@ export const projectService = {
     return response.data ?? response;
   },
 
-  /** PUT /projects/:id/members/:userId/role */
+  /** PATCH /projects/:id/members/:userId/role */
   updateMemberRole: async (
     projectId: string,
     userId: string,
     data: UpdateMemberRoleRequest
   ): Promise<ProjectMember> => {
-    const response: any = await api.put(`/projects/${projectId}/members/${userId}/role`, data);
+    const response: any = await api.patch(`/projects/${projectId}/members/${userId}/role`, data);
+    return response.data ?? response;
+  },
+
+  /** GET /projects/:id/roles — danh sách custom roles của project */
+  getProjectRoles: async (projectId: string): Promise<CustomRole[]> => {
+    const response: any = await api.get(`/projects/${projectId}/roles`);
     return response.data ?? response;
   },
 

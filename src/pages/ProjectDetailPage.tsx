@@ -61,14 +61,26 @@ const PRIORITY_LABEL: Record<string, string> = {
 const ACT_LABEL: Record<string, string> = {
   CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Đã xóa',
   MOVE: 'Di chuyển', ASSIGN: 'Phân công', COMPLETE: 'Hoàn thành',
+  STATUS_CHANGE: 'Đổi trạng thái',
+  COMMENT_ADDED: 'Bình luận', COMMENT_UPDATED: 'Sửa BL', COMMENT_DELETED: 'Xóa BL',
+  MEMBER_ADDED: 'Thêm TV', MEMBER_REMOVED: 'Xóa TV',
+  SPRINT_STARTED: 'Bắt đầu Sprint', SPRINT_COMPLETED: 'Kết thúc Sprint',
 };
 const ACT_COLOR: Record<string, string> = {
   CREATE: '#10b981', UPDATE: '#4361ee', DELETE: '#ef4444',
   MOVE: '#f59e0b', ASSIGN: '#8b5cf6', COMPLETE: '#06b6d4',
+  STATUS_CHANGE: '#0ea5e9',
+  COMMENT_ADDED: '#6366f1', COMMENT_UPDATED: '#6366f1', COMMENT_DELETED: '#ef4444',
+  MEMBER_ADDED: '#10b981', MEMBER_REMOVED: '#f43f5e',
+  SPRINT_STARTED: '#4361ee', SPRINT_COMPLETED: '#10b981',
 };
-const ACT_BG: Record<string, string> = {
-  CREATE: 'rgba(16,185,129,0.08)', UPDATE: 'rgba(67,97,238,0.08)', DELETE: 'rgba(239,68,68,0.08)',
-  MOVE: 'rgba(245,158,11,0.08)', ASSIGN: 'rgba(139,92,246,0.08)', COMPLETE: 'rgba(6,182,212,0.08)',
+const ACT_ICON: Record<string, string> = {
+  CREATE: '✦', UPDATE: '✎', DELETE: '✕',
+  MOVE: '⇢', ASSIGN: '◈', COMPLETE: '✔',
+  STATUS_CHANGE: '⟳',
+  COMMENT_ADDED: '◉', COMMENT_UPDATED: '◉', COMMENT_DELETED: '◉',
+  MEMBER_ADDED: '⊕', MEMBER_REMOVED: '⊖',
+  SPRINT_STARTED: '▶', SPRINT_COMPLETED: '⬛',
 };
 const ENTITY_LABEL: Record<string, string> = {
   TASK: 'Task', COMMENT: 'Bình luận', PROJECT: 'Dự án',
@@ -313,6 +325,7 @@ const ProjectDetailPage: React.FC = () => {
   const [labelSaving, setLabelSaving] = useState(false);
   const [labelColor, setLabelColor] = useState<string>('#1890ff');
 
+
   // Activity
   const [activity, setActivity] = useState<ActivityLog[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -522,6 +535,7 @@ const ProjectDetailPage: React.FC = () => {
       message.error(e.message || 'Xóa thành viên thất bại');
     }
   };
+
 
   // ── Sprints ───────────────────────────────────────────────
   const handleSaveSprint = async (values: any) => {
@@ -836,15 +850,11 @@ const ProjectDetailPage: React.FC = () => {
     },
     {
       title: 'Vai trò', dataIndex: 'role', key: 'role', width: 180,
-      render: (role: string) => {
-        const labels: Record<string, string> = {
-          OWNER: 'Quản trị viên', MANAGER: 'Quản lý', DEVELOPER: 'Lập trình viên', VIEWER: 'Người xem',
-        };
-        const colors: Record<string, string> = {
-          OWNER: 'gold', MANAGER: 'blue', DEVELOPER: 'green', VIEWER: 'default',
-        };
-        return <Tag color={colors[role] ?? 'default'}>{labels[role] ?? role}</Tag>;
-      },
+      render: (role: string, m: ProjectMember) => (
+        <Tooltip title={m.roleDescription || undefined}>
+          <Tag color="blue">{role}</Tag>
+        </Tooltip>
+      ),
     },
     {
       title: 'Tham gia', dataIndex: 'joinedAt', key: 'joinedAt', width: 130,
@@ -1359,21 +1369,22 @@ const ProjectDetailPage: React.FC = () => {
           {/* Header */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 20,
+            marginBottom: 24,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{
-                width: 32, height: 32, borderRadius: 8,
-                background: 'rgba(67,97,238,0.1)',
+                width: 34, height: 34, borderRadius: 9,
+                background: 'linear-gradient(135deg,rgba(67,97,238,0.15),rgba(99,102,241,0.08))',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '1px solid rgba(67,97,238,0.18)',
               }}>
-                <HistoryOutlined style={{ color: '#4361ee', fontSize: 15 }} />
+                <HistoryOutlined style={{ color: '#4361ee', fontSize: 16 }} />
               </div>
               <div>
-                <div style={{ fontWeight: 600, fontSize: 14, lineHeight: 1.2 }}>Nhật ký hoạt động</div>
+                <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2, color: token.colorText }}>Nhật ký hoạt động</div>
                 {activityTotal > 0 && (
-                  <div style={{ fontSize: 11, color: token.colorTextSecondary, marginTop: 1 }}>
-                    {activityTotal} sự kiện được ghi lại
+                  <div style={{ fontSize: 12, color: token.colorTextSecondary, marginTop: 2 }}>
+                    {activityTotal} sự kiện · cập nhật mới nhất
                   </div>
                 )}
               </div>
@@ -1383,7 +1394,7 @@ const ProjectDetailPage: React.FC = () => {
               icon={<ReloadOutlined />}
               onClick={() => fetchActivity(0)}
               loading={activityLoading}
-              style={{ borderRadius: 6 }}
+              style={{ borderRadius: 7, fontWeight: 500 }}
             >
               Làm mới
             </Button>
@@ -1396,137 +1407,188 @@ const ProjectDetailPage: React.FC = () => {
               <Text type="secondary" style={{ fontSize: 13 }}>Đang tải lịch sử…</Text>
             </div>
           ) : activity.length === 0 ? (
-            <div style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center',
-              padding: '60px 0', gap: 12,
-            }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 0', gap: 12 }}>
               <div style={{
-                width: 56, height: 56, borderRadius: 16,
-                background: 'rgba(67,97,238,0.06)',
+                width: 60, height: 60, borderRadius: 18,
+                background: token.colorFillAlter,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: `1px solid ${token.colorBorderSecondary}`,
               }}>
-                <HistoryOutlined style={{ fontSize: 24, color: '#bfbfbf' }} />
+                <HistoryOutlined style={{ fontSize: 26, color: token.colorTextDisabled }} />
               </div>
               <Text type="secondary" style={{ fontSize: 13 }}>Chưa có hoạt động nào</Text>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {activity.map((a) => {
+            /* Timeline layout */
+            <div style={{ position: 'relative', paddingLeft: 36 }}>
+              {/* Vertical line */}
+              <div style={{
+                position: 'absolute', left: 15, top: 8, bottom: 8,
+                width: 2, background: token.colorBorderSecondary, borderRadius: 2,
+              }} />
+
+              {activity.map((a, idx) => {
                 const accentColor = ACT_COLOR[a.action] ?? '#8c8c8c';
-                const bgTint = ACT_BG[a.action] ?? 'transparent';
+                const icon = ACT_ICON[a.action] ?? '·';
+
                 const parseVal = (v: string | null | undefined): string | null => {
                   if (!v) return null;
                   try {
                     const parsed = JSON.parse(v);
                     return Object.entries(parsed as Record<string, unknown>)
-                      .map(([k, val]) => `${k}: ${val}`)
-                      .join(' · ');
+                      .filter(([, val]) => val !== null && val !== undefined && val !== '')
+                      .map(([k, val]) => {
+                        const labels: Record<string, string> = {
+                          status: 'Trạng thái', priority: 'Độ ưu tiên', assigneeName: 'Người phụ trách',
+                          title: 'Tiêu đề', columnName: 'Cột', sprintName: 'Sprint',
+                          fullName: 'Tên', email: 'Email', role: 'Vai trò', preview: 'Nội dung',
+                          taskKey: 'Task', assigneeId: '', userId: '', taskId: '',
+                        };
+                        if (['assigneeId','userId','taskId'].includes(k)) return null;
+                        return `${labels[k] ?? k}: ${val}`;
+                      })
+                      .filter(Boolean)
+                      .join('  ·  ');
                   } catch { return v; }
                 };
                 const oldStr = parseVal(a.oldValue);
                 const newStr = parseVal(a.newValue);
                 const hasDiff = !!(oldStr || newStr);
+                const isLast = idx === activity.length - 1;
 
                 return (
-                  <div
-                    key={a.id}
-                    style={{
-                      display: 'flex',
-                      gap: 0,
+                  <div key={a.id} style={{ position: 'relative', marginBottom: isLast ? 0 : 18 }}>
+                    {/* Timeline dot */}
+                    <div style={{
+                      position: 'absolute', left: -28, top: 10,
+                      width: 22, height: 22, borderRadius: '50%',
+                      background: `${accentColor}18`,
+                      border: `2px solid ${accentColor}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 9, color: accentColor, fontWeight: 700,
+                      zIndex: 1,
+                    }}>
+                      {icon}
+                    </div>
+
+                    {/* Card */}
+                    <div style={{
                       borderRadius: 10,
+                      border: `1px solid ${token.colorBorderSecondary}`,
+                      background: token.colorBgContainer,
                       overflow: 'hidden',
-                      border: '1px solid var(--card-border, #e8eaf0)',
-                      background: 'var(--colorBgContainer, #fff)',
-                      transition: 'box-shadow 0.15s',
+                      transition: 'border-color 0.15s, box-shadow 0.15s',
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)')}
-                    onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
-                  >
-                    {/* Left accent bar */}
-                    <div style={{ width: 4, flexShrink: 0, background: accentColor }} />
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLDivElement).style.borderColor = accentColor + '60';
+                        (e.currentTarget as HTMLDivElement).style.boxShadow = `0 2px 10px ${accentColor}14`;
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLDivElement).style.borderColor = token.colorBorderSecondary;
+                        (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
+                      }}
+                    >
+                      {/* Top accent strip */}
+                      <div style={{ height: 3, background: `linear-gradient(90deg, ${accentColor}, ${accentColor}44)` }} />
 
-                    {/* Content */}
-                    <div style={{ flex: 1, padding: '10px 14px' }}>
-                      {/* Top row */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <Avatar
-                          size={26}
-                          src={resolveAvatarUrl(a.userAvatar)}
-                          icon={<UserOutlined />}
-                          style={{ flexShrink: 0 }}
-                        />
-                        <span style={{ fontWeight: 600, fontSize: 13 }}>
-                          {a.userFullName || a.username || 'Người dùng'}
-                        </span>
+                      <div style={{ padding: '10px 14px' }}>
+                        {/* Row 1: avatar + name + action badge + entity + time */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <Avatar
+                            size={28}
+                            src={resolveAvatarUrl(a.userAvatar)}
+                            icon={<UserOutlined />}
+                            style={{ flexShrink: 0, border: `2px solid ${accentColor}30` }}
+                          />
+                          <span style={{ fontWeight: 600, fontSize: 13, color: token.colorText }}>
+                            {a.userName || a.userFullName || a.username || 'Người dùng'}
+                          </span>
 
-                        {/* Action badge */}
-                        <span style={{
-                          fontSize: 11, fontWeight: 600, letterSpacing: '0.02em',
-                          padding: '1px 7px', borderRadius: 20,
-                          color: accentColor, background: bgTint,
-                          border: `1px solid ${accentColor}33`,
-                          lineHeight: '18px',
-                        }}>
-                          {ACT_LABEL[a.action] ?? a.action}
-                        </span>
-
-                        {/* Entity type chip */}
-                        {a.entityType && (
+                          {/* Action badge */}
                           <span style={{
-                            fontSize: 11, padding: '1px 7px', borderRadius: 20,
-                            color: '#595959', background: 'rgba(0,0,0,0.04)',
-                            border: '1px solid rgba(0,0,0,0.08)',
+                            fontSize: 11, fontWeight: 700, letterSpacing: '0.03em',
+                            padding: '2px 8px', borderRadius: 20,
+                            color: '#fff',
+                            background: accentColor,
                             lineHeight: '18px',
                           }}>
-                            {ENTITY_LABEL[a.entityType] ?? a.entityType}
+                            {ACT_LABEL[a.action] ?? a.action}
                           </span>
+
+                          {/* Entity chip */}
+                          {a.entityType && (
+                            <Tooltip title={a.entityTitle || undefined}>
+                              <span style={{
+                                fontSize: 11, padding: '2px 7px', borderRadius: 20,
+                                color: token.colorTextSecondary,
+                                background: token.colorFillAlter,
+                                border: `1px solid ${token.colorBorderSecondary}`,
+                                lineHeight: '18px',
+                                cursor: a.entityTitle ? 'help' : 'default',
+                              }}>
+                                {ENTITY_LABEL[a.entityType] ?? a.entityType}
+                              </span>
+                            </Tooltip>
+                          )}
+
+                          {/* Timestamp */}
+                          <Tooltip title={dayjs(a.createdAt).format('DD/MM/YYYY HH:mm:ss')}>
+                            <span style={{
+                              marginLeft: 'auto', fontSize: 11,
+                              color: token.colorTextQuaternary, whiteSpace: 'nowrap',
+                            }}>
+                              {dayjs(a.createdAt).fromNow()}
+                            </span>
+                          </Tooltip>
+                        </div>
+
+                        {/* Description */}
+                        {a.description && (
+                          <div style={{
+                            fontSize: 13, marginTop: 8, lineHeight: 1.6,
+                            color: token.colorTextSecondary,
+                            padding: '6px 10px',
+                            background: token.colorFillAlter,
+                            borderRadius: 6,
+                            borderLeft: `3px solid ${accentColor}`,
+                          }}>
+                            {a.description}
+                          </div>
                         )}
 
-                        {/* Timestamp — pushed right */}
-                        <span style={{
-                          marginLeft: 'auto', fontSize: 11,
-                          color: token.colorTextSecondary, whiteSpace: 'nowrap',
-                        }}>
-                          {dayjs(a.createdAt).fromNow()}
-                        </span>
+                        {/* Diff pills */}
+                        {hasDiff && (
+                          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {oldStr && (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                padding: '3px 10px', borderRadius: 20,
+                                background: token.colorErrorBg,
+                                color: token.colorError,
+                                fontSize: 11, fontWeight: 500,
+                                border: `1px solid ${token.colorErrorBorder}`,
+                              }}>
+                                <span style={{ opacity: 0.7 }}>trước</span> {oldStr}
+                              </span>
+                            )}
+                            {oldStr && newStr && (
+                              <span style={{ color: token.colorTextQuaternary, fontSize: 13, alignSelf: 'center' }}>→</span>
+                            )}
+                            {newStr && (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                padding: '3px 10px', borderRadius: 20,
+                                background: token.colorSuccessBg,
+                                color: token.colorSuccess,
+                                fontSize: 11, fontWeight: 500,
+                                border: `1px solid ${token.colorSuccessBorder}`,
+                              }}>
+                                <span style={{ opacity: 0.7 }}>sau</span> {newStr}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
-
-                      {/* Description */}
-                      {a.description && (
-                        <div style={{ fontSize: 13, color: '#595959', marginTop: 6, lineHeight: 1.5 }}>
-                          {a.description}
-                        </div>
-                      )}
-
-                      {/* Diff block */}
-                      {hasDiff && (
-                        <div style={{
-                          marginTop: 8, borderRadius: 6, overflow: 'hidden',
-                          border: '1px solid rgba(0,0,0,0.07)',
-                          fontSize: 11, fontFamily: "'Fira Code', 'Cascadia Code', monospace",
-                          lineHeight: 1.7,
-                        }}>
-                          {oldStr && (
-                            <div style={{
-                              padding: '3px 10px',
-                              background: 'rgba(239,68,68,0.06)',
-                              color: '#cf1322',
-                              borderBottom: newStr ? '1px solid rgba(0,0,0,0.05)' : undefined,
-                            }}>
-                              − {oldStr}
-                            </div>
-                          )}
-                          {newStr && (
-                            <div style={{
-                              padding: '3px 10px',
-                              background: 'rgba(16,185,129,0.06)',
-                              color: '#389e0d',
-                            }}>
-                              + {newStr}
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
@@ -1536,13 +1598,13 @@ const ProjectDetailPage: React.FC = () => {
 
           {/* Load more */}
           {activityTotal > activity.length && (
-            <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <div style={{ textAlign: 'center', marginTop: 20 }}>
               <Button
                 onClick={() => fetchActivity(activityPage + 1)}
                 loading={activityLoading}
-                style={{ borderRadius: 8, minWidth: 160 }}
+                style={{ borderRadius: 8, minWidth: 180, fontWeight: 500 }}
               >
-                Tải thêm · {activity.length}/{activityTotal}
+                Tải thêm · {activity.length} / {activityTotal}
               </Button>
             </div>
           )}

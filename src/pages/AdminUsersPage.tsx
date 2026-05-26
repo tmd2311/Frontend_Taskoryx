@@ -9,7 +9,6 @@ import {
   Tag,
   Avatar,
   Tooltip,
-  Popconfirm,
   Modal,
   Form,
   message,
@@ -33,6 +32,8 @@ import {
   MailOutlined,
   CopyOutlined,
   LockOutlined,
+  PlusOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 import type { TableColumnsType } from 'antd';
 type ColumnsType<T> = TableColumnsType<T>;
@@ -85,9 +86,12 @@ const AdminUsersPage: React.FC = () => {
 
   // Modal gán role
   const [roleModalOpen, setRoleModalOpen] = useState(false);
-  const [roleTargetUser, setRoleTargetUser] = useState<AdminUser | null>(null);
-  const [roleSaving, setRoleSaving] = useState(false);
-  const [selectedRoleId, setSelectedRoleId] = useState<string>('');
+  const [roleTargetUserId, setRoleTargetUserId] = useState<string | null>(null);
+  const [roleAssigning, setRoleAssigning] = useState(false);
+  const [roleRemoving, setRoleRemoving] = useState<string | null>(null); // roleId đang xóa
+
+  // Luôn đọc từ store để có data mới nhất
+  const roleTargetUser = users.find((u) => u.id === roleTargetUserId) ?? null;
 
   // Modal hiển thị temporary password sau khi tạo user
   const [tempPasswordModal, setTempPasswordModal] = useState<{ open: boolean; password: string; username: string }>({
@@ -232,34 +236,34 @@ const AdminUsersPage: React.FC = () => {
   };
 
   // ── Gán / xóa role ────────────────────────────────────────
-  const openAssignRole = (user: AdminUser) => {
-    setRoleTargetUser(user);
-    setSelectedRoleId('');
+  const openRoleModal = (user: AdminUser) => {
+    setRoleTargetUserId(user.id);
     setRoleModalOpen(true);
   };
 
-  const handleAssignRole = async () => {
-    if (!roleTargetUser || !selectedRoleId) return;
-    setRoleSaving(true);
+  const handleAssignRole = async (roleId: string) => {
+    if (!roleTargetUser) return;
+    setRoleAssigning(true);
     try {
-      await assignRole(roleTargetUser.id, { roleId: selectedRoleId });
+      await assignRole(roleTargetUser.id, { roleId });
       message.success('Đã gán vai trò');
-      setRoleModalOpen(false);
-      reload();
     } catch (e: any) {
       message.error(e.message || 'Gán vai trò thất bại');
     } finally {
-      setRoleSaving(false);
+      setRoleAssigning(false);
     }
   };
 
-  const handleRemoveRole = async (userId: string, roleId: string, roleName: string) => {
+  const handleRemoveRole = async (roleId: string, roleName: string) => {
+    if (!roleTargetUser) return;
+    setRoleRemoving(roleId);
     try {
-      await removeRole(userId, roleId);
-      message.success(`Đã xóa vai trò ${roleName}`);
-      reload();
+      await removeRole(roleTargetUser.id, roleId);
+      message.success(`Đã thu hồi "${roleName}"`);
     } catch (e: any) {
-      message.error(e.message || 'Xóa vai trò thất bại');
+      message.error(e.message || 'Thu hồi vai trò thất bại');
+    } finally {
+      setRoleRemoving(null);
     }
   };
 
@@ -294,32 +298,28 @@ const AdminUsersPage: React.FC = () => {
     {
       title: 'Vai trò hệ thống',
       key: 'roles',
-      width: 220,
+      width: 260,
       render: (_: unknown, u: AdminUser) => (
         <Space size={4} wrap>
           {u.roles && u.roles.length > 0 ? (
             u.roles.map((r: any) => (
-              <Popconfirm
+              <Tag
                 key={r.id}
-                title={`Xóa vai trò "${r.displayName || r.name}" khỏi người dùng này?`}
-                onConfirm={() => handleRemoveRole(u.id, r.id, r.displayName || r.name)}
-                okText="Xóa"
-                cancelText="Hủy"
-                okButtonProps={{ danger: true }}
-                disabled={r.isSystemRole}
+                color={r.name.includes('ADMIN') || r.name.includes('SUPER') ? 'red' : 'blue'}
               >
-                <Tag
-                  color={r.name.includes('ADMIN') || r.name.includes('SUPER') ? 'red' : 'blue'}
-                  style={{ cursor: r.isSystemRole ? 'default' : 'pointer' }}
-                  title={r.isSystemRole ? 'Vai trò hệ thống, không thể xóa' : 'Nhấn để xóa vai trò'}
-                >
-                  {r.displayName || r.name}
-                </Tag>
-              </Popconfirm>
+                {r.displayName || r.name}
+              </Tag>
             ))
           ) : (
             <Text type="secondary" style={{ fontSize: 12 }}>Chưa có vai trò</Text>
           )}
+          <Tooltip title="Quản lý vai trò">
+            <Tag
+              onClick={() => openRoleModal(u)}
+              style={{ cursor: 'pointer', borderStyle: 'dashed' }}
+              icon={<EditOutlined />}
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -371,8 +371,8 @@ const AdminUsersPage: React.FC = () => {
           {
             key: 'role',
             icon: <UserOutlined />,
-            label: 'Gán vai trò',
-            onClick: () => openAssignRole(u),
+            label: 'Quản lý vai trò',
+            onClick: () => openRoleModal(u),
           },
           {
             key: 'reset',
@@ -579,45 +579,82 @@ const AdminUsersPage: React.FC = () => {
         </Form>
       </Modal>
 
-      {/* Modal gán vai trò */}
+      {/* Modal quản lý vai trò */}
       <Modal
         title={
           <Space>
-            <UserOutlined />
-            Gán vai trò — {roleTargetUser?.fullName || roleTargetUser?.username}
+            <UserOutlined style={{ color: '#4361ee' }} />
+            <span>Vai trò — <strong>{roleTargetUser?.fullName || roleTargetUser?.username}</strong></span>
           </Space>
         }
         open={roleModalOpen}
-        onCancel={() => setRoleModalOpen(false)}
-        onOk={handleAssignRole}
-        okText="Gán vai trò"
-        cancelText="Hủy"
-        confirmLoading={roleSaving}
-        okButtonProps={{ disabled: !selectedRoleId }}
+        onCancel={() => { setRoleModalOpen(false); setRoleTargetUserId(null); }}
+        footer={<Button onClick={() => { setRoleModalOpen(false); setRoleTargetUserId(null); }}>Đóng</Button>}
         destroyOnHidden
+        width={480}
       >
-        <div style={{ marginTop: 12 }}>
-          {roleTargetUser && roleTargetUser.roles?.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <Text type="secondary" style={{ fontSize: 13 }}>Vai trò hiện tại:</Text>
-              <div style={{ marginTop: 6 }}>
-                {roleTargetUser.roles.map((r) => (
-                  <Tag key={r.id} color="blue">{r.displayName || r.name}</Tag>
-                ))}
-              </div>
+        {roleTargetUser && (
+          <div style={{ marginTop: 4 }}>
+            {/* Vai trò hiện có */}
+            <div style={{ marginBottom: 16 }}>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+                Vai trò đang được gán
+              </Text>
+              {roleTargetUser.roles?.length > 0 ? (
+                <Space size={6} wrap>
+                  {roleTargetUser.roles.map((r) => (
+                    <Tag
+                      key={r.id}
+                      color={r.name.includes('ADMIN') || r.name.includes('SUPER') ? 'red' : 'blue'}
+                      closeIcon={roleRemoving === r.id ? <span style={{ fontSize: 10 }}>…</span> : <CloseOutlined style={{ fontSize: 10 }} />}
+                      onClose={(e) => { e.preventDefault(); handleRemoveRole(r.id, r.displayName || r.name); }}
+                      style={{ fontSize: 13, padding: '3px 10px', userSelect: 'none' }}
+                    >
+                      {r.displayName || r.name}
+                    </Tag>
+                  ))}
+                </Space>
+              ) : (
+                <Text type="secondary" style={{ fontSize: 13 }}>Chưa có vai trò nào</Text>
+              )}
             </div>
-          )}
-          <Select
-            placeholder="Chọn vai trò muốn gán"
-            style={{ width: '100%' }}
-            value={selectedRoleId || undefined}
-            onChange={(v) => setSelectedRoleId(v)}
-            options={roles
-              .filter((r) => !roleTargetUser?.roles?.some((ur) => ur.id === r.id))
-              .map((r) => ({ label: r.displayName || r.name, value: r.id }))}
-            notFoundContent={<Text type="secondary">Người dùng đã có tất cả vai trò</Text>}
-          />
-        </div>
+
+            {/* Divider */}
+            <div style={{ borderTop: '1px solid #f0f0f0', margin: '16px 0' }} />
+
+            {/* Gán thêm role */}
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+              Gán thêm vai trò
+            </Text>
+            {(() => {
+              const assignable = roles.filter(
+                (r) => !roleTargetUser.roles?.some((ur) => ur.id === r.id)
+              );
+              if (assignable.length === 0) {
+                return <Text type="secondary" style={{ fontSize: 13 }}>Người dùng đã có tất cả vai trò</Text>;
+              }
+              return (
+                <Space size={6} wrap>
+                  {assignable.map((r) => (
+                    <Tag
+                      key={r.id}
+                      icon={roleAssigning ? undefined : <PlusOutlined />}
+                      onClick={() => !roleAssigning && handleAssignRole(r.id)}
+                      style={{
+                        cursor: roleAssigning ? 'not-allowed' : 'pointer',
+                        borderStyle: 'dashed',
+                        fontSize: 13, padding: '3px 10px',
+                        opacity: roleAssigning ? 0.5 : 1,
+                      }}
+                    >
+                      {r.displayName || r.name}
+                    </Tag>
+                  ))}
+                </Space>
+              );
+            })()}
+          </div>
+        )}
       </Modal>
 
       {/* Modal hiển thị mật khẩu tạm thời */}

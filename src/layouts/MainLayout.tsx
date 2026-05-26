@@ -55,7 +55,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   // Detect active project tab from URL
   const searchParams = new URLSearchParams(location.search);
-  const activeProjectTab = searchParams.get('tab') || 'tasks';
+  const activeProjectTab = searchParams.get('tab') || 'stats';
 
   const isInProject = !!currentProject;
   const isTaskDetail = /^\/tasks\/[^/]+/.test(location.pathname);
