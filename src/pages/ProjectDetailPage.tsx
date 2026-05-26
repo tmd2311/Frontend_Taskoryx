@@ -256,7 +256,7 @@ const ProjectDetailPage: React.FC = () => {
 
   // Derived shorthand
   const page = taskFilter.page;
-  const activeTab = searchParams.get('tab') || 'tasks';
+  const activeTab = searchParams.get('tab') || 'stats';
 
   // Members
   const [addModalOpen, setAddModalOpen] = useState(false);

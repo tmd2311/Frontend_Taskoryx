@@ -28,49 +28,47 @@ async function openProjectSprints(page: any) {
   await expect(page).toHaveURL(/\/projects\/\w+/, { timeout: 10000 });
   await waitForSpinner(page);
 
-  // Click tab Sprints
-  const sprintTab = page.getByRole('tab', { name: /sprint/i });
-  await sprintTab.waitFor({ state: 'visible', timeout: 5000 });
-  await sprintTab.click();
+  // App dùng sidebar menu với ?tab= query param thay vì tabs
+  const sprintMenuItem = page.locator('.ant-menu-item').filter({ hasText: /sprints?/i }).first();
+  await sprintMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+  await sprintMenuItem.click();
   await waitForSpinner(page);
 }
 
 test('TC-SPRINT-001: Xem danh sách sprint trong project', async ({ page }) => {
   await openProjectSprints(page);
 
-  // Sprint list hoặc empty state
+  // Sprint list — có nút "Tạo Sprint" hoặc sprint card
   await expect(
-    page.locator('[class*="sprint"], .ant-collapse, .ant-list, .ant-empty').first(),
+    page.getByRole('button', { name: /tạo sprint/i }).or(page.getByText(/sprint đang chạy/i)).first(),
   ).toBeVisible({ timeout: 8000 });
 });
 
 test('TC-SPRINT-002: Tạo sprint mới', async ({ page }) => {
   await openProjectSprints(page);
 
-  const createBtn = page.getByRole('button', { name: /tạo sprint|create sprint|thêm sprint/i }).first();
-  if (!(await createBtn.isVisible({ timeout: 3000 }))) {
-    // Fallback: nút tạo generic
-    await page.getByRole('button', { name: /tạo|create|new/i }).first().click();
-  } else {
-    await createBtn.click();
-  }
+  const createBtn = page.getByRole('button', { name: /tạo sprint/i }).first();
+  await createBtn.waitFor({ state: 'visible', timeout: 5000 });
+  await createBtn.click();
 
-  const modal = await waitForModal(page, undefined, 5000);
-
-  const nameInput = modal.locator('input[placeholder*="tên" i], input[placeholder*="name" i], input#name').first();
+  // Chờ modal — placeholder thực là "VD: Sprint 1", không phải "tên"
+  const nameInput = page.locator('input[placeholder*="Sprint 1" i], input[placeholder*="VD:" i]').first();
+  await nameInput.waitFor({ state: 'visible', timeout: 8000 });
   await nameInput.fill(sprintName);
 
-  const goalInput = modal.locator('input[placeholder*="mục tiêu" i], input[placeholder*="goal" i], textarea').first();
-  if (await goalInput.isVisible()) {
+  // Mục tiêu Sprint — textarea
+  const goalInput = page.locator('textarea[placeholder*="mục tiêu" i], textarea[placeholder*="sprint" i]').first();
+  if (await goalInput.isVisible({ timeout: 1000 })) {
     await goalInput.fill('E2E sprint goal');
   }
 
-  await modal.locator('button[type="submit"]').or(
-    page.locator('.ant-modal-footer button').filter({ hasText: /tạo|create|lưu|save/i })
-  ).first().click();
+  // Nút "Tạo Sprint" trong modal (không phải nút ngoài trang)
+  await page.getByRole('button', { name: /^tạo sprint$/i }).first().click();
 
-  await expectSuccessMessage(page, 8000);
-  await expect(page.getByText(sprintName)).toBeVisible({ timeout: 8000 });
+  // Toast biến mất quá nhanh — chờ modal đóng rồi check sprint trong list
+  await page.locator('.ant-modal-content').waitFor({ state: 'hidden', timeout: 8000 }).catch(() => {});
+  // getByText có thể match nhiều element (strong + span) — dùng first()
+  await expect(page.getByText(sprintName).first()).toBeVisible({ timeout: 8000 });
 });
 
 test('TC-SPRINT-003: Bắt đầu sprint (PLANNED → ACTIVE)', async ({ page }) => {
@@ -84,18 +82,15 @@ test('TC-SPRINT-003: Bắt đầu sprint (PLANNED → ACTIVE)', async ({ page })
 
   await startBtn.click();
 
-  // Confirm dialog nếu có
-  const confirmBtn = page.locator('.ant-modal-confirm-btns .ant-btn-primary, .ant-popconfirm-buttons .ant-btn-primary');
-  if (await confirmBtn.isVisible({ timeout: 3000 })) {
-    await confirmBtn.click();
-  }
+  // Popconfirm "Bắt đầu sprint này?" — bấm nút "Bắt đầu" trong popconfirm
+  const confirmBtn = page.locator('.ant-popconfirm-buttons .ant-btn-primary, .ant-modal-confirm-btns .ant-btn-primary');
+  await confirmBtn.waitFor({ state: 'visible', timeout: 5000 });
+  await confirmBtn.click();
 
-  await expectSuccessMessage(page, 8000);
-
-  // Sprint chuyển thành ACTIVE
+  // Toast biến mất nhanh — kiểm tra "SPRINT ĐANG CHẠY" xuất hiện thay vì toast
   await expect(
-    page.locator('[class*="active"], .ant-tag').filter({ hasText: /active|đang chạy/i }).first(),
-  ).toBeVisible({ timeout: 5000 });
+    page.getByText(/sprint đang chạy/i).first(),
+  ).toBeVisible({ timeout: 8000 });
 });
 
 test('TC-SPRINT-004: Xem backlog của sprint', async ({ page }) => {
@@ -115,9 +110,10 @@ test('TC-SPRINT-004: Xem backlog của sprint', async ({ page }) => {
     await waitForSpinner(page);
   }
 
+  // Sprint content — có "Sprint Goal" hoặc nút "Thêm task"
   await expect(
-    page.locator('.ant-collapse-content-active, [class*="sprint-content"], .ant-list').first(),
-  ).toBeVisible({ timeout: 5000 });
+    page.getByText('Sprint Goal').or(page.getByText(/thêm task/i)).first(),
+  ).toBeVisible({ timeout: 8000 });
 });
 
 test('TC-SPRINT-005: Xem Kanban của sprint đang active', async ({ page }) => {

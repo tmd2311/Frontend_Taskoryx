@@ -5,6 +5,8 @@ type MessageHandler = (body: any) => void;
 
 let stompClient: Client | null = null;
 const subscriptions: Map<string, any> = new Map();
+const extraNotifListeners: Map<string, MessageHandler> = new Map();
+const aiPlanReadyListeners: Map<string, MessageHandler> = new Map();
 
 export const websocketService = {
   async connect(handlers: {
@@ -21,21 +23,34 @@ export const websocketService = {
       const SockJS = SockJSModule.default;
 
       stompClient = new Client({
-        // SockJS protocol – backend yêu cầu
         webSocketFactory: () => new (SockJS as any)(`${config.apiBaseUrl}/ws`),
         connectHeaders: { Authorization: `Bearer ${token}` },
         reconnectDelay: 10000,
         onConnect: () => {
+          // /user/queue/notifications — notification chuẩn
           if (handlers.onNotification) {
             const sub = stompClient!.subscribe('/user/queue/notifications', (msg) => {
               try {
-                handlers.onNotification!(JSON.parse(msg.body));
+                const parsed = JSON.parse(msg.body);
+                handlers.onNotification!(parsed);
+                extraNotifListeners.forEach((fn) => { try { fn(parsed); } catch { /* */ } });
               } catch {
                 // bỏ qua parse error
               }
             });
             subscriptions.set('/user/queue/notifications', sub);
           }
+
+          // /user/queue/ai-plan-ready — event chuyên biệt khi AI generate xong
+          const aiSub = stompClient!.subscribe('/user/queue/ai-plan-ready', (msg) => {
+            try {
+              const parsed = JSON.parse(msg.body);
+              aiPlanReadyListeners.forEach((fn) => { try { fn(parsed); } catch { /* */ } });
+            } catch {
+              // bỏ qua parse error
+            }
+          });
+          subscriptions.set('/user/queue/ai-plan-ready', aiSub);
         },
         onStompError: () => {
           // lỗi STOMP – sẽ tự reconnect sau reconnectDelay
@@ -90,5 +105,23 @@ export const websocketService = {
 
   isConnected() {
     return stompClient?.connected ?? false;
+  },
+
+  // Listeners cho /user/queue/notifications
+  addNotificationListener(key: string, handler: MessageHandler) {
+    extraNotifListeners.set(key, handler);
+  },
+
+  removeNotificationListener(key: string) {
+    extraNotifListeners.delete(key);
+  },
+
+  // Listeners cho /user/queue/ai-plan-ready
+  addAiPlanReadyListener(key: string, handler: MessageHandler) {
+    aiPlanReadyListeners.set(key, handler);
+  },
+
+  removeAiPlanReadyListener(key: string) {
+    aiPlanReadyListeners.delete(key);
   },
 };

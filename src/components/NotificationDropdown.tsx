@@ -45,7 +45,21 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
 };
 
 // ─── Tính URL đích từ notification ───────────────────────────
+const AI_PLAN_NOTIF_TITLES = new Set([
+  'Kế hoạch AI đã sẵn sàng',
+  'Sinh kế hoạch AI thất bại',
+  'Tạo dự án AI thất bại',
+]);
+
 function getNotifTarget(notif: Notification): string | null {
+  // Tạo dự án AI thành công → vào thẳng trang dự án
+  if (notif.title === 'Tạo dự án AI thành công' && notif.relatedId) {
+    return `/projects/${notif.relatedId}`;
+  }
+  // Thông báo AI khác → mở trang AI để xem/retry
+  if (AI_PLAN_NOTIF_TITLES.has(notif.title)) {
+    return '/ai-project';
+  }
   if (notif.relatedType === NotificationRelatedType.TASK) {
     return `/tasks?openTask=${notif.relatedId}`;
   }

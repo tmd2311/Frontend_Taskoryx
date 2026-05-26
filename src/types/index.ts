@@ -1093,12 +1093,23 @@ export interface AiTask {
   sub_tasks: AiSubTask[];
 }
 
+export interface AiSprint {
+  name: string;
+  goal: string;
+  sprint_number: number;
+  duration_days: number;
+  start_offset_days: number;
+  tasks: AiTask[];
+}
+
 export interface AiProjectPlan {
   project_name: string;
   project_description: string;
   project_key: string;
   total_duration_days: number;
-  tasks: AiTask[];
+  sprints: AiSprint[];
+  /** @deprecated legacy flat tasks field — use sprints instead */
+  tasks?: AiTask[];
 }
 
 export interface AiGenerateRequest {
@@ -1106,23 +1117,42 @@ export interface AiGenerateRequest {
   language?: 'vi' | 'en';
 }
 
-export interface AiGenerateResponse {
-  plan: AiProjectPlan;
-  totalTaskCount: number;
-  modelUsed: string;
+export type AiSessionStatus = 'GENERATING' | 'READY' | 'FAILED';
+export type AiJobStatus = 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED';
+
+export interface AiSessionResponse {
+  sessionId: string;
+  status: AiSessionStatus;
+  message: string;
+  requirement?: string;
+  plan: AiProjectPlan | null;
+  totalTaskCount?: number;
+  modelUsed?: string;
+  errorMessage?: string | null;
+  createdAt?: string;
+  finishedAt?: string | null;
+}
+
+export interface AiJobResponse {
+  jobId: string;
+  status: AiJobStatus;
+  message: string;
+  resultProjectId: string | null;
+  resultProjectKey?: string | null;
+  resultProjectName?: string | null;
+  tasksCreated?: number;
+  subTasksCreated?: number;
+  sprintsCreated?: number;
+  errorMessage?: string | null;
+  createdAt?: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
 }
 
 export interface AiConfirmRequest {
   plan: AiProjectPlan;
+  sessionId?: string | null;
   targetProjectId?: string | null;
-}
-
-export interface AiConfirmResponse {
-  projectId: string;
-  projectKey: string;
-  projectName: string;
-  tasksCreated: number;
-  subTasksCreated: number;
 }
 
 // ============================================================

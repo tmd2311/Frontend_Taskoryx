@@ -6,7 +6,7 @@
  * - TC-PERM-002: Admin truy cập được tất cả route
  * - TC-PERM-003: Logout clear session và block access
  */
-import { test, expect, browser } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { TEST_USERS, ADMIN_AUTH_FILE } from '../fixtures/test-data';
 import { loginViaUI } from '../helpers/auth.helper';
 import { waitForSpinner } from '../helpers/wait.helper';
@@ -40,8 +40,9 @@ test('TC-PERM-003: Unauthenticated user bị redirect về /login', async ({ bro
 
   const protectedRoutes = ['/dashboard', '/tasks', '/projects', '/profile'];
 
+  // Dùng relative URL — playwright.config.ts đã set baseURL đúng
   for (const route of protectedRoutes) {
-    await page.goto(process.env.BASE_URL ? `${process.env.BASE_URL}${route}` : route);
+    await page.goto(route);
     await expect(page).toHaveURL(/\/login/, { timeout: 8000 });
   }
 

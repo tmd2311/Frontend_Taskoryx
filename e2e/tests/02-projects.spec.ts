@@ -41,50 +41,59 @@ test('TC-PRJ-002: Tạo dự án mới thành công', async ({ page }) => {
   await waitForSpinner(page);
 
   // Bấm nút tạo mới
-  const createBtn = page
-    .getByRole('button', { name: /tạo|create|mới|new/i })
-    .first();
-  await createBtn.waitFor({ state: 'visible', timeout: 5000 });
+  const createBtn = page.getByRole('button', { name: /tạo dự án/i }).first();
+  await createBtn.waitFor({ state: 'visible', timeout: 8000 });
   await createBtn.click();
 
-  const modal = await waitForModal(page, undefined, 8000);
+  // Chờ modal xuất hiện — dùng modal title để tránh timing issue
+  await page.getByText('Tạo dự án mới').waitFor({ state: 'visible', timeout: 10000 });
 
-  // Điền tên dự án
-  const nameInput = modal.locator('input[placeholder*="tên" i], input[placeholder*="name" i], input#name, input[id*="name"]').first();
-  await nameInput.fill(projectName);
+  // Bước 1: chọn template "Trống" rồi click "Tiếp theo →"
+  await page.locator('text=Trống').first().click();
+  await page.getByRole('button', { name: /tiếp theo/i }).click();
 
-  // Điền key dự án nếu không tự generate
-  const keyInput = modal.locator('input[placeholder*="key" i], input#key, input[id*="key"]').first();
-  if (await keyInput.isVisible()) {
-    await keyInput.fill(projectKey);
-  }
+  // Bước 2: Form không có name prop → Ant Design tạo ID #key và #name
+  await page.locator('input#key').waitFor({ state: 'visible', timeout: 8000 });
+  await page.locator('input#key').fill(projectKey);
+  await page.locator('input#name').fill(projectName);
 
   // Submit
-  await modal.locator('button[type="submit"]').or(
-    page.locator('.ant-modal-footer button').filter({ hasText: /tạo|create|lưu|save/i })
-  ).first().click();
+  await page.getByRole('button', { name: /tạo dự án/i }).last().click();
 
-  await expectSuccessMessage(page, 8000);
+  // Chờ modal đóng (tạo thành công thì modal biến mất)
+  await page.locator('.ant-modal-content').waitFor({ state: 'hidden', timeout: 10000 });
 
-  // Dự án mới xuất hiện trong danh sách
-  await expect(page.getByText(projectName)).toBeVisible({ timeout: 8000 });
+  // Sau khi tạo: app navigate sang trang project hoặc về danh sách
+  await waitForSpinner(page);
+
+  // Xác nhận: hoặc đang ở trang project detail, hoặc thấy tên project trong list
+  const currentUrl = page.url();
+  if (!currentUrl.match(/\/projects\/[a-zA-Z0-9]+$/)) {
+    await expect(page.getByText(projectName)).toBeVisible({ timeout: 8000 });
+  }
 });
 
 test('TC-PRJ-003: Validation tạo dự án — tên bắt buộc', async ({ page }) => {
   await page.goto('/projects');
   await waitForSpinner(page);
 
-  const createBtn = page.getByRole('button', { name: /tạo|create|mới|new/i }).first();
+  const createBtn = page.getByRole('button', { name: /tạo dự án/i }).first();
   await createBtn.click();
-  const modal = await waitForModal(page, undefined, 5000);
+  // Dùng modal title text thay vì .ant-modal-content để tránh timing issue
+  await page.getByText('Tạo dự án mới').waitFor({ state: 'visible', timeout: 8000 });
 
-  // Submit không điền gì
-  await modal.locator('button[type="submit"]').or(
-    page.locator('.ant-modal-footer button').filter({ hasText: /tạo|create|lưu|save/i })
-  ).first().click();
+  // Bước 1: chọn template Trống → Tiếp theo
+  await page.locator('text=Trống').first().click();
+  await page.getByRole('button', { name: /tiếp theo/i }).click();
+
+  // Bước 2: chờ form xuất hiện (field key đầu tiên)
+  await page.locator('input[placeholder*="PSBS" i], input[placeholder*="key" i]').first()
+    .waitFor({ state: 'visible', timeout: 5000 });
+  // Submit không điền gì — kiểm tra validation
+  await page.getByRole('button', { name: /tạo dự án/i }).last().click();
 
   // Validation message xuất hiện
-  await expect(modal.locator('.ant-form-item-explain-error').first())
+  await expect(page.locator('.ant-form-item-explain-error').first())
     .toBeVisible({ timeout: 3000 });
 
   // Đóng modal
@@ -136,8 +145,8 @@ test('TC-PRJ-006: Tab Members hiển thị danh sách thành viên', async ({ pa
   await expect(page).toHaveURL(/\/projects\/\w+/);
   await waitForSpinner(page);
 
-  // Click tab Members
-  const membersTab = page.getByRole('tab', { name: /member|thành viên/i });
+  // App dùng sidebar menu item thay vì tab
+  const membersTab = page.locator('.ant-menu-item').filter({ hasText: /thành viên|member/i }).first();
   await membersTab.waitFor({ state: 'visible', timeout: 5000 });
   await membersTab.click();
   await waitForSpinner(page);
@@ -158,16 +167,35 @@ test('TC-PRJ-007: Tìm kiếm dự án theo tên', async ({ page }) => {
     return;
   }
 
-  // Lấy tên project đầu tiên đang hiển thị để search
-  const firstCard = page.locator('.ant-card-meta-title, .ant-list-item-meta-title, tr.ant-table-row td').first();
-  const firstProjectName = await firstCard.textContent({ timeout: 5000 });
+  // Lấy project name từ card đầu tiên bằng innerText (có whitespace đúng hơn textContent)
+  // Cấu trúc card: Avatar(1 char) → div[fontWeight700: project.name] → Text[project.key]
+  const firstCard = page.locator('.ant-card').first();
+  await firstCard.waitFor({ state: 'visible', timeout: 8000 });
+
+  // Dùng evaluate innerText để lấy text với line-break đúng
+  const rawText = await firstCard.evaluate((el) => (el as HTMLElement).innerText);
+  // innerText trả về dạng: "N\nNewman Project Updated\nNWM\n..."
+  // Bỏ dòng 1 char (avatar), lấy dòng đầu tiên có > 2 ký tự
+  const lines = rawText.split('\n').map(t => t.trim()).filter(t => t.length > 2);
+  const firstProjectName = lines[0] ?? null;
+
   if (!firstProjectName) {
     test.skip(true, 'No projects found to search');
     return;
   }
 
-  await searchInput.fill(firstProjectName.trim().substring(0, 6));
-  await page.waitForTimeout(600);
+  // Search bằng 4 ký tự đầu của tên project
+  await searchInput.fill(firstProjectName.substring(0, 4));
+
+  // Bấm icon search hoặc Enter
+  const searchBtn = page.locator('button').filter({ has: page.locator('[data-icon="search"]') }).first();
+  if (await searchBtn.isVisible({ timeout: 1000 })) {
+    await searchBtn.click();
+  } else {
+    await page.keyboard.press('Enter');
+  }
+
+  await waitForSpinner(page);
 
   const rows = page.locator('.ant-card, .ant-list-item, tr.ant-table-row');
   const count = await rows.count();

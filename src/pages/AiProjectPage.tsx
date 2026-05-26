@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Typography,
   Card,
@@ -14,6 +14,7 @@ import {
   Row,
   Col,
   Tooltip,
+  Progress,
 } from 'antd';
 import {
   RobotOutlined,
@@ -23,14 +24,21 @@ import {
   ClockCircleOutlined,
   UnorderedListOutlined,
   CaretRightOutlined,
+  LoadingOutlined,
+  ExclamationCircleOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { aiService } from '../services/aiService';
-import type { AiGenerateResponse, AiTask, AiSubTask } from '../types';
+import { websocketService } from '../services/websocketService';
+import type { AiSprint, AiTask, AiSubTask, AiSessionResponse, AiJobResponse } from '../types';
 import { useThemeStore } from '../stores/themeStore';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
+
+// step: 'form' | 'waiting' | 'preview' | 'confirming' | 'error'
+type Step = 'form' | 'waiting' | 'preview' | 'confirming' | 'error';
 
 const PRIORITY_COLOR: Record<string, string> = {
   LOW: '#22c55e',
@@ -46,93 +54,117 @@ const PRIORITY_LABEL: Record<string, string> = {
   URGENT: 'Khẩn cấp',
 };
 
+const addDays = (date: Date, n: number) => new Date(date.getTime() + n * 86400000);
+const fmtDate = (d: Date) => d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+
 const PriorityBadge: React.FC<{ priority: string }> = ({ priority }) => (
   <Tag
     style={{
-      background: PRIORITY_COLOR[priority] + '20',
-      color: PRIORITY_COLOR[priority],
-      border: `1px solid ${PRIORITY_COLOR[priority]}40`,
+      background: (PRIORITY_COLOR[priority] ?? '#888') + '20',
+      color: PRIORITY_COLOR[priority] ?? '#888',
+      border: `1px solid ${(PRIORITY_COLOR[priority] ?? '#888')}40`,
       fontWeight: 600,
       fontSize: 11,
       borderRadius: 4,
       padding: '0 6px',
+      flexShrink: 0,
     }}
   >
     {PRIORITY_LABEL[priority] || priority}
   </Tag>
 );
 
-interface TaskNodeProps {
-  task: AiTask | AiSubTask;
-  isSubtask?: boolean;
-  isDark: boolean;
-}
-
-const TaskNode: React.FC<TaskNodeProps> = ({ task, isSubtask = false, isDark }) => {
-  const hasChildren = task.sub_tasks && task.sub_tasks.length > 0;
-
-  if (hasChildren && !isSubtask) {
-    return (
-      <Collapse
-        ghost
-        expandIcon={({ isActive }) => (
-          <CaretRightOutlined rotate={isActive ? 90 : 0} style={{ color: '#4361ee' }} />
-        )}
-        style={{ marginBottom: 6 }}
-      >
-        <Collapse.Panel
-          key="1"
-          header={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-              <PriorityBadge priority={task.priority} />
-              <Text strong style={{ fontSize: 13 }}>{task.title}</Text>
-              <Text type="secondary" style={{ fontSize: 12, marginLeft: 'auto' }}>
-                <ClockCircleOutlined style={{ marginRight: 4 }} />
-                {task.duration_days} ngày
-              </Text>
-            </div>
-          }
-          style={{
-            background: isDark ? '#1c1f2e' : '#f8f9ff',
-            border: `1px solid ${isDark ? '#2e3250' : '#e8ecff'}`,
-            borderRadius: 8,
-          }}
-        >
-          {task.description && (
-            <Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
-              {task.description}
-            </Paragraph>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 8 }}>
-            {task.sub_tasks.map((sub, idx) => (
-              <TaskNode key={idx} task={sub} isSubtask isDark={isDark} />
-            ))}
-          </div>
-        </Collapse.Panel>
-      </Collapse>
-    );
-  }
-
-  return (
+const TaskRow: React.FC<{ task: AiTask | AiSubTask; depth?: number; isDark: boolean }> = ({
+  task, depth = 0, isDark,
+}) => (
+  <>
     <div
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: 8,
-        padding: '6px 10px',
+        padding: '5px 8px',
+        paddingLeft: 8 + depth * 20,
         borderRadius: 6,
-        background: isDark ? '#232638' : '#fafafa',
+        background: isDark ? (depth > 0 ? '#1a1d2e' : '#232638') : (depth > 0 ? '#f5f5f5' : '#fafafa'),
         border: `1px solid ${isDark ? '#2e3250' : '#f0f0f0'}`,
-        marginBottom: 4,
+        marginBottom: 3,
       }}
     >
-      <span style={{ color: isDark ? '#3d4268' : '#ccc', fontSize: 11 }}>├─</span>
+      {depth > 0 && (
+        <span style={{ color: isDark ? '#3d4268' : '#ccc', fontSize: 11, flexShrink: 0 }}>└─</span>
+      )}
       <PriorityBadge priority={task.priority} />
       <Text style={{ fontSize: 12, flex: 1 }}>{task.title}</Text>
       <Text type="secondary" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+        <ClockCircleOutlined style={{ marginRight: 3 }} />
         {task.duration_days} ngày
       </Text>
     </div>
+    {task.sub_tasks?.map((sub, j) => (
+      <TaskRow key={j} task={sub} depth={depth + 1} isDark={isDark} />
+    ))}
+  </>
+);
+
+const SprintPanel: React.FC<{
+  sprint: AiSprint;
+  today: Date;
+  isDark: boolean;
+  defaultOpen: boolean;
+}> = ({ sprint, today, isDark, defaultOpen }) => {
+  const sStart = addDays(today, sprint.start_offset_days);
+  const sEnd = addDays(sStart, sprint.duration_days);
+  const cardBg = isDark ? '#1c1f2e' : '#ffffff';
+  const borderColor = isDark ? '#2e3250' : '#eef0f6';
+
+  return (
+    <Collapse
+      defaultActiveKey={defaultOpen ? ['1'] : []}
+      expandIcon={({ isActive }) => (
+        <CaretRightOutlined rotate={isActive ? 90 : 0} style={{ color: '#4361ee' }} />
+      )}
+      style={{ marginBottom: 10, borderRadius: 10, overflow: 'hidden' }}
+    >
+      <Collapse.Panel
+        key="1"
+        header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+            <Text strong style={{ fontSize: 14 }}>{sprint.name}</Text>
+            <Tag style={{ borderRadius: 4, fontSize: 11, flexShrink: 0 }}>
+              <ClockCircleOutlined style={{ marginRight: 3 }} />
+              {sprint.duration_days} ngày
+            </Tag>
+            <Text type="secondary" style={{ fontSize: 12, marginLeft: 'auto' }}>
+              {fmtDate(sStart)} → {fmtDate(sEnd)}
+            </Text>
+          </div>
+        }
+        style={{ background: cardBg, border: `1px solid ${borderColor}` }}
+      >
+        {sprint.goal && (
+          <Paragraph
+            type="secondary"
+            italic
+            style={{
+              fontSize: 12,
+              marginBottom: 10,
+              paddingLeft: 8,
+              borderLeft: '3px solid #4361ee',
+              paddingTop: 2,
+              paddingBottom: 2,
+            }}
+          >
+            Goal: {sprint.goal}
+          </Paragraph>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {sprint.tasks?.map((task, i) => (
+            <TaskRow key={i} task={task} isDark={isDark} />
+          ))}
+        </div>
+      </Collapse.Panel>
+    </Collapse>
   );
 };
 
@@ -145,53 +177,220 @@ const EXAMPLE_PROMPTS = [
 const AiProjectPage: React.FC = () => {
   const navigate = useNavigate();
   const { isDark } = useThemeStore();
-  const [step, setStep] = useState<1 | 2>(1);
+
+  const [step, setStep] = useState<Step>('form');
   const [requirement, setRequirement] = useState('');
-  const [preview, setPreview] = useState<AiGenerateResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [confirming, setConfirming] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionData, setSessionData] = useState<AiSessionResponse | null>(null);
+  const [jobData, setJobData] = useState<AiJobResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const cardBg = isDark ? '#1c1f2e' : '#ffffff';
   const borderColor = isDark ? '#2e3250' : '#eef0f6';
 
+  // Kiểm tra session/job đang chờ từ localStorage khi mount
+  useEffect(() => {
+    const savedSessionId = aiService.getSavedSessionId();
+    const savedJobId = aiService.getSavedJobId();
+
+    if (savedJobId) {
+      // Có job đang chờ confirm → poll ngay
+      setStep('confirming');
+      startJobPolling(savedJobId);
+      return;
+    }
+
+    if (savedSessionId) {
+      // Có session đang generate → check trạng thái, luôn prefill requirement
+      aiService.getSession(savedSessionId).then((data) => {
+        if (data.requirement) setRequirement(data.requirement);
+        if (data.status === 'READY') {
+          setSessionId(savedSessionId);
+          setSessionData(data);
+          setStep('preview');
+        } else if (data.status === 'GENERATING') {
+          setSessionId(savedSessionId);
+          setStep('waiting');
+          startSessionPolling(savedSessionId);
+        } else {
+          // FAILED → prefill requirement rồi để user ở form
+          aiService.clearSaved();
+        }
+      }).catch(() => {
+        aiService.clearSaved();
+      });
+    }
+  }, []);
+
+  // Cleanup khi unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      websocketService.removeAiPlanReadyListener('ai-project-page');
+      websocketService.removeNotificationListener('ai-project-page');
+    };
+  }, []);
+
+  // Đăng ký WebSocket listeners mỗi khi sessionId / jobData thay đổi
+  useEffect(() => {
+    // Listener AI_PLAN_READY
+    websocketService.addAiPlanReadyListener('ai-project-page', async (event) => {
+      if (event.type !== 'AI_PLAN_READY') return;
+      const sid = event.payload?.sessionId;
+      if (!sid) return;
+      // Chỉ xử lý nếu đúng session này
+      setSessionId((currentSid) => {
+        if (currentSid && currentSid !== sid) return currentSid;
+        // Dừng poll session rồi load
+        if (pollRef.current) clearInterval(pollRef.current);
+        loadSession(sid);
+        return sid;
+      });
+    });
+
+    // Listener notification confirm done/failed
+    websocketService.addNotificationListener('ai-project-page', (noti) => {
+      if (noti.title === 'Tạo dự án AI thành công') {
+        if (pollRef.current) clearInterval(pollRef.current);
+        websocketService.removeNotificationListener('ai-project-page');
+        aiService.clearSaved();
+        navigate(`/projects/${noti.relatedId}`);
+      }
+      if (noti.title === 'Tạo dự án AI thất bại') {
+        if (pollRef.current) clearInterval(pollRef.current);
+        websocketService.removeNotificationListener('ai-project-page');
+        aiService.clearSaved();
+        setError('Tạo dự án thất bại. Vui lòng thử lại.');
+        setStep('error');
+      }
+      if (noti.title === 'Sinh kế hoạch AI thất bại') {
+        if (pollRef.current) clearInterval(pollRef.current);
+        websocketService.removeAiPlanReadyListener('ai-project-page');
+        aiService.clearSaved();
+        setError('AI không thể sinh kế hoạch. Vui lòng thử lại.');
+        setStep('error');
+      }
+    });
+  }, []);
+
+  const loadSession = async (sid: string) => {
+    try {
+      const data = await aiService.getSession(sid);
+      setSessionData(data);
+      setStep('preview');
+    } catch {
+      setError('Không thể tải kế hoạch AI. Vui lòng thử lại.');
+      setStep('error');
+    }
+  };
+
+  const startSessionPolling = (sid: string) => {
+    pollRef.current = setInterval(async () => {
+      try {
+        const data = await aiService.getSession(sid);
+        if (data.status === 'READY') {
+          clearInterval(pollRef.current!);
+          setSessionData(data);
+          setStep('preview');
+        } else if (data.status === 'FAILED') {
+          clearInterval(pollRef.current!);
+          aiService.clearSaved();
+          setError(data.errorMessage || data.message || 'AI không thể sinh kế hoạch.');
+          setStep('error');
+        }
+      } catch {
+        // Bỏ qua lỗi mạng tạm thời
+      }
+    }, 3000);
+  };
+
+  const startJobPolling = (jobId: string) => {
+    pollRef.current = setInterval(async () => {
+      try {
+        const data = await aiService.getJobStatus(jobId);
+        setJobData(data);
+        if (data.status === 'DONE') {
+          clearInterval(pollRef.current!);
+          websocketService.removeNotificationListener('ai-project-page');
+          aiService.clearSaved();
+          navigate(`/projects/${data.resultProjectId}`);
+        } else if (data.status === 'FAILED') {
+          clearInterval(pollRef.current!);
+          websocketService.removeNotificationListener('ai-project-page');
+          aiService.clearSaved();
+          setError(data.errorMessage || data.message || 'Tạo dự án thất bại.');
+          setStep('error');
+        }
+      } catch {
+        // Bỏ qua lỗi mạng tạm thời
+      }
+    }, 2500);
+  };
+
+  // ① Gửi yêu cầu
   const handleGenerate = async () => {
     if (!requirement.trim()) return;
-    setLoading(true);
     setError(null);
     try {
-      const data = await aiService.generatePlan(requirement.trim());
-      setPreview(data);
-      setStep(2);
+      const data = await aiService.startGenerate(requirement.trim());
+      setSessionId(data.sessionId);
+      setStep('waiting');
+      startSessionPolling(data.sessionId);
     } catch (e: any) {
-      setError(e?.message || 'Không thể kết nối AI. Vui lòng thử lại.');
-    } finally {
-      setLoading(false);
+      setError(e?.response?.data?.message || e?.message || 'Không thể gửi yêu cầu.');
     }
   };
 
+  const handleCancelWaiting = () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    aiService.clearSaved();
+    setSessionId(null);
+    setStep('form');
+    setError(null);
+  };
+
+  // ⑤ Xác nhận tạo dự án
   const handleConfirm = async () => {
-    if (!preview) return;
-    setConfirming(true);
+    if (!sessionData?.plan) return;
     setError(null);
     try {
-      const result = await aiService.confirmPlan(preview.plan);
-      navigate(`/projects/${result.projectId}`);
+      const job = await aiService.confirmPlan(sessionData.plan, sessionId);
+      setJobData(job);
+      setStep('confirming');
+      startJobPolling(job.jobId);
     } catch (e: any) {
-      setError(e?.message || 'Tạo dự án thất bại. Vui lòng thử lại.');
-    } finally {
-      setConfirming(false);
+      setError(e?.response?.data?.message || e?.message || 'Tạo dự án thất bại. Vui lòng thử lại.');
     }
   };
 
-  const handleRegenerate = () => {
-    setStep(1);
-    setPreview(null);
+  const handleRegenerate = async () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    aiService.clearSaved();
+
+    // Prefill requirement từ sessionData nếu có, không thì gọi API lấy lại
+    if (sessionData?.requirement) {
+      setRequirement(sessionData.requirement);
+    } else if (sessionId && !sessionData) {
+      try {
+        const data = await aiService.getSession(sessionId);
+        if (data.requirement) setRequirement(data.requirement);
+      } catch {
+        // Bỏ qua — giữ requirement hiện tại trong state
+      }
+    }
+    // requirement hiện tại trong state cũng được giữ nguyên nếu không có gì mới
+
+    setSessionId(null);
+    setSessionData(null);
+    setJobData(null);
     setError(null);
+    setStep('form');
   };
 
-  // ── Step 1: Form nhập yêu cầu ──
-  if (step === 1) {
+  // ── Step: form ──
+  if (step === 'form') {
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 0' }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
@@ -204,7 +403,7 @@ const AiProjectPage: React.FC = () => {
           </div>
           <Title level={2} style={{ marginBottom: 8 }}>Tạo dự án bằng AI</Title>
           <Text type="secondary" style={{ fontSize: 15 }}>
-            Mô tả dự án của bạn bằng tiếng Việt hoặc tiếng Anh — AI sẽ sinh kế hoạch hoàn chỉnh
+            Mô tả dự án bằng tiếng Việt hoặc tiếng Anh — AI sinh kế hoạch Scrum với sprints, tasks và subtasks
           </Text>
         </div>
 
@@ -225,7 +424,7 @@ const AiProjectPage: React.FC = () => {
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Càng chi tiết, kế hoạch càng chính xác
+              AI phân tích ngầm — trang sẽ nhận kết quả tự động khi xong
             </Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
               {requirement.length} / 2000
@@ -240,9 +439,9 @@ const AiProjectPage: React.FC = () => {
             <Button
               type="primary"
               size="large"
-              icon={loading ? <Spin size="small" /> : <ThunderboltOutlined />}
+              icon={<ThunderboltOutlined />}
               onClick={handleGenerate}
-              disabled={loading || !requirement.trim()}
+              disabled={!requirement.trim()}
               style={{
                 background: 'linear-gradient(135deg, #4361ee, #7c3aed)',
                 border: 'none',
@@ -251,12 +450,11 @@ const AiProjectPage: React.FC = () => {
                 paddingInline: 28,
               }}
             >
-              {loading ? 'AI đang phân tích...' : 'Sinh kế hoạch'}
+              Sinh kế hoạch
             </Button>
           </div>
         </Card>
 
-        {/* Ví dụ gợi ý */}
         <div style={{ marginTop: 24 }}>
           <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 10 }}>
             Gợi ý nhanh:
@@ -294,122 +492,234 @@ const AiProjectPage: React.FC = () => {
     );
   }
 
-  // ── Step 2: Preview kế hoạch ──
-  if (!preview) return null;
-  const { plan, totalTaskCount, modelUsed } = preview;
-
-  return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px 0' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div>
-          <Title level={3} style={{ marginBottom: 4 }}>Kế hoạch dự án</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            Xem trước và xác nhận để tạo dự án
+  // ── Step: waiting (AI đang phân tích ngầm) ──
+  if (step === 'waiting') {
+    return (
+      <div style={{ maxWidth: 520, margin: '80px auto', textAlign: 'center' }}>
+        <Card
+          style={{ background: cardBg, border: `1px solid ${borderColor}`, borderRadius: 20 }}
+          bodyStyle={{ padding: 48 }}
+        >
+          <div style={{
+            width: 80, height: 80, borderRadius: 20, margin: '0 auto 24px',
+            background: 'linear-gradient(135deg, #4361ee22, #7c3aed22)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Spin indicator={<LoadingOutlined style={{ fontSize: 40, color: '#4361ee' }} spin />} />
+          </div>
+          <Title level={4} style={{ marginBottom: 8 }}>AI đang phân tích yêu cầu...</Title>
+          <Text type="secondary" style={{ fontSize: 14, display: 'block', marginBottom: 24 }}>
+            Thường mất 10–30 giây. Bạn có thể đóng trang này,
+            <br />chúng tôi sẽ thông báo khi kế hoạch sẵn sàng.
           </Text>
-        </div>
-        <Tooltip title={modelUsed}>
-          <Tag color="purple" style={{ borderRadius: 6, fontSize: 11 }}>
-            <RobotOutlined style={{ marginRight: 4 }} />
-            {modelUsed?.split('/').pop() || 'AI'}
-          </Tag>
-        </Tooltip>
+          <Button
+            icon={<CloseOutlined />}
+            onClick={handleCancelWaiting}
+            style={{ borderRadius: 8 }}
+          >
+            Hủy
+          </Button>
+        </Card>
       </div>
+    );
+  }
 
-      {/* Stats */}
-      <Card
-        style={{ background: cardBg, border: `1px solid ${borderColor}`, borderRadius: 12, marginBottom: 16 }}
-        bodyStyle={{ padding: '16px 24px' }}
-      >
-        <Row gutter={24}>
-          <Col span={12}>
-            <div style={{ marginBottom: 4 }}>
-              <Text type="secondary" style={{ fontSize: 12 }}>Tên dự án</Text>
-            </div>
-            <Text strong style={{ fontSize: 15 }}>{plan.project_name}</Text>
-          </Col>
-          <Col span={6}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 12 }}>Mã dự án</Text>}
-              value={plan.project_key}
-              valueStyle={{ fontSize: 16, fontWeight: 700, color: '#4361ee' }}
-            />
-          </Col>
-          <Col span={3}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 12 }}>Thời gian</Text>}
-              value={plan.total_duration_days}
-              suffix="ngày"
-              valueStyle={{ fontSize: 16 }}
-              prefix={<ClockCircleOutlined />}
-            />
-          </Col>
-          <Col span={3}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 12 }}>Tổng tasks</Text>}
-              value={totalTaskCount}
-              valueStyle={{ fontSize: 16 }}
-              prefix={<UnorderedListOutlined />}
-            />
-          </Col>
-        </Row>
-        {plan.project_description && (
-          <>
-            <Divider style={{ margin: '12px 0' }} />
-            <Text type="secondary" style={{ fontSize: 13 }}>{plan.project_description}</Text>
-          </>
-        )}
-      </Card>
+  // ── Step: preview ──
+  if (step === 'preview') {
+    if (!sessionData?.plan) return null;
+    const { plan, totalTaskCount, modelUsed } = sessionData;
+    const today = new Date();
+    const sprintCount = plan.sprints?.length ?? 0;
 
-      {/* Task tree */}
-      <Card
-        title={
-          <Space>
-            <UnorderedListOutlined style={{ color: '#4361ee' }} />
-            <Text strong>Danh sách công việc ({plan.tasks.length} nhóm task)</Text>
-          </Space>
-        }
-        style={{ background: cardBg, border: `1px solid ${borderColor}`, borderRadius: 12, marginBottom: 16 }}
-        bodyStyle={{ padding: '8px 16px 16px' }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {plan.tasks.map((task, idx) => (
-            <TaskNode key={idx} task={task} isDark={isDark} />
+    return (
+      <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px 0' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div>
+            <Title level={3} style={{ marginBottom: 4 }}>Kế hoạch dự án AI</Title>
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              Xem trước và xác nhận để tạo dự án
+            </Text>
+          </div>
+          <Tooltip title={modelUsed}>
+            <Tag color="purple" style={{ borderRadius: 6, fontSize: 11 }}>
+              <RobotOutlined style={{ marginRight: 4 }} />
+              {modelUsed?.split('/').pop() || 'AI'}
+            </Tag>
+          </Tooltip>
+        </div>
+
+        {/* Stats card */}
+        <Card
+          style={{ background: cardBg, border: `1px solid ${borderColor}`, borderRadius: 12, marginBottom: 16 }}
+          bodyStyle={{ padding: '16px 24px' }}
+        >
+          <Row gutter={24}>
+            <Col span={12}>
+              <div style={{ marginBottom: 4 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>Tên dự án</Text>
+              </div>
+              <Text strong style={{ fontSize: 15 }}>{plan.project_name}</Text>
+            </Col>
+            <Col span={5}>
+              <Statistic
+                title={<Text type="secondary" style={{ fontSize: 12 }}>Mã dự án</Text>}
+                value={plan.project_key}
+                valueStyle={{ fontSize: 15, fontWeight: 700, color: '#4361ee' }}
+              />
+            </Col>
+            <Col span={4}>
+              <Statistic
+                title={<Text type="secondary" style={{ fontSize: 12 }}>Thời gian</Text>}
+                value={plan.total_duration_days}
+                suffix="ngày"
+                valueStyle={{ fontSize: 15 }}
+                prefix={<ClockCircleOutlined />}
+              />
+            </Col>
+            <Col span={3}>
+              <Statistic
+                title={<Text type="secondary" style={{ fontSize: 12 }}>Tổng tasks</Text>}
+                value={totalTaskCount ?? 0}
+                valueStyle={{ fontSize: 15 }}
+                prefix={<UnorderedListOutlined />}
+              />
+            </Col>
+          </Row>
+          {plan.project_description && (
+            <>
+              <Divider style={{ margin: '12px 0' }} />
+              <Text type="secondary" style={{ fontSize: 13 }}>{plan.project_description}</Text>
+            </>
+          )}
+        </Card>
+
+        {/* Sprint accordion list */}
+        <Card
+          title={
+            <Space>
+              <UnorderedListOutlined style={{ color: '#4361ee' }} />
+              <Text strong>{sprintCount} Sprint · {totalTaskCount ?? 0} task</Text>
+            </Space>
+          }
+          style={{ background: cardBg, border: `1px solid ${borderColor}`, borderRadius: 12, marginBottom: 16 }}
+          bodyStyle={{ padding: '12px 16px 8px' }}
+        >
+          {plan.sprints?.map((sprint, idx) => (
+            <SprintPanel
+              key={sprint.sprint_number}
+              sprint={sprint}
+              today={today}
+              isDark={isDark}
+              defaultOpen={idx === 0}
+            />
           ))}
+        </Card>
+
+        {error && (
+          <Alert type="error" message={error} style={{ marginBottom: 16, borderRadius: 8 }} showIcon />
+        )}
+
+        {/* Actions */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={handleRegenerate}
+            size="large"
+            style={{ borderRadius: 8 }}
+          >
+            Sinh lại
+          </Button>
+          <Button
+            type="primary"
+            size="large"
+            icon={<SendOutlined />}
+            onClick={handleConfirm}
+            style={{
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              border: 'none',
+              borderRadius: 8,
+              fontWeight: 600,
+              paddingInline: 32,
+            }}
+          >
+            Tạo dự án
+          </Button>
         </div>
-      </Card>
-
-      {error && (
-        <Alert type="error" message={error} style={{ marginBottom: 16, borderRadius: 8 }} showIcon />
-      )}
-
-      {/* Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={handleRegenerate}
-          size="large"
-          style={{ borderRadius: 8 }}
-        >
-          Sinh lại
-        </Button>
-        <Button
-          type="primary"
-          size="large"
-          icon={confirming ? <Spin size="small" /> : <SendOutlined />}
-          onClick={handleConfirm}
-          disabled={confirming}
-          style={{
-            background: 'linear-gradient(135deg, #10b981, #059669)',
-            border: 'none',
-            borderRadius: 8,
-            fontWeight: 600,
-            paddingInline: 32,
-          }}
-        >
-          {confirming ? 'Đang tạo dự án...' : 'Tạo dự án'}
-        </Button>
       </div>
+    );
+  }
+
+  // ── Step: confirming (job đang chạy ngầm) ──
+  if (step === 'confirming') {
+    const isPending = jobData?.status === 'PENDING';
+    return (
+      <div style={{ maxWidth: 520, margin: '80px auto', textAlign: 'center' }}>
+        <Card
+          style={{ background: cardBg, border: `1px solid ${borderColor}`, borderRadius: 20 }}
+          bodyStyle={{ padding: 48 }}
+        >
+          <Spin
+            indicator={<LoadingOutlined style={{ fontSize: 56, color: '#10b981' }} spin />}
+            style={{ display: 'block', marginBottom: 28 }}
+          />
+          <Title level={4} style={{ marginBottom: 8 }}>
+            {isPending ? 'Đang xếp hàng chờ...' : 'Đang tạo dự án...'}
+          </Title>
+          <Text type="secondary" style={{ fontSize: 14, display: 'block', marginBottom: 16 }}>
+            {isPending
+              ? 'Có job khác đang chạy, bạn sẽ được xử lý ngay khi có slot.'
+              : 'Đang tạo project, sprint và tasks trong hệ thống...'}
+          </Text>
+          <Progress
+            percent={isPending ? 20 : 65}
+            status="active"
+            strokeColor={{ from: '#10b981', to: '#059669' }}
+            showInfo={false}
+            style={{ marginBottom: 16 }}
+          />
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Bạn có thể đóng trang này, chúng tôi sẽ thông báo khi hoàn thành.
+          </Text>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Step: error ──
+  return (
+    <div style={{ maxWidth: 520, margin: '80px auto', textAlign: 'center' }}>
+      <Card
+        style={{ background: cardBg, border: `1px solid ${borderColor}`, borderRadius: 20 }}
+        bodyStyle={{ padding: 48 }}
+      >
+        <ExclamationCircleOutlined
+          style={{ fontSize: 56, color: '#ef4444', display: 'block', marginBottom: 20 }}
+        />
+        <Title level={4} style={{ marginBottom: 8 }}>Có lỗi xảy ra</Title>
+        {error && (
+          <Alert type="error" message={error} style={{ marginBottom: 20, borderRadius: 8 }} showIcon />
+        )}
+        <Space>
+          <Button
+            size="large"
+            onClick={handleRegenerate}
+            style={{ borderRadius: 8 }}
+          >
+            Nhập lại yêu cầu
+          </Button>
+          {sessionData?.plan && (
+            <Button
+              type="primary"
+              size="large"
+              onClick={() => { setStep('preview'); setError(null); }}
+              style={{ borderRadius: 8 }}
+            >
+              Xem lại kế hoạch
+            </Button>
+          )}
+        </Space>
+      </Card>
     </div>
   );
 };

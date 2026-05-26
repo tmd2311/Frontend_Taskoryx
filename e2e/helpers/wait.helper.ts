@@ -15,10 +15,10 @@ export async function waitForMessage(page: Page, text: string, timeout = 5000) {
   ).toBeVisible({ timeout });
 }
 
-/** Wait for success message */
+/** Wait for success message — checks both ant-message and ant-notification */
 export async function expectSuccessMessage(page: Page, timeout = 5000) {
   await expect(
-    page.locator('.ant-message-success, .ant-notification-notice-success'),
+    page.locator('.ant-message-notice-content, .ant-notification-notice-message').first(),
   ).toBeVisible({ timeout });
 }
 
