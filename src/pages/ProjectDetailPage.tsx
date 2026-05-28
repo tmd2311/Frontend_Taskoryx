@@ -369,13 +369,13 @@ const ProjectDetailPage: React.FC = () => {
   const buildTaskParams = useCallback((f: TaskFilterState) => {
     const params: any = { page: f.page - 1, size: PAGE_SIZE };
     if (f.keyword.trim()) params.keyword = f.keyword.trim();
-    if (f.priorities.length) params.priorities = f.priorities.join(',');
+    if (f.priorities.length) params.priorities = f.priorities;
     if (f.assigneeId) params.assigneeId = f.assigneeId;
-    if (f.categoryId) params.categoryId = f.categoryId;
-    if (f.versionId) params.versionId = f.versionId;
     if (f.sprintId) params.sprintId = f.sprintId;
-    if (f.status && f.status !== 'all') params.status = f.status;
-    if (f.subtasking && f.subtasking !== 'all') params.subtasking = f.subtasking;
+    // status mapping → completed param (API chỉ hỗ trợ completed boolean)
+    if (f.status === 'not_closed') params.completed = false;
+    else if (f.status === 'DONE') params.completed = true;
+    // 'all' và các status khác: không gửi completed (backend trả tất cả)
     return params;
   }, [PAGE_SIZE]);
 
@@ -931,8 +931,8 @@ const ProjectDetailPage: React.FC = () => {
 
           <TaskFilterPanel
             value={taskFilter}
-            onChange={(patch) => setTaskFilter((prev) => ({ ...prev, ...patch, page: patch.page ?? 1 }))}
-            onSearch={() => fetchProjectTasks(projectId!, buildTaskParams({ ...taskFilter, page: 1 }))}
+            onChange={(patch) => setTaskFilter((prev) => ({ ...prev, ...patch, page: 'page' in patch ? (patch.page ?? 1) : 1 }))}
+            onSearch={() => {}}
             onReset={() => setTaskFilter(DEFAULT_FILTER)}
             loading={isLoading}
             members={members}

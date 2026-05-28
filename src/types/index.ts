@@ -361,21 +361,17 @@ export interface TaskFilterParams extends PageParams {
   sprintId?: string;
   columnId?: string;
   assigneeId?: string;
-  priorities?: string;  // comma-separated: "MEDIUM,HIGH"
-  labelIds?: string;    // comma-separated
+  priorities?: string[];
+  labelIds?: string[];
   dueDateFrom?: string;
   dueDateTo?: string;
   overdue?: boolean;
   completed?: boolean;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
-  status?: string;
-  categoryId?: string;
-  versionId?: string;
-  subtasking?: 'all' | 'parent_only' | 'exclude_child';
 }
 
-export type TaskFilterStatus = 'all' | 'open' | 'in_progress' | 'resolved' | 'closed' | 'not_closed';
+export type TaskFilterStatus = 'all' | 'not_closed' | 'DONE';
 export type TaskFilterSubtasking = 'all' | 'parent_only' | 'exclude_child';
 
 export interface TaskFilterState {

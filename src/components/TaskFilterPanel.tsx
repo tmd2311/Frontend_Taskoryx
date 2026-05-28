@@ -13,12 +13,7 @@ import { useThemeStore } from '../stores/themeStore';
 const STATUS_OPTIONS: { value: string; label: string; color: string }[] = [
   { value: 'not_closed', label: 'Chưa đóng', color: '#4361ee' },
   { value: 'all',        label: 'Tất cả',    color: '#8c8c8c' },
-  { value: 'TODO',       label: 'Chưa làm',  color: '#8c8c8c' },
-  { value: 'IN_PROGRESS',label: 'Đang làm',  color: '#1890ff' },
-  { value: 'IN_REVIEW',  label: 'Đang review', color: '#fa8c16' },
-  { value: 'RESOLVED',   label: 'Đã giải quyết', color: '#722ed1' },
   { value: 'DONE',       label: 'Hoàn thành', color: '#52c41a' },
-  { value: 'CANCELLED',  label: 'Đã hủy',    color: '#f5222d' },
 ];
 
 const SUBTASKING_OPTIONS: { value: string; label: string }[] = [
