@@ -14,7 +14,7 @@ import type { TableColumnsType } from 'antd';
 type ColumnsType<T> = TableColumnsType<T>;
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip as ReTooltip, ResponsiveContainer,
-  LineChart, Line, CartesianGrid, PieChart, Pie, Cell,
+  AreaChart, Area, CartesianGrid, PieChart, Pie, Cell,
 } from 'recharts';
 import { timeTrackingService } from '../services/timeTrackingService';
 import { projectService } from '../services/projectService';
@@ -41,17 +41,36 @@ const DailyBarChart: React.FC<{ data: DailyTimeStats[] }> = ({ data }) => {
     hours: Number(d.totalHours),
     label: d.dayOfWeek,
   }));
+  // Tính interval động: hiển thị tối đa ~10 nhãn
+  const tickInterval = Math.max(1, Math.ceil(chartData.length / 10) - 1);
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+    <ResponsiveContainer width="100%" height={240}>
+      <BarChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 24 }}>
+        <defs>
+          <linearGradient id="gradDaily" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#4361ee" stopOpacity={1} />
+            <stop offset="100%" stopColor="#4361ee" stopOpacity={0.5} />
+          </linearGradient>
+        </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={token.colorBorderSecondary} />
-        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+        <XAxis
+          dataKey="name"
+          tick={{ fontSize: 11 }}
+          interval={tickInterval}
+          angle={-35}
+          textAnchor="end"
+          height={48}
+        />
         <YAxis unit="h" tick={{ fontSize: 11 }} />
         <ReTooltip
+          contentStyle={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,.12)', border: 'none', background: '#fff' }}
           formatter={(v: any) => [`${v}h`, 'Giờ làm']}
-          labelFormatter={(label, payload) => payload?.[0]?.payload?.label || label}
+          labelFormatter={(label, payload) => {
+            const item = payload?.[0]?.payload;
+            return item?.label ? `${item.label} (${label})` : label;
+          }}
         />
-        <Bar dataKey="hours" fill="#4361ee" radius={[4, 4, 0, 0]} maxBarSize={40} />
+        <Bar dataKey="hours" fill="url(#gradDaily)" radius={[4, 4, 0, 0]} maxBarSize={36} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -62,22 +81,41 @@ const WeeklyBarChart: React.FC<{ data: WeeklyTimeStats[] }> = ({ data }) => {
   const { token } = theme.useToken();
   const chartData = data.map((w) => ({
     name: w.weekLabel.split(' (')[0],
+    fullLabel: w.weekLabel,
     hours: Number(w.totalHours),
   }));
+  const tickInterval = Math.max(0, Math.ceil(chartData.length / 8) - 1);
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+    <ResponsiveContainer width="100%" height={240}>
+      <BarChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 24 }}>
+        <defs>
+          <linearGradient id="gradWeekly" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
+            <stop offset="100%" stopColor="#10b981" stopOpacity={0.5} />
+          </linearGradient>
+        </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={token.colorBorderSecondary} />
-        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+        <XAxis
+          dataKey="name"
+          tick={{ fontSize: 11 }}
+          interval={tickInterval}
+          angle={-25}
+          textAnchor="end"
+          height={44}
+        />
         <YAxis unit="h" tick={{ fontSize: 11 }} />
-        <ReTooltip formatter={(v: any) => [`${v}h`, 'Giờ làm']} />
-        <Bar dataKey="hours" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
+        <ReTooltip
+          contentStyle={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,.12)', border: 'none', background: '#fff' }}
+          formatter={(v: any) => [`${v}h`, 'Giờ làm']}
+          labelFormatter={(_: any, payload: any) => payload?.[0]?.payload?.fullLabel || ''}
+        />
+        <Bar dataKey="hours" fill="url(#gradWeekly)" radius={[4, 4, 0, 0]} maxBarSize={40} />
       </BarChart>
     </ResponsiveContainer>
   );
 };
 
-// ─── Biểu đồ theo tháng trong năm ───────────────────────────
+// ─── Biểu đồ theo tháng — AreaChart ─────────────────────────
 const MonthlyLineChart: React.FC<{ data: MonthlyTimeStats[] }> = ({ data }) => {
   const { token } = theme.useToken();
   const chartData = data.map((m) => ({
@@ -86,31 +124,63 @@ const MonthlyLineChart: React.FC<{ data: MonthlyTimeStats[] }> = ({ data }) => {
   }));
   return (
     <ResponsiveContainer width="100%" height={220}>
-      <LineChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke={token.colorBorderSecondary} />
+      <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+        <defs>
+          <linearGradient id="gradMonthly" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#4361ee" stopOpacity={0.3} />
+            <stop offset="95%" stopColor="#4361ee" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={token.colorBorderSecondary} />
         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
         <YAxis unit="h" tick={{ fontSize: 11 }} />
-        <ReTooltip formatter={(v: any) => [`${v}h`, 'Giờ làm']} />
-        <Line type="monotone" dataKey="hours" stroke="#4361ee" strokeWidth={2} dot={{ r: 3 }} />
-      </LineChart>
+        <ReTooltip
+          contentStyle={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,.12)', border: 'none', background: '#fff' }}
+          formatter={(v: any) => [`${v}h`, 'Giờ làm']}
+        />
+        <Area type="monotone" dataKey="hours" stroke="#4361ee" fill="url(#gradMonthly)" strokeWidth={2} dot={{ r: 3, fill: '#4361ee' }} />
+      </AreaChart>
     </ResponsiveContainer>
   );
 };
 
-// ─── Pie chart theo project ──────────────────────────────────
+// ─── Pie chart theo project — donut ─────────────────────────
 const ProjectPieChart: React.FC<{ data: TimeStatsByProject[] }> = ({ data }) => {
+  const { token } = theme.useToken();
   const chartData = data.map((p) => ({ name: p.projectName, value: Number(p.totalHours) }));
+  const total = chartData.reduce((s, d) => s + d.value, 0);
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <PieChart>
-        <Pie data={chartData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={(props: any) => `${props.name} ${((props.percent ?? 0) * 100).toFixed(0)}%`}>
-          {chartData.map((_, i) => (
-            <Cell key={i} fill={COLORS[i % COLORS.length]} />
-          ))}
-        </Pie>
-        <ReTooltip formatter={(v: any) => [`${v}h`, 'Giờ làm']} />
-      </PieChart>
-    </ResponsiveContainer>
+    <div style={{ position: 'relative' }}>
+      <ResponsiveContainer width="100%" height={220}>
+        <PieChart>
+          <Pie
+            data={chartData}
+            cx="50%" cy="50%"
+            innerRadius={50} outerRadius={85}
+            paddingAngle={2}
+            dataKey="value"
+          >
+            {chartData.map((_, i) => (
+              <Cell key={i} fill={COLORS[i % COLORS.length]} />
+            ))}
+          </Pie>
+          <ReTooltip
+            contentStyle={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,.12)', border: 'none', background: '#fff' }}
+            formatter={(v: any) => [`${v}h`, 'Giờ làm']}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+      <div style={{
+        position: 'absolute', top: '50%', left: '50%',
+        transform: 'translate(-50%, -50%)',
+        textAlign: 'center', pointerEvents: 'none',
+      }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: token.colorText, display: 'block' }}>
+          {total.toFixed(1)}h
+        </span>
+        <span style={{ fontSize: 11, color: token.colorTextSecondary }}>Tổng giờ</span>
+      </div>
+    </div>
   );
 };
 
@@ -858,7 +928,7 @@ const TimeReportPage: React.FC = () => {
       {summary && (
         <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
           <Col xs={12} sm={6}>
-            <Card>
+            <Card style={{ borderTop: '3px solid #4361ee', borderRadius: 10 }}>
               <Statistic
                 title="Tổng giờ làm"
                 value={summary.formattedTotalHours}
@@ -868,22 +938,22 @@ const TimeReportPage: React.FC = () => {
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card>
+            <Card style={{ borderTop: '3px solid #6b7280', borderRadius: 10 }}>
               <Statistic title="Số lần ghi" value={summary.totalEntries} valueStyle={{ fontSize: 22 }} />
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card>
+            <Card style={{ borderTop: '3px solid #3b82f6', borderRadius: 10 }}>
               <Statistic
                 title="Ngày hoạt động"
                 value={summary.activeDays}
                 prefix={<CalendarOutlined />}
-                valueStyle={{ fontSize: 22 }}
+                valueStyle={{ fontSize: 22, color: '#3b82f6' }}
               />
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card>
+            <Card style={{ borderTop: '3px solid #10b981', borderRadius: 10 }}>
               <Statistic
                 title="TB giờ/ngày hoạt động"
                 value={summary.avgHoursPerActiveDay?.toFixed(1)}
@@ -897,13 +967,15 @@ const TimeReportPage: React.FC = () => {
 
       {/* Biểu đồ */}
       <Card
-        style={{ marginBottom: 20 }}
+        style={{ marginBottom: 20, borderRadius: 10 }}
+        styles={{ body: { padding: '16px 20px', paddingTop: 8 } }}
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <Text strong>Biểu đồ thời gian làm việc</Text>
             <Segmented
               value={viewMode}
               onChange={(v) => setViewMode(v as any)}
+              style={{ fontSize: 12 }}
               options={[
                 { label: 'Ngày', value: 'daily' },
                 { label: 'Tuần', value: 'weekly' },
@@ -913,21 +985,23 @@ const TimeReportPage: React.FC = () => {
           </div>
         }
       >
-        {viewMode === 'daily' && dailyStats.length > 0 && <DailyBarChart data={dailyStats} />}
-        {viewMode === 'weekly' && weeklyStats.length > 0 && <WeeklyBarChart data={weeklyStats} />}
-        {viewMode === 'monthly' && monthlyStats.length > 0 && <MonthlyLineChart data={monthlyStats} />}
-        {((viewMode === 'daily' && dailyStats.length === 0) ||
-          (viewMode === 'weekly' && weeklyStats.length === 0) ||
-          (viewMode === 'monthly' && monthlyStats.length === 0)) && (
-          <div style={{ textAlign: 'center', padding: 40, color: token.colorTextDisabled }}>Không có dữ liệu</div>
-        )}
+        <div style={{ padding: '4px 0' }}>
+          {viewMode === 'daily' && dailyStats.length > 0 && <DailyBarChart data={dailyStats} />}
+          {viewMode === 'weekly' && weeklyStats.length > 0 && <WeeklyBarChart data={weeklyStats} />}
+          {viewMode === 'monthly' && monthlyStats.length > 0 && <MonthlyLineChart data={monthlyStats} />}
+          {((viewMode === 'daily' && dailyStats.length === 0) ||
+            (viewMode === 'weekly' && weeklyStats.length === 0) ||
+            (viewMode === 'monthly' && monthlyStats.length === 0)) && (
+            <div style={{ textAlign: 'center', padding: 40, color: token.colorTextDisabled }}>Không có dữ liệu</div>
+          )}
+        </div>
       </Card>
 
       {/* Phân bổ + project chi tiết */}
       <Row gutter={[16, 16]}>
         {summary && summary.byProject.length > 0 && (
           <Col xs={24} md={10}>
-            <Card title="Phân bổ theo dự án" style={{ height: '100%' }}>
+            <Card title="Phân bổ theo dự án" style={{ height: '100%', borderRadius: 10 }}>
               <ProjectPieChart data={summary.byProject} />
               <div style={{ marginTop: 12 }}>
                 {summary.byProject.map((p, i) => (

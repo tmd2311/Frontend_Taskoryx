@@ -4,6 +4,7 @@ import {
   Typography, Button, Table, Tag, Space, Input, Select, InputNumber,
   Avatar, Empty, Tooltip, Modal, Form, Popconfirm, message, Spin,
   DatePicker, Card, Progress, List, Row, Col, Alert, Statistic, Badge, ColorPicker, theme,
+  Checkbox, Divider,
 } from 'antd';
 import {
   CheckSquareOutlined, TeamOutlined, ExclamationCircleOutlined,
@@ -28,6 +29,8 @@ import { useAdminStore } from '../stores/adminStore';
 import { projectService } from '../services/projectService';
 import { sprintService } from '../services/sprintService';
 import { taskService } from '../services/taskService';
+import { exportService } from '../services/exportService';
+import type { ExportSheet } from '../services/exportService';
 import { categoryService } from '../services/categoryService';
 import { versionService } from '../services/versionService';
 import { activityService } from '../services/activityService';
@@ -193,6 +196,32 @@ const buildTaskColumns = (
     ),
   },
   {
+    title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 145,
+    render: (s: string, r: TaskSummary) => {
+      const STATUS_CFG: Record<string, { color: string; label: string }> = {
+        TODO:        { color: '#8c8c8c', label: 'Chưa làm' },
+        IN_PROGRESS: { color: '#4361ee', label: 'Đang làm' },
+        IN_REVIEW:   { color: '#fa8c16', label: 'Đang review' },
+        RESOLVED:    { color: '#13c2c2', label: 'Đã giải quyết' },
+        DONE:        { color: '#52c41a', label: 'Hoàn thành' },
+        CANCELLED:   { color: '#ff4d4f', label: 'Đã hủy' },
+      };
+      const cfg = r.overdue && s !== 'DONE' && s !== 'CANCELLED'
+        ? { color: '#ff4d4f', label: 'Quá hạn' }
+        : (STATUS_CFG[s] ?? { color: '#d9d9d9', label: s });
+      return (
+        <Badge
+          color={cfg.color}
+          text={
+            <span style={{ fontSize: 12, color: cfg.color, opacity: (r.depth ?? 0) > 0 ? 0.85 : 1 }}>
+              {cfg.label}
+            </span>
+          }
+        />
+      );
+    },
+  },
+  {
     title: 'Ưu tiên', dataIndex: 'priority', key: 'priority', width: 110,
     render: (p: string, r: TaskSummary) => (
       <Tag color={PRIORITY_COLOR[p]} style={{ opacity: (r.depth ?? 0) > 0 ? 0.85 : 1 }}>
@@ -282,6 +311,16 @@ const ProjectDetailPage: React.FC = () => {
   // Delete project
   const [deleting, setDeleting] = useState(false);
 
+  // Export modal
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportSheets, setExportSheets] = useState<ExportSheet[]>(['overview', 'tasks', 'members', 'sprints', 'overdue']);
+  const [exportSprintId, setExportSprintId] = useState<string | undefined>();
+  const [exportAssigneeId, setExportAssigneeId] = useState<string | undefined>();
+  const [exportDateFrom, setExportDateFrom] = useState<string | undefined>();
+  const [exportDateTo, setExportDateTo] = useState<string | undefined>();
+  const [exportStatuses, setExportStatuses] = useState<string[]>([]);
+  const [exportPriorities, setExportPriorities] = useState<string[]>([]);
+  const [exporting, setExporting] = useState(false);
 
   // Sprints
   const [sprints, setSprints] = useState<Sprint[]>([]);
@@ -803,11 +842,36 @@ const ProjectDetailPage: React.FC = () => {
   };
 
   // ── Export ────────────────────────────────────────────────
-  const handleExport = () => {
+  const openExportModal = () => {
+    setExportSheets(['overview', 'tasks', 'members', 'sprints', 'overdue']);
+    setExportSprintId(undefined);
+    setExportAssigneeId(undefined);
+    setExportDateFrom(undefined);
+    setExportDateTo(undefined);
+    setExportStatuses([]);
+    setExportPriorities([]);
+    setExportModalOpen(true);
+  };
+
+  const handleDoExport = async () => {
     if (!projectId) return;
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
-    const token = localStorage.getItem('access_token');
-    window.open(`${baseUrl}/export/projects/${projectId}/tasks/excel?token=${encodeURIComponent(token ?? '')}`, '_blank');
+    setExporting(true);
+    try {
+      await exportService.exportProjectTasks(projectId, {
+        sheets: exportSheets.length > 0 ? exportSheets : undefined,
+        sprintId: exportSprintId,
+        assigneeId: exportAssigneeId,
+        dateFrom: exportDateFrom,
+        dateTo: exportDateTo,
+        statuses: exportStatuses.length > 0 ? exportStatuses : undefined,
+        priorities: exportPriorities.length > 0 ? exportPriorities : undefined,
+      });
+      setExportModalOpen(false);
+    } catch (e: any) {
+      message.error(e.message || 'Xuất Excel thất bại');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const rootTasks = projectTasks?.content ?? [];
@@ -894,8 +958,8 @@ const ProjectDetailPage: React.FC = () => {
             <CheckSquareOutlined /> {project?.taskCount ?? total} task &nbsp;·&nbsp;
             <TeamOutlined /> {project?.memberCount ?? members.length} thành viên
           </Text>
-          <Tooltip title="Xuất Excel">
-            <Button icon={<DownloadOutlined />} size="small" onClick={handleExport}>Export</Button>
+          <Tooltip title="Xuất báo cáo Excel">
+            <Button icon={<DownloadOutlined />} size="small" onClick={openExportModal}>Export</Button>
           </Tooltip>
           {canDelete && (
             <Popconfirm
@@ -2200,6 +2264,132 @@ const ProjectDetailPage: React.FC = () => {
             <Button onClick={() => { setLabelModal(false); labelForm.resetFields(); setLabelColor('#1890ff'); }}>Hủy</Button>
           </Space>
         </Form>
+      </Modal>
+
+      {/* ── Export Modal ─────────────────────────────────────── */}
+      <Modal
+        title={<Space><DownloadOutlined />Xuất báo cáo Excel</Space>}
+        open={exportModalOpen}
+        onCancel={() => setExportModalOpen(false)}
+        onOk={handleDoExport}
+        okText={<Space><DownloadOutlined />Xuất Excel</Space>}
+        cancelText="Hủy"
+        okButtonProps={{ loading: exporting }}
+        width={520}
+        destroyOnHidden
+      >
+        <div style={{ marginTop: 8 }}>
+          {/* Sheet selection */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>Chọn sheet cần xuất:</div>
+            <Checkbox.Group
+              value={exportSheets}
+              onChange={(vals) => setExportSheets(vals as ExportSheet[])}
+              style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+            >
+              <Row gutter={[0, 6]}>
+                <Col span={12}><Checkbox value="overview">📊 Tổng Quan</Checkbox></Col>
+                <Col span={12}><Checkbox value="tasks">📋 Danh Sách Task</Checkbox></Col>
+                <Col span={12}><Checkbox value="members">👥 Thành Viên</Checkbox></Col>
+                <Col span={12}><Checkbox value="sprints">🏃 Sprint</Checkbox></Col>
+                <Col span={12}><Checkbox value="overdue">⚠️ Quá Hạn</Checkbox></Col>
+              </Row>
+            </Checkbox.Group>
+            <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 6 }}>
+              Không chọn sheet nào → server tự động xuất đủ 5 sheet.
+            </div>
+          </div>
+
+          <Divider style={{ margin: '12px 0' }}>Bộ lọc (tùy chọn)</Divider>
+
+          <Row gutter={[12, 10]}>
+            {/* Sprint */}
+            <Col span={24}>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>Sprint</div>
+              <Select
+                allowClear
+                placeholder="Tất cả sprint"
+                style={{ width: '100%' }}
+                value={exportSprintId}
+                onChange={(v) => setExportSprintId(v)}
+                options={sprints.map((s) => ({ value: s.id, label: s.name }))}
+              />
+            </Col>
+
+            {/* Assignee */}
+            <Col span={24}>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>Người thực hiện</div>
+              <Select
+                allowClear
+                placeholder="Tất cả"
+                style={{ width: '100%' }}
+                value={exportAssigneeId}
+                onChange={(v) => setExportAssigneeId(v)}
+                options={members.map((m) => ({ value: m.userId, label: m.fullName || m.username }))}
+              />
+            </Col>
+
+            {/* Date range */}
+            <Col span={12}>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>Từ ngày</div>
+              <DatePicker
+                style={{ width: '100%' }}
+                format="DD/MM/YYYY"
+                placeholder="Từ ngày"
+                onChange={(d) => setExportDateFrom(d ? d.format('YYYY-MM-DD') : undefined)}
+              />
+            </Col>
+            <Col span={12}>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>Đến ngày</div>
+              <DatePicker
+                style={{ width: '100%' }}
+                format="DD/MM/YYYY"
+                placeholder="Đến ngày"
+                onChange={(d) => setExportDateTo(d ? d.format('YYYY-MM-DD') : undefined)}
+              />
+            </Col>
+
+            {/* Statuses */}
+            <Col span={24}>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>Trạng thái</div>
+              <Select
+                mode="multiple"
+                allowClear
+                placeholder="Tất cả trạng thái"
+                style={{ width: '100%' }}
+                value={exportStatuses}
+                onChange={setExportStatuses}
+                options={[
+                  { value: 'TODO', label: 'Chưa làm' },
+                  { value: 'IN_PROGRESS', label: 'Đang làm' },
+                  { value: 'IN_REVIEW', label: 'Đang review' },
+                  { value: 'RESOLVED', label: 'Đã giải quyết' },
+                  { value: 'DONE', label: 'Hoàn thành' },
+                  { value: 'CANCELLED', label: 'Đã hủy' },
+                ]}
+              />
+            </Col>
+
+            {/* Priorities */}
+            <Col span={24}>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>Mức ưu tiên</div>
+              <Select
+                mode="multiple"
+                allowClear
+                placeholder="Tất cả mức ưu tiên"
+                style={{ width: '100%' }}
+                value={exportPriorities}
+                onChange={setExportPriorities}
+                options={[
+                  { value: 'URGENT', label: <Tag color="red">Khẩn cấp</Tag> },
+                  { value: 'HIGH', label: <Tag color="orange">Cao</Tag> },
+                  { value: 'MEDIUM', label: <Tag color="blue">Trung bình</Tag> },
+                  { value: 'LOW', label: <Tag color="green">Thấp</Tag> },
+                ]}
+              />
+            </Col>
+          </Row>
+        </div>
       </Modal>
 
       <style>{`
