@@ -7,20 +7,30 @@ import type {
   Project,
 } from '../types';
 
+// Backend trả field `public` thay vì `isPublic` — normalize để dùng nhất quán
+function normalizeTemplate(t: any): ProjectTemplate {
+  return {
+    ...t,
+    isPublic: t.isPublic ?? t.public ?? false,
+  };
+}
+
 export const templateService = {
   getAll: async (): Promise<ProjectTemplate[]> => {
     const response: any = await api.get('/templates');
-    return response.data ?? response;
+    const data: any[] = response.data ?? response;
+    return data.map(normalizeTemplate);
   },
 
   getPublic: async (): Promise<ProjectTemplate[]> => {
     const response: any = await api.get('/templates/public');
-    return response.data ?? response;
+    const data: any[] = response.data ?? response;
+    return data.map(normalizeTemplate);
   },
 
   getById: async (id: string): Promise<ProjectTemplate> => {
     const response: any = await api.get(`/templates/${id}`);
-    return response.data ?? response;
+    return normalizeTemplate(response.data ?? response);
   },
 
   useTemplate: async (id: string, data: UseTemplateRequest): Promise<Project> => {
@@ -31,13 +41,13 @@ export const templateService = {
   /** POST /templates — yêu cầu quyền TEMPLATE_MANAGE */
   create: async (data: CreateTemplateRequest): Promise<ProjectTemplate> => {
     const response: any = await api.post('/templates', data);
-    return response.data ?? response;
+    return normalizeTemplate(response.data ?? response);
   },
 
   /** PUT /templates/{id} — yêu cầu quyền TEMPLATE_MANAGE */
   update: async (id: string, data: UpdateTemplateRequest): Promise<ProjectTemplate> => {
     const response: any = await api.put(`/templates/${id}`, data);
-    return response.data ?? response;
+    return normalizeTemplate(response.data ?? response);
   },
 
   /** DELETE /templates/{id} — yêu cầu quyền TEMPLATE_MANAGE; system template trả 403 */

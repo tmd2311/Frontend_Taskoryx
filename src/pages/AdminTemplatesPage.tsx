@@ -8,7 +8,7 @@ import type { TableColumnsType } from 'antd';
 type ColumnsType<T> = TableColumnsType<T>;
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined,
-  AppstoreAddOutlined, LockOutlined, MinusCircleOutlined, HolderOutlined,
+  AppstoreAddOutlined, MinusCircleOutlined, HolderOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
@@ -55,7 +55,9 @@ const DEFAULT_COLUMNS: TemplateColumn[] = [
   { name: 'Done', color: '#22c55e', isCompleted: true, mappedStatus: 'DONE' },
 ];
 
-const isSystemTemplate = (t: ProjectTemplate) => !t.createdBy;
+// Backend không trả createdBy trong response → không thể xác định system template từ FE
+// Thay vào đó để backend quyết định (trả 403 khi cố xóa system template)
+const isSystemTemplate = (_t: ProjectTemplate) => false;
 
 type ModalMode = 'view' | 'create' | 'edit';
 
@@ -264,12 +266,10 @@ const AdminTemplatesPage: React.FC = () => {
           <div>
             <Space size={6}>
               <Text strong style={{ fontSize: 13 }}>{t.name}</Text>
-              {isSystemTemplate(t) && (
-                <Tag icon={<LockOutlined />} color="red" style={{ fontSize: 11 }}>Hệ thống</Tag>
-              )}
-              {!isSystemTemplate(t) && (
-                <Tag color="blue" style={{ fontSize: 11 }}>Của tôi</Tag>
-              )}
+              {t.isPublic
+                ? <Tag color="blue" style={{ fontSize: 11 }}>Công khai</Tag>
+                : <Tag color="default" style={{ fontSize: 11 }}>Riêng tư</Tag>
+              }
             </Space>
             {t.description && (
               <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>{t.description}</Text>
@@ -303,7 +303,7 @@ const AdminTemplatesPage: React.FC = () => {
           <Tooltip title="Xem chi tiết">
             <Button size="small" icon={<EyeOutlined />} onClick={() => openView(t)} />
           </Tooltip>
-          {canManage && !isSystemTemplate(t) && (
+          {canManage && (
             <>
               <Tooltip title="Chỉnh sửa">
                 <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(t)} />
@@ -474,12 +474,11 @@ const AdminTemplatesPage: React.FC = () => {
           )
         }
       >
-        {isViewMode && target && isSystemTemplate(target) && (
+        {isViewMode && (
           <Alert
             type="info"
             showIcon
-            icon={<LockOutlined />}
-            message="System Template — không thể sửa hoặc xóa"
+            message="Chế độ xem — không thể chỉnh sửa"
             style={{ marginBottom: 16 }}
           />
         )}

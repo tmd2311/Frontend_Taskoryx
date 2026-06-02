@@ -73,6 +73,13 @@ const AdminUsersPage: React.FC = () => {
   const [filterActive, setFilterActive] = useState<boolean | undefined>(undefined);
   const [page, setPage] = useState(1);
 
+  // Filter client-side (roleId/isActive không được backend hỗ trợ qua query)
+  const filteredUsers = users.filter((u) => {
+    if (filterRole && !u.roles?.some((r: any) => r.id === filterRole)) return false;
+    if (filterActive !== undefined && u.isActive !== filterActive) return false;
+    return true;
+  });
+
   // Modal tạo user
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createForm] = Form.useForm();
@@ -111,19 +118,19 @@ const AdminUsersPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const params: any = { page: page - 1, size: PAGE_SIZE };
+    const clientFilter = filterRole !== undefined || filterActive !== undefined;
+    const params: any = clientFilter
+      ? { page: 0, size: 1000 }
+      : { page: page - 1, size: PAGE_SIZE };
     if (search.trim()) params.keyword = search.trim();
-    if (filterRole) params.roleId = filterRole;
-    if (filterActive !== undefined) params.isActive = filterActive;
     fetchUsers(params);
   }, [page, search, filterRole, filterActive]);
 
   const reload = () => {
     setPage(1);
-    const params: any = { page: 0, size: PAGE_SIZE };
+    const clientFilter = filterRole !== undefined || filterActive !== undefined;
+    const params: any = clientFilter ? { page: 0, size: 1000 } : { page: 0, size: PAGE_SIZE };
     if (search.trim()) params.keyword = search.trim();
-    if (filterRole) params.roleId = filterRole;
-    if (filterActive !== undefined) params.isActive = filterActive;
     fetchUsers(params);
   };
 
@@ -461,13 +468,13 @@ const AdminUsersPage: React.FC = () => {
       {/* Table */}
       <Table
         columns={columns}
-        dataSource={users}
+        dataSource={filteredUsers}
         rowKey="id"
         loading={isLoading}
         pagination={{
           current: page,
           pageSize: PAGE_SIZE,
-          total: totalElements,
+          total: (filterRole !== undefined || filterActive !== undefined) ? filteredUsers.length : totalElements,
           onChange: (p) => setPage(p),
           showTotal: (t) => `Tổng ${t} tài khoản`,
           showSizeChanger: false,

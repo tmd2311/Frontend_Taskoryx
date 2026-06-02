@@ -1055,7 +1055,8 @@ export interface ProjectTemplate {
   category?: string;
   icon?: string;
   color?: string;
-  isPublic: boolean;
+  isPublic: boolean;   // alias cho `public` từ backend
+  public?: boolean;    // tên thực từ ProjectTemplateResponse
   createdAt?: string;
   createdBy?: string | null;
   config?: TemplateConfig;
