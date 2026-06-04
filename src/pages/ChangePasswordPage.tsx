@@ -1,5 +1,5 @@
 import React from 'react';
-import { Form, Input, Button, Card, Typography, message, Alert } from 'antd';
+import { Form, Input, Button, Card, Typography, message, Alert, ConfigProvider, theme } from 'antd';
 import { LockOutlined, KeyOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
@@ -41,6 +41,19 @@ const ChangePasswordPage: React.FC = () => {
   };
 
   return (
+    <ConfigProvider
+      theme={{
+        algorithm: theme.defaultAlgorithm,
+        token: {
+          colorPrimary: '#4361ee',
+          colorInfo: '#4361ee',
+          colorBgContainer: '#ffffff',
+          colorBgLayout: '#f0f2f5',
+          borderRadius: 8,
+          borderRadiusLG: 12,
+        },
+      }}
+    >
     <div
       style={{
         display: 'flex',
@@ -138,6 +151,7 @@ const ChangePasswordPage: React.FC = () => {
         </Form>
       </Card>
     </div>
+    </ConfigProvider>
   );
 };
 

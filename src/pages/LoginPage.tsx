@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Typography, message, Alert, Steps } from 'antd';
+import { Form, Input, Button, Typography, message, Alert, Steps, ConfigProvider, theme } from 'antd';
 import {
   UserOutlined, LockOutlined, SafetyCertificateOutlined,
   CheckCircleFilled,
@@ -69,7 +69,17 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f0f2f5' }}>
+    <ConfigProvider
+      theme={{
+        algorithm: theme.defaultAlgorithm,
+        token: {
+          colorPrimary: '#4361ee',
+          colorBgContainer: '#ffffff',
+          colorBgLayout: '#f0f2f5',
+        },
+      }}
+    >
+    <div className="login-page" style={{ display: 'flex', minHeight: '100vh', background: '#f0f2f5' }}>
       {/* ─── Left branding panel ─── */}
       <div style={{
         flex: '0 0 480px',
@@ -126,25 +136,27 @@ const LoginPage: React.FC = () => {
       </div>
 
       {/* ─── Right form panel ─── */}
-      <div style={{
+      <div className="login-form-panel" style={{
         flex: 1,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '40px 24px',
+        background: '#ffffff',
+        color: '#1a1a2e',
       }}>
         <div style={{ width: '100%', maxWidth: 420 }}>
           {step === 'credentials' ? (
             <>
               <div style={{ marginBottom: 32 }}>
-                <Title level={3} style={{ marginBottom: 6, fontWeight: 700 }}>Chào mừng trở lại</Title>
-                <Text type="secondary" style={{ fontSize: 15 }}>Đăng nhập để tiếp tục làm việc</Text>
+                <Title level={3} style={{ marginBottom: 6, fontWeight: 700, color: '#111827' }}>Chào mừng trở lại</Title>
+                <Text style={{ fontSize: 15, color: '#6b7280' }}>Đăng nhập để tiếp tục làm việc</Text>
               </div>
 
               <Form form={form} name="login" onFinish={onFinish} autoComplete="off" layout="vertical" size="large">
                 <Form.Item
                   name="email"
-                  label={<Text strong style={{ fontSize: 13 }}>Email</Text>}
+                  label={<Text strong style={{ fontSize: 13, color: '#374151' }}>Email</Text>}
                   rules={[
                     { required: true, message: 'Vui lòng nhập email!' },
                     { type: 'email', message: 'Email không hợp lệ!' },
@@ -159,7 +171,7 @@ const LoginPage: React.FC = () => {
 
                 <Form.Item
                   name="password"
-                  label={<Text strong style={{ fontSize: 13 }}>Mật khẩu</Text>}
+                  label={<Text strong style={{ fontSize: 13, color: '#374151' }}>Mật khẩu</Text>}
                   rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}
                 >
                   <Input.Password
@@ -185,8 +197,8 @@ const LoginPage: React.FC = () => {
           ) : (
             <>
               <div style={{ marginBottom: 28 }}>
-                <Title level={3} style={{ marginBottom: 6, fontWeight: 700 }}>Xác thực 2 yếu tố</Title>
-                <Text type="secondary" style={{ fontSize: 15 }}>Nhập mã từ ứng dụng Authenticator</Text>
+                <Title level={3} style={{ marginBottom: 6, fontWeight: 700, color: '#111827' }}>Xác thực 2 yếu tố</Title>
+                <Text style={{ fontSize: 15, color: '#6b7280' }}>Nhập mã từ ứng dụng Authenticator</Text>
               </div>
 
               <Steps
@@ -209,7 +221,7 @@ const LoginPage: React.FC = () => {
               <Form form={totpForm} onFinish={onTotpFinish} layout="vertical" size="large">
                 <Form.Item
                   name="totpCode"
-                  label={<Text strong style={{ fontSize: 13 }}>Mã xác thực (6 chữ số)</Text>}
+                  label={<Text strong style={{ fontSize: 13, color: '#374151' }}>Mã xác thực (6 chữ số)</Text>}
                   rules={[
                     { required: true, message: 'Nhập mã xác thực' },
                     { len: 6, message: 'Mã gồm 6 chữ số' },
@@ -257,6 +269,7 @@ const LoginPage: React.FC = () => {
         }
       `}</style>
     </div>
+    </ConfigProvider>
   );
 };
 

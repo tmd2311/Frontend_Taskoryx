@@ -957,3 +957,70 @@ body {
 /* ─── React Quill – editor trong drawer (legacy) ─── */
 .ql-container { font-size: 13px; }
 .ql-editor { min-height: 80px; max-height: 200px; overflow-y: auto; }
+
+/* ─── Login page: panel phải luôn light mode, không phụ thuộc data-theme ─── */
+
+/* Input / affix wrapper */
+[data-theme="dark"] .login-form-panel .ant-input,
+[data-theme="dark"] .login-form-panel .ant-input-affix-wrapper,
+[data-theme="dark"] .login-form-panel .ant-input-affix-wrapper input,
+[data-theme="dark"] .login-form-panel .ant-select-selector,
+[data-theme="dark"] .login-form-panel .ant-picker,
+[data-theme="dark"] .login-form-panel .ant-input-number,
+[data-theme="dark"] .login-form-panel .ant-input-textarea textarea {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #1a1a2e !important;
+}
+
+[data-theme="dark"] .login-form-panel .ant-input::placeholder,
+[data-theme="dark"] .login-form-panel .ant-input-affix-wrapper input::placeholder {
+  color: #9ca3af !important;
+}
+
+[data-theme="dark"] .login-form-panel .ant-input-affix-wrapper .ant-input-suffix svg,
+[data-theme="dark"] .login-form-panel .ant-input-affix-wrapper .ant-input-password-icon {
+  color: #8c9ab0 !important;
+}
+
+[data-theme="dark"] .login-form-panel .ant-input:focus,
+[data-theme="dark"] .login-form-panel .ant-input-affix-wrapper-focused {
+  border-color: #4361ee !important;
+  box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.12) !important;
+}
+
+/* Typography */
+[data-theme="dark"] .login-form-panel .ant-typography {
+  color: #1a1a2e !important;
+}
+
+[data-theme="dark"] .login-form-panel .ant-typography.ant-typography-secondary {
+  color: #6b7280 !important;
+}
+
+[data-theme="dark"] .login-form-panel h1.ant-typography,
+[data-theme="dark"] .login-form-panel h2.ant-typography,
+[data-theme="dark"] .login-form-panel h3.ant-typography,
+[data-theme="dark"] .login-form-panel h4.ant-typography,
+[data-theme="dark"] .login-form-panel h5.ant-typography {
+  color: #111827 !important;
+}
+
+/* Form labels & messages */
+[data-theme="dark"] .login-form-panel .ant-form-item-label > label {
+  color: #374151 !important;
+}
+
+[data-theme="dark"] .login-form-panel .ant-form-item-explain,
+[data-theme="dark"] .login-form-panel .ant-form-item-explain-error {
+  color: #ef4444 !important;
+}
+
+/* Steps */
+[data-theme="dark"] .login-form-panel .ant-steps-item-title {
+  color: #374151 !important;
+}
+
+[data-theme="dark"] .login-form-panel .ant-steps-item-description {
+  color: #6b7280 !important;
+}
