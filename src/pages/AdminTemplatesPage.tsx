@@ -57,7 +57,6 @@ const DEFAULT_COLUMNS: TemplateColumn[] = [
 
 // Backend không trả createdBy trong response → không thể xác định system template từ FE
 // Thay vào đó để backend quyết định (trả 403 khi cố xóa system template)
-const isSystemTemplate = (_t: ProjectTemplate) => false;
 
 type ModalMode = 'view' | 'create' | 'edit';
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Typography, Row, Col, Card, Statistic, Tag, Space, Avatar,
-  Button, Empty, Tooltip, Progress, Badge, Table, theme,
+  Button, Empty, Progress, Badge, Table, theme,
 } from 'antd';
 import type { TableColumnsType } from 'antd';
 import {
