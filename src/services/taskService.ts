@@ -169,7 +169,8 @@ export const taskService = {
   /** GET /projects/:projectId/gantt – Tasks có ngày để hiển thị Gantt */
   getGantt: async (projectId: string): Promise<GanttTask[]> => {
     const response: any = await api.get(`/projects/${projectId}/gantt`);
-    return response.data ?? response;
+    const body = response.data ?? response;
+    return Array.isArray(body) ? body : (body?.tasks ?? []);
   },
 
   /** GET /projects/:projectId/tasks/valid-parents – Danh sách task hợp lệ làm Đầu việc chính */

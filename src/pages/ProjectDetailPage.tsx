@@ -488,7 +488,7 @@ const ProjectDetailPage: React.FC = () => {
     setGanttError(null);
     try {
       const data = await taskService.getGantt(projectId);
-      setGanttTasks(Array.isArray(data) ? data : []);
+      setGanttTasks(data);
     } catch (e: any) {
       if (e?.status === 403) setForbiddenTab('gantt');
       else setGanttError(e.message || 'Không thể tải dữ liệu Gantt');
