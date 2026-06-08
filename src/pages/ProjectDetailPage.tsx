@@ -45,6 +45,7 @@ import { TaskPriority, ProjectRole, TaskStatus, SprintStatus } from '../types';
 import SprintKanbanView from '../components/SprintKanbanView';
 import TaskFilterPanel, { DEFAULT_FILTER } from '../components/TaskFilterPanel';
 import BoardTab from './tabs/BoardTab';
+import GanttChartView from '../components/GanttChartView';
 import dayjs from 'dayjs';
 
 const { TextArea } = Input;
@@ -1677,46 +1678,17 @@ const ProjectDetailPage: React.FC = () => {
 
       {activeTab === 'gantt' && (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-            <Text type="secondary">Tasks có ngày bắt đầu hoặc deadline</Text>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
             <Button size="small" icon={<ReloadOutlined />} onClick={fetchGantt} loading={ganttLoading}>
               Làm mới
             </Button>
           </div>
-          {ganttLoading ? (
-            <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-          ) : ganttError ? (
-            <Empty description={<span style={{ color: '#f5222d' }}>{ganttError}</span>} style={{ padding: '40px 0' }} />
-          ) : ganttTasks.length === 0 ? (
-            <Empty description="Không có task nào có ngày bắt đầu hoặc deadline" style={{ padding: '40px 0' }} />
-          ) : (
-            <Table
-              dataSource={ganttTasks}
-              rowKey="id"
-              pagination={false}
-              scroll={{ x: 800 }}
-              columns={[
-                { title: 'Mã', dataIndex: 'taskKey', width: 110, render: (k) => <Tag style={{ fontFamily: 'monospace' }}>{k}</Tag> },
-                { title: 'Tiêu đề', dataIndex: 'title', render: (t, r) => <Button type="link" style={{ padding: 0, height: 'auto', textAlign: 'left' }} onClick={() => navigate(`/tasks/${r.taskKey}`)}>{t}</Button> },
-                { title: 'Ưu tiên', dataIndex: 'priority', width: 110, render: (p) => <Tag color={PRIORITY_COLOR[p]}>{PRIORITY_LABEL[p]}</Tag> },
-                { title: 'Assignee', dataIndex: 'assigneeName', width: 140, render: (n) => n ? <Space size={6}><Avatar size={20} icon={<UserOutlined />} />{n}</Space> : <Text type="secondary">—</Text> },
-                { title: 'Bắt đầu', dataIndex: 'startDate', width: 120, render: (d) => d ? dayjs(d).format('DD/MM/YYYY') : <Text type="secondary">—</Text> },
-                { title: 'Deadline', dataIndex: 'dueDate', width: 120, render: (d, r) => d ? <Text style={{ color: r.completedAt ? undefined : (dayjs(d).isBefore(dayjs()) ? '#f5222d' : undefined) }}>{dayjs(d).format('DD/MM/YYYY')}</Text> : <Text type="secondary">—</Text> },
-                {
-                  title: 'Tiến độ', key: 'timeline', width: 200,
-                  render: (_, r) => {
-                    if (!r.startDate && !r.dueDate) return null;
-                    const start = r.startDate ? dayjs(r.startDate) : dayjs();
-                    const end = r.dueDate ? dayjs(r.dueDate) : dayjs();
-                    const tot = end.diff(start, 'day') || 1;
-                    const elapsed = dayjs().diff(start, 'day');
-                    const pct = Math.min(Math.max(Math.round((elapsed / tot) * 100), 0), 100);
-                    return <Progress percent={pct} size="small" strokeColor={r.completedAt ? '#52c41a' : (pct > 100 ? '#f5222d' : '#1890ff')} />;
-                  },
-                },
-              ]}
-            />
-          )}
+          <GanttChartView
+            tasks={ganttTasks}
+            loading={ganttLoading}
+            error={ganttError}
+            onTaskClick={(taskKey) => navigate(`/tasks/${taskKey}`)}
+          />
         </>
       )}
 

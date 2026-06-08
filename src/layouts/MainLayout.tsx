@@ -219,7 +219,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     {
       key: 'gantt',
       icon: <PartitionOutlined />,
-      label: 'Gantt Chart',
+      label: 'Biểu đồ tiến độ',
       onClick: () => navTo(`/projects/${currentProject.id}?tab=gantt`),
     },
     {
