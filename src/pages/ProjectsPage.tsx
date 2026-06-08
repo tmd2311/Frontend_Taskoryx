@@ -41,6 +41,7 @@ import {
 } from '@ant-design/icons';
 import { useProjectStore } from '../stores/projectStore';
 import { usePermissionStore } from '../stores/permissionStore';
+import { useThemeStore } from '../stores/themeStore';
 import { adminService } from '../services/adminService';
 import { templateService } from '../services/templateService';
 import { useAuthStore } from '../stores/authStore';
@@ -229,6 +230,7 @@ const ProjectCard: React.FC<{
 
 const ProjectsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { isDark } = useThemeStore();
   const { isAdmin: authIsAdmin } = useAuthStore();
   const { hasPermission } = usePermissionStore();
   const canCreateProject = hasPermission('CREATE_PROJECT') || authIsAdmin === true;
@@ -628,19 +630,21 @@ const ProjectsPage: React.FC = () => {
                   <div
                     onClick={() => setSelectedTemplateId(BLANK_TEMPLATE_ID)}
                     style={{
-                      border: `2px solid ${selectedTemplateId === BLANK_TEMPLATE_ID ? '#8c8c8c' : '#f0f0f0'}`,
+                      border: `2px solid ${selectedTemplateId === BLANK_TEMPLATE_ID ? (isDark ? '#888' : '#8c8c8c') : (isDark ? '#303030' : '#f0f0f0')}`,
                       borderRadius: 8,
                       padding: '12px 14px',
                       cursor: 'pointer',
-                      background: selectedTemplateId === BLANK_TEMPLATE_ID ? '#f5f5f5' : '#fff',
+                      background: selectedTemplateId === BLANK_TEMPLATE_ID
+                        ? (isDark ? '#2a2a2a' : '#f5f5f5')
+                        : (isDark ? '#1a1a1a' : '#fff'),
                       transition: 'all .15s',
                     }}
                   >
                     <Space align="start">
-                      <span style={{ fontSize: 20 }}><AppstoreOutlined style={{ color: '#8c8c8c' }} /></span>
+                      <span style={{ fontSize: 20 }}><AppstoreOutlined style={{ color: isDark ? '#888' : '#8c8c8c' }} /></span>
                       <div>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>Trống</div>
-                        <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: isDark ? '#888' : '#8c8c8c', marginTop: 2 }}>
                           Bắt đầu từ đầu, không áp dụng template
                         </div>
                       </div>
@@ -657,11 +661,13 @@ const ProjectsPage: React.FC = () => {
                       <div
                         onClick={() => setSelectedTemplateId(tpl.id)}
                         style={{
-                          border: `2px solid ${isSelected ? color : '#f0f0f0'}`,
+                          border: `2px solid ${isSelected ? color : (isDark ? '#303030' : '#f0f0f0')}`,
                           borderRadius: 8,
                           padding: '12px 14px',
                           cursor: 'pointer',
-                          background: isSelected ? `${color}10` : '#fff',
+                          background: isSelected
+                            ? `${color}${isDark ? '22' : '10'}`
+                            : (isDark ? '#1a1a1a' : '#fff'),
                           transition: 'all .15s',
                         }}
                       >
@@ -677,7 +683,7 @@ const ProjectsPage: React.FC = () => {
                               )}
                             </Space>
                             {tpl.description && (
-                              <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>
+                              <div style={{ fontSize: 11, color: isDark ? '#888' : '#8c8c8c', marginTop: 2 }}>
                                 {tpl.description}
                               </div>
                             )}
@@ -690,7 +696,7 @@ const ProjectsPage: React.FC = () => {
 
                 {!templatesLoading && apiTemplates.length === 0 && (
                   <Col span={24}>
-                    <div style={{ textAlign: 'center', padding: '12px 0', color: '#8c8c8c', fontSize: 13 }}>
+                    <div style={{ textAlign: 'center', padding: '12px 0', color: isDark ? '#888' : '#8c8c8c', fontSize: 13 }}>
                       Chưa có template nào. Chỉ có thể tạo dự án trống.
                     </div>
                   </Col>
@@ -704,7 +710,7 @@ const ProjectsPage: React.FC = () => {
                 return (
                   <>
                     <Divider style={{ margin: '16px 0 10px' }} />
-                    <div style={{ fontSize: 12, color: '#595959', marginBottom: 6, fontWeight: 500 }}>
+                    <div style={{ fontSize: 12, color: isDark ? '#a0a0a0' : '#595959', marginBottom: 6, fontWeight: 500 }}>
                       Cột Kanban ({tpl.config.boardType}) — {tpl.config.columns.length} cột:
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -718,7 +724,7 @@ const ProjectsPage: React.FC = () => {
                       ))}
                     </div>
                     {tpl.config.taskFields && tpl.config.taskFields.length > 0 && (
-                      <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
+                      <div style={{ marginTop: 8, fontSize: 12, color: isDark ? '#888' : '#8c8c8c' }}>
                         Task fields: {tpl.config.taskFields.join(', ')}
                       </div>
                     )}

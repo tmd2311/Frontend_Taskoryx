@@ -10,11 +10,12 @@ import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import type { GanttTask } from '../types';
 import { TaskPriority, TaskStatus } from '../types';
+import { useThemeStore } from '../stores/themeStore';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ROW_HEIGHT = 38;
-const HEADER_HEIGHT = 56; // two sub-rows: 24 + 32
+const HEADER_HEIGHT = 56;
 const BASE_COL_WIDTH_DAY = 28;
 const BASE_COL_WIDTH_WEEK = 80;
 const BASE_COL_WIDTH_MONTH = 120;
@@ -32,6 +33,56 @@ const PRIORITY_COLOR: Record<string, string> = {
   [TaskPriority.HIGH]: '#fa8c16',
   [TaskPriority.URGENT]: '#ff4d4f',
 };
+
+// ─── Theme tokens ─────────────────────────────────────────────────────────────
+
+interface ThemeTokens {
+  bg: string;
+  bgAlt: string;
+  bgHeader: string;
+  bgHover: string;
+  border: string;
+  borderStrong: string;
+  text: string;
+  textSub: string;
+  textMuted: string;
+  progressTrack: string;
+  weekendBg: string;
+  rowStripeBg: string;
+}
+
+function getTokens(isDark: boolean): ThemeTokens {
+  if (isDark) {
+    return {
+      bg: '#141414',
+      bgAlt: '#1d1d1d',
+      bgHeader: '#1f1f1f',
+      bgHover: '#1a2a4a',
+      border: '#303030',
+      borderStrong: '#424242',
+      text: '#e0e0e0',
+      textSub: '#a0a0a0',
+      textMuted: '#606060',
+      progressTrack: '#2a2a2a',
+      weekendBg: 'rgba(255,255,255,0.03)',
+      rowStripeBg: 'rgba(255,255,255,0.025)',
+    };
+  }
+  return {
+    bg: '#ffffff',
+    bgAlt: '#fafafa',
+    bgHeader: '#f7f8fa',
+    bgHover: '#f0f5ff',
+    border: '#f0f0f0',
+    borderStrong: '#e8e8e8',
+    text: '#262626',
+    textSub: '#595959',
+    textMuted: '#8c8c8c',
+    progressTrack: '#f0f0f0',
+    weekendBg: '#f5f5f5',
+    rowStripeBg: 'rgba(0,0,0,0.012)',
+  };
+}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -52,7 +103,7 @@ interface TimeCol {
   isToday: boolean;
   isWeekend: boolean;
   isMonthStart: boolean;
-  spanCols?: number; // for week/month view grouping
+  spanCols?: number;
 }
 
 function buildCols(
@@ -79,7 +130,6 @@ function buildCols(
       cur = cur.add(1, 'day');
     }
   } else if (mode === 'week') {
-    // align to monday
     cur = cur.startOf('isoWeek' as any);
     while (!cur.isAfter(finish)) {
       cols.push({
@@ -161,7 +211,6 @@ const TaskBar: React.FC<TaskBarProps> = ({ task, colWidth, cols, onClick, mode }
     ? '#52c41a'
     : (PRIORITY_COLOR[task.priority] ?? '#1890ff');
 
-  // compute pixel offset
   const getOffset = (d: dayjs.Dayjs) => {
     if (mode === 'day') {
       return d.diff(rangeStart.startOf('day'), 'day') * colWidth;
@@ -217,7 +266,6 @@ const TaskBar: React.FC<TaskBarProps> = ({ task, colWidth, cols, onClick, mode }
   const right = getOffset(endDate!.add(1, 'day'));
   const width = Math.max(right - left, colWidth);
 
-  // progress: elapsed time ratio
   const today = dayjs().startOf('day');
   const totalDays = endDate!.diff(startDate!, 'day') || 1;
   const elapsed = Math.min(Math.max(today.diff(startDate!, 'day'), 0), totalDays);
@@ -323,6 +371,9 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
   onTaskClick,
 }) => {
   const navigate = useNavigate();
+  const { isDark } = useThemeStore();
+  const tk = getTokens(isDark);
+
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [zoom, setZoom] = useState(1.0);
   const [searchText, setSearchText] = useState('');
@@ -331,7 +382,6 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
   const rightScrollRef = useRef<HTMLDivElement>(null);
   const syncingRef = useRef(false);
 
-  // Scroll sync
   const onLeftScroll = useCallback(() => {
     if (syncingRef.current) return;
     syncingRef.current = true;
@@ -350,7 +400,6 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
     syncingRef.current = false;
   }, []);
 
-  // Filter tasks
   const filteredTasks = useMemo(() => {
     const q = searchText.toLowerCase();
     return tasks.filter(t =>
@@ -358,7 +407,6 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
     );
   }, [tasks, searchText]);
 
-  // Date range
   const { rangeStart, rangeEnd } = useMemo(() => {
     const dates: dayjs.Dayjs[] = [];
     filteredTasks.forEach(t => {
@@ -377,7 +425,6 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
     };
   }, [filteredTasks]);
 
-  // Columns
   const cols = useMemo(() => buildCols(rangeStart, rangeEnd, viewMode), [rangeStart, rangeEnd, viewMode]);
 
   const baseColWidth = viewMode === 'day'
@@ -391,14 +438,12 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
 
   const monthSpans = useMemo(() => buildMonthSpans(cols), [cols]);
 
-  // Today column index
   const todayIdx = useMemo(() => {
     return cols.findIndex(c => c.isToday);
   }, [cols]);
 
   const todayLeft = todayIdx >= 0 ? todayIdx * colWidth + colWidth / 2 : -1;
 
-  // Scroll today into view on mount / mode change
   useEffect(() => {
     if (rightScrollRef.current && todayLeft > 0) {
       const scrollLeft = Math.max(0, todayLeft - rightScrollRef.current.clientWidth / 2);
@@ -456,15 +501,14 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '8px 12px',
-        background: '#fafafa',
-        border: '1px solid #f0f0f0',
+        background: tk.bgHeader,
+        border: `1px solid ${tk.borderStrong}`,
         borderRadius: '8px 8px 0 0',
         gap: 12,
         flexWrap: 'wrap',
       }}>
-        {/* Left: search */}
         <Input
-          prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+          prefix={<SearchOutlined style={{ color: tk.textMuted }} />}
           placeholder="Tìm task..."
           value={searchText}
           onChange={e => setSearchText(e.target.value)}
@@ -473,7 +517,6 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
           size="small"
         />
 
-        {/* Center: view mode */}
         <Space size={0}>
           {(['day', 'week', 'month'] as ViewMode[]).map(m => (
             <Button
@@ -494,7 +537,6 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
           ))}
         </Space>
 
-        {/* Right: zoom */}
         <Space size={4}>
           <Button size="small" icon={<MinusOutlined />} onClick={zoomOut}
             style={{ borderRadius: '6px 0 0 6px', borderRight: 0 }}
@@ -513,11 +555,11 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
       <div style={{
         display: 'flex',
         flex: 1,
-        border: '1px solid #e8e8e8',
+        border: `1px solid ${tk.borderStrong}`,
         borderTop: 0,
         borderRadius: '0 0 8px 8px',
         overflow: 'hidden',
-        background: '#fff',
+        background: tk.bg,
         minHeight: 360,
       }}>
 
@@ -528,7 +570,7 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
           maxWidth: 480,
           display: 'flex',
           flexDirection: 'column',
-          borderRight: '2px solid #e8e8e8',
+          borderRight: `2px solid ${tk.borderStrong}`,
           flexShrink: 0,
         }}>
           {/* Header */}
@@ -536,22 +578,22 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
             height: HEADER_HEIGHT,
             display: 'flex',
             alignItems: 'center',
-            background: '#f7f8fa',
-            borderBottom: '1px solid #e8e8e8',
+            background: tk.bgHeader,
+            borderBottom: `1px solid ${tk.borderStrong}`,
             padding: '0 12px',
             flexShrink: 0,
           }}>
             <div style={{ display: 'flex', gap: 0, width: '100%' }}>
-              <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: '#595959', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: tk.textSub, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Task
               </span>
-              <span style={{ width: 64, fontSize: 11, fontWeight: 700, color: '#595959', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>
+              <span style={{ width: 64, fontSize: 11, fontWeight: 700, color: tk.textSub, textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>
                 Bắt đầu
               </span>
-              <span style={{ width: 64, fontSize: 11, fontWeight: 700, color: '#595959', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>
+              <span style={{ width: 64, fontSize: 11, fontWeight: 700, color: tk.textSub, textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>
                 Kết thúc
               </span>
-              <span style={{ width: 60, fontSize: 11, fontWeight: 700, color: '#595959', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>
+              <span style={{ width: 60, fontSize: 11, fontWeight: 700, color: tk.textSub, textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>
                 %
               </span>
             </div>
@@ -568,7 +610,7 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
             }}
           >
             {filteredTasks.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#bfbfbf', padding: '32px 16px', fontSize: 13 }}>
+              <div style={{ textAlign: 'center', color: tk.textMuted, padding: '32px 16px', fontSize: 13 }}>
                 Không tìm thấy task
               </div>
             ) : filteredTasks.map((task, i) => {
@@ -584,6 +626,8 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                 : 0;
               const pct = task.completedAt ? 100 : (task.startDate ? Math.round((elapsed / totalDays) * 100) : 0);
 
+              const rowBg = i % 2 === 0 ? tk.bg : tk.bgAlt;
+
               return (
                 <div
                   key={task.id}
@@ -592,23 +636,18 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     padding: '0 12px',
-                    background: i % 2 === 0 ? '#fff' : '#fafafa',
-                    borderBottom: '1px solid #f0f0f0',
+                    background: rowBg,
+                    borderBottom: `1px solid ${tk.border}`,
                     cursor: 'pointer',
                     transition: 'background 0.1s',
                   }}
                   onClick={() => handleTaskClick(task.taskKey)}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#f0f5ff')}
-                  onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa')}
+                  onMouseEnter={e => (e.currentTarget.style.background = tk.bgHover)}
+                  onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
                 >
                   {/* Name + assignee */}
                   <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 5,
-                      overflow: 'hidden',
-                    }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden' }}>
                       <span style={{
                         display: 'inline-block',
                         width: 8,
@@ -621,7 +660,7 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                         <span style={{
                           fontSize: 12,
                           fontWeight: 500,
-                          color: isDone ? '#8c8c8c' : '#262626',
+                          color: isDone ? tk.textMuted : tk.text,
                           textDecoration: isDone ? 'line-through' : 'none',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
@@ -633,11 +672,11 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                       </Tooltip>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                      <span style={{ fontSize: 10, color: '#8c8c8c', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: 10, color: tk.textMuted, fontFamily: 'monospace' }}>
                         {task.taskKey}
                       </span>
                       {task.assigneeName && (
-                        <span style={{ fontSize: 10, color: '#8c8c8c' }}>
+                        <span style={{ fontSize: 10, color: tk.textMuted }}>
                           · {task.assigneeName}
                         </span>
                       )}
@@ -645,14 +684,14 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                   </div>
 
                   {/* Start date */}
-                  <div style={{ width: 64, textAlign: 'center', fontSize: 11, color: '#595959', flexShrink: 0 }}>
+                  <div style={{ width: 64, textAlign: 'center', fontSize: 11, color: tk.textSub, flexShrink: 0 }}>
                     {task.startDate ? dayjs(task.startDate).format('DD/MM') : '—'}
                   </div>
 
                   {/* Due date */}
                   <div style={{
                     width: 64, textAlign: 'center', fontSize: 11, flexShrink: 0,
-                    color: isOverdue ? '#ff4d4f' : isDone ? '#52c41a' : '#595959',
+                    color: isOverdue ? '#ff4d4f' : isDone ? '#52c41a' : tk.textSub,
                     fontWeight: isOverdue ? 600 : 400,
                   }}>
                     {task.dueDate ? dayjs(task.dueDate).format('DD/MM') : '—'}
@@ -664,7 +703,7 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                       <div style={{
                         flex: 1,
                         height: 4,
-                        background: '#f0f0f0',
+                        background: tk.progressTrack,
                         borderRadius: 2,
                         overflow: 'hidden',
                       }}>
@@ -676,7 +715,7 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                           transition: 'width 0.3s',
                         }} />
                       </div>
-                      <span style={{ fontSize: 10, color: '#8c8c8c', minWidth: 24, textAlign: 'right' }}>
+                      <span style={{ fontSize: 10, color: tk.textMuted, minWidth: 24, textAlign: 'right' }}>
                         {pct}%
                       </span>
                     </div>
@@ -697,26 +736,18 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
           {/* Sticky Header */}
           <div style={{
             height: HEADER_HEIGHT,
-            background: '#f7f8fa',
-            borderBottom: '1px solid #e8e8e8',
+            background: tk.bgHeader,
+            borderBottom: `1px solid ${tk.borderStrong}`,
             overflow: 'hidden',
             flexShrink: 0,
             position: 'relative',
           }}>
             <div
-              style={{
-                width: totalTimelineWidth,
-                height: HEADER_HEIGHT,
-                position: 'relative',
-              }}
+              style={{ width: totalTimelineWidth, height: HEADER_HEIGHT, position: 'relative' }}
               id="gantt-header-inner"
             >
               {/* Row 1: Month spans */}
-              <div style={{
-                height: 22,
-                display: 'flex',
-                borderBottom: '1px solid #e0e0e0',
-              }}>
+              <div style={{ height: 22, display: 'flex', borderBottom: `1px solid ${tk.borderStrong}` }}>
                 {monthSpans.map((ms) => (
                   <div
                     key={ms.startIdx}
@@ -728,8 +759,8 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                       paddingLeft: 8,
                       fontSize: 11,
                       fontWeight: 700,
-                      color: '#434343',
-                      borderRight: '1px solid #e0e0e0',
+                      color: tk.text,
+                      borderRight: `1px solid ${tk.borderStrong}`,
                       letterSpacing: '0.03em',
                       overflow: 'hidden',
                       whiteSpace: 'nowrap',
@@ -754,14 +785,14 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                       justifyContent: 'center',
                       fontSize: 11,
                       fontWeight: col.isToday ? 800 : col.isMonthStart ? 600 : 400,
-                      color: col.isToday ? '#4361ee' : col.isWeekend ? '#bfbfbf' : '#595959',
+                      color: col.isToday ? '#4361ee' : col.isWeekend ? tk.textMuted : tk.textSub,
                       background: col.isToday
                         ? 'rgba(67,97,238,0.08)'
                         : col.isWeekend
-                          ? '#f5f5f5'
+                          ? tk.weekendBg
                           : 'transparent',
-                      borderRight: '1px solid #f0f0f0',
-                      borderLeft: col.isMonthStart && i > 0 ? '1px solid #d9d9d9' : undefined,
+                      borderRight: `1px solid ${tk.border}`,
+                      borderLeft: col.isMonthStart && i > 0 ? `1px solid ${tk.borderStrong}` : undefined,
                       flexShrink: 0,
                       position: 'relative',
                     }}
@@ -790,16 +821,11 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
             ref={rightScrollRef}
             onScroll={(e) => {
               onRightScroll();
-              // Sync header scroll
               const headerEl = document.getElementById('gantt-header-inner');
               const parent = headerEl?.parentElement;
               if (parent) parent.scrollLeft = (e.currentTarget as HTMLDivElement).scrollLeft;
             }}
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              overflowX: 'auto',
-            }}
+            style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}
           >
             <div style={{
               width: totalTimelineWidth,
@@ -819,10 +845,10 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                     background: col.isToday
                       ? 'rgba(67,97,238,0.04)'
                       : col.isWeekend
-                        ? 'rgba(0,0,0,0.015)'
+                        ? tk.weekendBg
                         : 'transparent',
-                    borderRight: '1px solid #f5f5f5',
-                    borderLeft: col.isMonthStart && i > 0 ? '1px solid #ebebeb' : undefined,
+                    borderRight: `1px solid ${tk.border}`,
+                    borderLeft: col.isMonthStart && i > 0 ? `1px solid ${tk.borderStrong}` : undefined,
                     pointerEvents: 'none',
                   }}
                 />
@@ -864,8 +890,8 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                     top: i * ROW_HEIGHT,
                     width: '100%',
                     height: ROW_HEIGHT,
-                    background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.012)',
-                    borderBottom: '1px solid #f5f5f5',
+                    background: i % 2 === 0 ? 'transparent' : tk.rowStripeBg,
+                    borderBottom: `1px solid ${tk.border}`,
                     pointerEvents: 'none',
                   }}
                 />
@@ -894,7 +920,6 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                 </div>
               ))}
 
-              {/* Empty search result */}
               {filteredTasks.length === 0 && (
                 <div style={{
                   position: 'absolute',
@@ -902,7 +927,7 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#bfbfbf',
+                  color: tk.textMuted,
                   fontSize: 13,
                 }}>
                   Không tìm thấy task
@@ -919,8 +944,8 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
         justifyContent: 'space-between',
         padding: '6px 12px',
         fontSize: 11,
-        color: '#8c8c8c',
-        borderTop: '1px solid #f0f0f0',
+        color: tk.textMuted,
+        borderTop: `1px solid ${tk.border}`,
       }}>
         <span>
           {filteredTasks.length} task

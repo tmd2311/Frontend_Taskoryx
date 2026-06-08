@@ -39,6 +39,7 @@ import { useBoardStore } from '../../stores/boardStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { usePermissionStore } from '../../stores/permissionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { useNavigate } from 'react-router-dom';
 import { StatusTag } from '../../components/StatusSelect';
 import type { Board, KanbanColumn, TaskSummary } from '../../types';
@@ -77,81 +78,91 @@ interface TaskCardProps {
   dragHandleProps?: any;
   draggableProps?: any;
   innerRef?: (el: HTMLElement | null) => void;
+  isDark: boolean;
 }
 
 const TaskCard: React.FC<TaskCardProps> = ({
-  task, onOpen, isDragging, dragHandleProps, draggableProps, innerRef,
-}) => (
-  <div
-    ref={innerRef}
-    {...draggableProps}
-    style={{
-      background: isDragging ? '#e6f4ff' : '#fff',
-      border: `1px solid ${isDragging ? '#1890ff' : '#f0f0f0'}`,
-      borderRadius: 8,
-      padding: '10px 12px',
-      marginBottom: 8,
-      boxShadow: isDragging
-        ? '0 6px 20px rgba(24,144,255,.25)'
-        : '0 1px 3px rgba(0,0,0,.06)',
-      cursor: 'grab',
-      transition: 'box-shadow .15s, border-color .15s',
-      userSelect: 'none',
-      ...(draggableProps?.style ?? {}),
-    }}
-  >
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
-      <span
-        {...dragHandleProps}
-        style={{ color: '#bfbfbf', fontSize: 12, paddingTop: 2, cursor: 'grab', flexShrink: 0 }}
-        title="Kéo để di chuyển"
-      >
-        <HolderOutlined />
-      </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5, flexWrap: 'wrap' }}>
-          <Tag style={{ margin: 0, fontSize: 11 }}>{task.taskKey}</Tag>
-          <Tag color={PRIORITY_COLOR[task.priority]} style={{ margin: 0, fontSize: 11 }}>
-            {PRIORITY_LABEL[task.priority]}
-          </Tag>
-          <StatusTag status={task.status} small />
-        </div>
+  task, onOpen, isDragging, dragHandleProps, draggableProps, innerRef, isDark,
+}) => {
+  const bg = isDragging
+    ? (isDark ? '#1a3a5c' : '#e6f4ff')
+    : (isDark ? '#1f1f1f' : '#fff');
+  const border = isDragging
+    ? '#1890ff'
+    : (isDark ? '#303030' : '#f0f0f0');
 
-        <div
-          onClick={() => onOpen(task.taskKey)}
-          style={{ fontSize: 13, fontWeight: 500, marginBottom: 5, lineHeight: 1.4, cursor: 'pointer' }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = '#1890ff')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = '')}
+  return (
+    <div
+      ref={innerRef}
+      {...draggableProps}
+      style={{
+        background: bg,
+        border: `1px solid ${border}`,
+        borderRadius: 8,
+        padding: '10px 12px',
+        marginBottom: 8,
+        boxShadow: isDragging
+          ? '0 6px 20px rgba(24,144,255,.25)'
+          : isDark ? '0 1px 3px rgba(0,0,0,.3)' : '0 1px 3px rgba(0,0,0,.06)',
+        cursor: 'grab',
+        transition: 'box-shadow .15s, border-color .15s',
+        userSelect: 'none',
+        ...(draggableProps?.style ?? {}),
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+        <span
+          {...dragHandleProps}
+          style={{ color: isDark ? '#505050' : '#bfbfbf', fontSize: 12, paddingTop: 2, cursor: 'grab', flexShrink: 0 }}
+          title="Kéo để di chuyển"
         >
-          {task.title}
-        </div>
-
-        {task.dueDate && (
-          <div style={{ fontSize: 11, color: task.overdue ? '#f5222d' : '#8c8c8c', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-            {task.overdue && <ExclamationCircleOutlined />}
-            {dayjs(task.dueDate).format('DD/MM/YYYY')}
+          <HolderOutlined />
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5, flexWrap: 'wrap' }}>
+            <Tag style={{ margin: 0, fontSize: 11 }}>{task.taskKey}</Tag>
+            <Tag color={PRIORITY_COLOR[task.priority]} style={{ margin: 0, fontSize: 11 }}>
+              {PRIORITY_LABEL[task.priority]}
+            </Tag>
+            <StatusTag status={task.status} small />
           </div>
-        )}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-          <Text type="secondary" style={{ fontSize: 11 }}>{task.assigneeName ?? '—'}</Text>
-          <Space size={8}>
-            {(task.commentCount ?? 0) > 0 && (
-              <span style={{ fontSize: 11, color: '#8c8c8c' }}>
-                <CommentOutlined /> {task.commentCount}
-              </span>
-            )}
-            {(task.attachmentCount ?? 0) > 0 && (
-              <span style={{ fontSize: 11, color: '#8c8c8c' }}>
-                <PaperClipOutlined /> {task.attachmentCount}
-              </span>
-            )}
-          </Space>
+          <div
+            onClick={() => onOpen(task.taskKey)}
+            style={{ fontSize: 13, fontWeight: 500, marginBottom: 5, lineHeight: 1.4, cursor: 'pointer' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#1890ff')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = '')}
+          >
+            {task.title}
+          </div>
+
+          {task.dueDate && (
+            <div style={{ fontSize: 11, color: task.overdue ? '#f5222d' : (isDark ? '#888' : '#8c8c8c'), marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              {task.overdue && <ExclamationCircleOutlined />}
+              {dayjs(task.dueDate).format('DD/MM/YYYY')}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+            <Text type="secondary" style={{ fontSize: 11 }}>{task.assigneeName ?? '—'}</Text>
+            <Space size={8}>
+              {(task.commentCount ?? 0) > 0 && (
+                <span style={{ fontSize: 11, color: isDark ? '#888' : '#8c8c8c' }}>
+                  <CommentOutlined /> {task.commentCount}
+                </span>
+              )}
+              {(task.attachmentCount ?? 0) > 0 && (
+                <span style={{ fontSize: 11, color: isDark ? '#888' : '#8c8c8c' }}>
+                  <PaperClipOutlined /> {task.attachmentCount}
+                </span>
+              )}
+            </Space>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Column Card ──────────────────────────────────────────────
 interface ColumnCardProps {
@@ -169,15 +180,21 @@ interface ColumnCardProps {
   dragHandleProps?: any;
   draggableProps?: any;
   innerRef?: (el: HTMLElement | null) => void;
+  isDark: boolean;
 }
 
 const ColumnCard: React.FC<ColumnCardProps> = ({
   col, isSprintBoard, canEditBoard, canCreateTask, canMoveTask,
   onEdit, onDelete, onAddTask, onOpenTask,
-  isDraggingColumn, dragHandleProps, draggableProps, innerRef,
+  isDraggingColumn, dragHandleProps, draggableProps, innerRef, isDark,
 }) => {
   const overLimit = col.taskLimit != null && col.tasks.length > col.taskLimit;
   const isCompleted = col.isCompleted === true;
+
+  const colBg = isDark ? '#1a1a1a' : '#f5f5f5';
+  const dropBg = isDark ? '#0d2a40' : '#e6f7ff';
+  const emptyBorder = isDark ? '#303030' : '#e8e8e8';
+  const emptyColor = isDark ? '#505050' : '#bfbfbf';
 
   return (
     <div
@@ -186,7 +203,7 @@ const ColumnCard: React.FC<ColumnCardProps> = ({
       style={{
         width: 280,
         minWidth: 280,
-        background: '#f5f5f5',
+        background: colBg,
         borderRadius: 10,
         display: 'flex',
         flexDirection: 'column',
@@ -197,7 +214,7 @@ const ColumnCard: React.FC<ColumnCardProps> = ({
             ? '1px solid #ffccc7'
             : isDraggingColumn
               ? '1px solid #1890ff'
-              : '1px solid transparent',
+              : `1px solid ${isDark ? '#2a2a2a' : 'transparent'}`,
         boxShadow: isDraggingColumn ? '0 8px 24px rgba(24,144,255,.2)' : undefined,
         transition: 'border-color .15s, box-shadow .15s',
         ...(draggableProps?.style ?? {}),
@@ -211,11 +228,10 @@ const ColumnCard: React.FC<ColumnCardProps> = ({
         alignItems: 'center',
         gap: 6,
       }}>
-        {/* Drag handle for column */}
         <span
           {...(canEditBoard && !isSprintBoard ? dragHandleProps : {})}
           style={{
-            color: canEditBoard && !isSprintBoard ? '#bfbfbf' : 'transparent',
+            color: canEditBoard && !isSprintBoard ? (isDark ? '#505050' : '#bfbfbf') : 'transparent',
             fontSize: 12,
             cursor: canEditBoard && !isSprintBoard ? 'grab' : 'default',
             flexShrink: 0,
@@ -231,7 +247,7 @@ const ColumnCard: React.FC<ColumnCardProps> = ({
         <Badge
           count={col.tasks.length}
           showZero
-          color={overLimit ? '#f5222d' : '#595959'}
+          color={overLimit ? '#f5222d' : (isDark ? '#505050' : '#595959')}
           style={{ fontSize: 10 }}
         />
         {col.taskLimit != null && (
@@ -241,7 +257,7 @@ const ColumnCard: React.FC<ColumnCardProps> = ({
           <Tag color="success" style={{ fontSize: 10, margin: 0 }}>Done</Tag>
         )}
         {isSprintBoard ? (
-          <Tag style={{ fontSize: 10, margin: 0, color: '#8c8c8c' }}>Sprint</Tag>
+          <Tag style={{ fontSize: 10, margin: 0, color: isDark ? '#888' : '#8c8c8c' }}>Sprint</Tag>
         ) : canEditBoard && (
           <Space size={2}>
             <Tooltip title="Chỉnh sửa">
@@ -272,13 +288,20 @@ const ColumnCard: React.FC<ColumnCardProps> = ({
               overflowY: 'auto',
               flex: 1,
               minHeight: 80,
-              background: snapshot.isDraggingOver ? '#e6f7ff' : 'transparent',
+              background: snapshot.isDraggingOver ? dropBg : 'transparent',
               borderRadius: '0 0 4px 4px',
               transition: 'background .15s',
             }}
           >
             {col.tasks.length === 0 && !snapshot.isDraggingOver && (
-              <div style={{ textAlign: 'center', color: '#bfbfbf', padding: '16px 0', fontSize: 12, border: '2px dashed #e8e8e8', borderRadius: 6 }}>
+              <div style={{
+                textAlign: 'center',
+                color: emptyColor,
+                padding: '16px 0',
+                fontSize: 12,
+                border: `2px dashed ${emptyBorder}`,
+                borderRadius: 6,
+              }}>
                 Kéo task vào đây
               </div>
             )}
@@ -292,6 +315,7 @@ const ColumnCard: React.FC<ColumnCardProps> = ({
                     dragHandleProps={dragProvided.dragHandleProps}
                     draggableProps={{ ...dragProvided.draggableProps, ref: dragProvided.innerRef }}
                     innerRef={dragProvided.innerRef}
+                    isDark={isDark}
                   />
                 )}
               </Draggable>
@@ -308,7 +332,7 @@ const ColumnCard: React.FC<ColumnCardProps> = ({
             type="text"
             icon={<PlusOutlined />}
             size="small"
-            style={{ width: '100%', color: '#8c8c8c', textAlign: 'left' }}
+            style={{ width: '100%', color: isDark ? '#888' : '#8c8c8c', textAlign: 'left' }}
             onClick={() => onAddTask(col)}
           >
             Thêm task
@@ -326,6 +350,7 @@ interface BoardTabProps {
 
 const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
   const navigate = useNavigate();
+  const { isDark } = useThemeStore();
   const {
     boards, currentBoard, isLoading,
     fetchBoards, fetchKanban,
@@ -357,12 +382,10 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
   const taskFields = currentProject?.projectConfig?.taskFields ?? [];
   const isFieldRequired = (field: string) => taskFields.includes(field);
 
-  // Fetch boards on mount
   useEffect(() => {
     if (projectId) fetchBoards(projectId);
   }, [projectId]);
 
-  // Auto-select default board
   useEffect(() => {
     if (boards.length > 0 && !activeBoardId) {
       const defaultBoard = boards.find((b) => b.isDefault) ?? boards[0];
@@ -370,7 +393,6 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
     }
   }, [boards]);
 
-  // Fetch kanban when active board changes
   useEffect(() => {
     if (activeBoardId) fetchKanban(activeBoardId);
   }, [activeBoardId]);
@@ -607,6 +629,7 @@ const BoardTab: React.FC<BoardTabProps> = ({ projectId }) => {
                         dragHandleProps={dragProvided.dragHandleProps}
                         draggableProps={{ ...dragProvided.draggableProps, ref: dragProvided.innerRef }}
                         innerRef={dragProvided.innerRef}
+                        isDark={isDark}
                       />
                     )}
                   </Draggable>
