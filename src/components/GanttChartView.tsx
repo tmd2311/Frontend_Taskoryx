@@ -1,10 +1,9 @@
 import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react';
-import { Input, Button, Tooltip, Spin, Empty, Avatar, Space, Tag } from 'antd';
+import { Input, Button, Tooltip, Spin, Empty, Space } from 'antd';
 import {
   SearchOutlined,
   PlusOutlined,
   MinusOutlined,
-  UserOutlined,
   CalendarOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -32,13 +31,6 @@ const PRIORITY_COLOR: Record<string, string> = {
   [TaskPriority.MEDIUM]: '#1890ff',
   [TaskPriority.HIGH]: '#fa8c16',
   [TaskPriority.URGENT]: '#ff4d4f',
-};
-
-const PRIORITY_LABEL: Record<string, string> = {
-  [TaskPriority.LOW]: 'Thấp',
-  [TaskPriority.MEDIUM]: 'TB',
-  [TaskPriority.HIGH]: 'Cao',
-  [TaskPriority.URGENT]: 'Khẩn',
 };
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -401,15 +393,8 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
 
   // Today column index
   const todayIdx = useMemo(() => {
-    const today = dayjs().startOf('day');
-    if (viewMode === 'day') {
-      return cols.findIndex(c => c.isToday);
-    } else if (viewMode === 'week') {
-      return cols.findIndex(c => c.isToday);
-    } else {
-      return cols.findIndex(c => c.isToday);
-    }
-  }, [cols, viewMode]);
+    return cols.findIndex(c => c.isToday);
+  }, [cols]);
 
   const todayLeft = todayIdx >= 0 ? todayIdx * colWidth + colWidth / 2 : -1;
 
