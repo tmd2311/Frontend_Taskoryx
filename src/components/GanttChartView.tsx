@@ -206,7 +206,10 @@ const TaskBar: React.FC<TaskBarProps> = ({ task, colWidth, cols, onClick, mode }
   const rangeStart = cols[0]?.date;
   if (!rangeStart) return null;
 
-  const isMilestone = !startDate || (startDate && endDate && startDate.isSame(endDate, 'day'));
+  // Only render as diamond milestone in day-view where colWidth is narrow enough
+  const isMilestone = mode === 'day' &&
+    (!startDate || (startDate && endDate && startDate.isSame(endDate, 'day')));
+
   const baseColor = task.completedAt
     ? '#52c41a'
     : (PRIORITY_COLOR[task.priority] ?? '#1890ff');
@@ -216,8 +219,10 @@ const TaskBar: React.FC<TaskBarProps> = ({ task, colWidth, cols, onClick, mode }
       return d.diff(rangeStart.startOf('day'), 'day') * colWidth;
     } else if (mode === 'week') {
       const startOfRange = rangeStart.startOf('isoWeek' as any);
-      return d.startOf('isoWeek' as any).diff(startOfRange, 'week') * colWidth
-        + (d.day() / 7) * colWidth;
+      const weekIdx = d.startOf('isoWeek' as any).diff(startOfRange, 'week');
+      // (day() + 6) % 7: Mon=0, Tue=1, ..., Sun=6  →  fraction 0..1
+      const dayFraction = (d.day() + 6) % 7 / 7;
+      return weekIdx * colWidth + dayFraction * colWidth;
     } else {
       const startOfRange = rangeStart.startOf('month');
       const months = d.startOf('month').diff(startOfRange, 'month');
@@ -262,13 +267,17 @@ const TaskBar: React.FC<TaskBarProps> = ({ task, colWidth, cols, onClick, mode }
     );
   }
 
-  const left = getOffset(startDate!);
-  const right = getOffset(endDate!.add(1, 'day'));
-  const width = Math.max(right - left, colWidth);
+  // For week/month, use dueDate as both start and end if startDate is missing
+  const effectiveStart = startDate ?? endDate!;
+  const effectiveEnd = endDate ?? startDate!;
+
+  const left = getOffset(effectiveStart);
+  const rawRight = getOffset(effectiveEnd.add(1, 'day'));
+  const width = Math.max(rawRight - left, colWidth);
 
   const today = dayjs().startOf('day');
-  const totalDays = endDate!.diff(startDate!, 'day') || 1;
-  const elapsed = Math.min(Math.max(today.diff(startDate!, 'day'), 0), totalDays);
+  const totalDays = effectiveEnd.diff(effectiveStart, 'day') || 1;
+  const elapsed = Math.min(Math.max(today.diff(effectiveStart, 'day'), 0), totalDays);
   const pct = task.completedAt ? 100 : Math.round((elapsed / totalDays) * 100);
 
   const tooltipContent = (
