@@ -19,7 +19,6 @@ import {
   ArrowLeftOutlined,
   ClockCircleOutlined,
   AppstoreAddOutlined,
-  AppstoreOutlined,
   RobotOutlined,
   TagOutlined,
 } from '@ant-design/icons';
@@ -191,12 +190,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       icon: <TableOutlined />,
       label: 'Sprints',
       onClick: () => navTo(`/projects/${currentProject.id}?tab=sprints`),
-    },
-    {
-      key: 'board',
-      icon: <AppstoreOutlined />,
-      label: 'Board',
-      onClick: () => navTo(`/projects/${currentProject.id}?tab=board`),
     },
     ...(isAdmin || hasPermission('PROJECT_MANAGE_MEMBERS') ? [{
       key: 'members',
