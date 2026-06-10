@@ -130,14 +130,14 @@ function buildCols(
       cur = cur.add(1, 'day');
     }
   } else if (mode === 'week') {
-    cur = cur.startOf('isoWeek' as any);
+    cur = cur.startOf('isoWeek');
     while (!cur.isAfter(finish)) {
       cols.push({
         key: cur.format('YYYY-[W]WW'),
         date: cur,
         label: `W${cur.format('WW')}`,
         monthLabel: cur.format('MMM YYYY'),
-        isToday: today.isSame(cur, 'isoWeek' as any),
+        isToday: today.isSame(cur, 'isoWeek'),
         isWeekend: false,
         isMonthStart: cur.date() <= 7,
       });
@@ -218,10 +218,10 @@ const TaskBar: React.FC<TaskBarProps> = ({ task, colWidth, cols, onClick, mode }
     if (mode === 'day') {
       return d.diff(rangeStart.startOf('day'), 'day') * colWidth;
     } else if (mode === 'week') {
-      const startOfRange = rangeStart.startOf('isoWeek' as any);
-      const weekIdx = d.startOf('isoWeek' as any).diff(startOfRange, 'week');
-      // (day() + 6) % 7: Mon=0, Tue=1, ..., Sun=6  →  fraction 0..1
-      const dayFraction = (d.day() + 6) % 7 / 7;
+      const startOfRange = rangeStart.startOf('isoWeek');
+      const weekIdx = d.startOf('isoWeek').diff(startOfRange, 'week');
+      // isoWeekday(): Mon=1 … Sun=7  →  fraction 0..1
+      const dayFraction = (d.isoWeekday() - 1) / 7;
       return weekIdx * colWidth + dayFraction * colWidth;
     } else {
       const startOfRange = rangeStart.startOf('month');
