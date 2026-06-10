@@ -314,7 +314,7 @@ const ProjectDetailPage: React.FC = () => {
   // Export modal
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportSheets, setExportSheets] = useState<ExportSheet[]>(['overview', 'tasks', 'members', 'sprints', 'overdue']);
-  const [exportSprintId, setExportSprintId] = useState<string | undefined>();
+  const [exportSprintIds, setExportSprintIds] = useState<string[]>([]);
   const [exportAssigneeId, setExportAssigneeId] = useState<string | undefined>();
   const [exportDateFrom, setExportDateFrom] = useState<string | undefined>();
   const [exportDateTo, setExportDateTo] = useState<string | undefined>();
@@ -844,7 +844,7 @@ const ProjectDetailPage: React.FC = () => {
   // ── Export ────────────────────────────────────────────────
   const openExportModal = () => {
     setExportSheets(['overview', 'tasks', 'members', 'sprints', 'overdue']);
-    setExportSprintId(undefined);
+    setExportSprintIds([]);
     setExportAssigneeId(undefined);
     setExportDateFrom(undefined);
     setExportDateTo(undefined);
@@ -859,7 +859,7 @@ const ProjectDetailPage: React.FC = () => {
     try {
       await exportService.exportProjectTasks(projectId, {
         sheets: exportSheets.length > 0 ? exportSheets : undefined,
-        sprintId: exportSprintId,
+        sprintIds: exportSprintIds.length > 0 ? exportSprintIds : undefined,
         assigneeId: exportAssigneeId,
         dateFrom: exportDateFrom,
         dateTo: exportDateTo,
@@ -2275,11 +2275,12 @@ const ProjectDetailPage: React.FC = () => {
             <Col span={24}>
               <div style={{ fontSize: 12, marginBottom: 4 }}>Sprint</div>
               <Select
+                mode="multiple"
                 allowClear
                 placeholder="Tất cả sprint"
                 style={{ width: '100%' }}
-                value={exportSprintId}
-                onChange={(v) => setExportSprintId(v)}
+                value={exportSprintIds}
+                onChange={(v) => setExportSprintIds(v)}
                 options={sprints.map((s) => ({ value: s.id, label: s.name }))}
               />
             </Col>

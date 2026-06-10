@@ -5,7 +5,7 @@ export type ExportSheet = 'overview' | 'tasks' | 'members' | 'sprints' | 'overdu
 
 export interface ExportTasksParams {
   sheets?: ExportSheet[];
-  sprintId?: string;
+  sprintIds?: string[];
   assigneeId?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -26,25 +26,45 @@ function downloadBlob(data: Blob, filename: string) {
 
 export const exportService = {
   exportProjectTasks: async (projectId: string, params: ExportTasksParams = {}) => {
-    const query: Record<string, string> = {};
-    if (params.sheets?.length) query.sheets = params.sheets.join(',');
-    if (params.sprintId) query.sprintId = params.sprintId;
-    if (params.assigneeId) query.assigneeId = params.assigneeId;
-    if (params.dateFrom) query.dateFrom = params.dateFrom;
-    if (params.dateTo) query.dateTo = params.dateTo;
-    if (params.statuses?.length) query.statuses = params.statuses.join(',');
-    if (params.priorities?.length) query.priorities = params.priorities.join(',');
+    const query = new URLSearchParams();
+
+    // sheets dùng join(',') vì Spring nhận Set<String>
+    if (params.sheets?.length) query.append('sheets', params.sheets.join(','));
+
+    // sprintIds, statuses, priorities dùng multi-value append vì Spring nhận List
+    params.sprintIds?.forEach(id => query.append('sprintIds', id));
+    params.statuses?.forEach(s => query.append('statuses', s));
+    params.priorities?.forEach(p => query.append('priorities', p));
+
+    if (params.assigneeId) query.append('assigneeId', params.assigneeId);
+    if (params.dateFrom)   query.append('dateFrom', params.dateFrom);
+    if (params.dateTo)     query.append('dateTo', params.dateTo);
 
     const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-    const response = await axios.get(
-      `${config.apiBaseUrl}/export/projects/${projectId}/tasks/excel`,
-      {
-        params: query,
-        responseType: 'blob',
-        headers: { Authorization: `Bearer ${token ?? ''}` },
-      }
-    );
+    try {
+      const response = await axios.get(
+        `${config.apiBaseUrl}/export/projects/${projectId}/tasks/excel`,
+        {
+          params: query,
+          responseType: 'blob',
+          headers: { Authorization: `Bearer ${token ?? ''}` },
+        }
+      );
 
-    downloadBlob(response.data, `bao-cao-${projectId}.xlsx`);
+      const date = new Date().toISOString().slice(0, 10);
+      downloadBlob(response.data, `bao-cao-${date}.xlsx`);
+    } catch (error: any) {
+      // Server trả ApiResponse JSON dưới dạng blob khi lỗi
+      if (error.response?.data instanceof Blob) {
+        const text = await error.response.data.text();
+        try {
+          const json = JSON.parse(text);
+          throw new Error(json.message || 'Xuất Excel thất bại');
+        } catch {
+          throw new Error('Xuất Excel thất bại');
+        }
+      }
+      throw error;
+    }
   },
 };
