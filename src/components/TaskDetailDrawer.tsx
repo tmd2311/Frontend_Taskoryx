@@ -11,7 +11,7 @@ import {
   PaperClipOutlined, FolderOutlined, AppstoreOutlined, SendOutlined,
   FileOutlined, FileImageOutlined, FilePdfOutlined, FileExcelOutlined,
   FileWordOutlined, FileZipOutlined, ReloadOutlined, DownloadOutlined,
-  MessageOutlined, CheckSquareOutlined, ClockCircleOutlined, LinkOutlined,
+  MessageOutlined, CheckSquareOutlined, ClockCircleOutlined,
   PlusOutlined, EyeOutlined, EyeFilled, HistoryOutlined,
 } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
@@ -21,7 +21,6 @@ import { useThemeStore } from '../stores/themeStore';
 import { projectService } from '../services/projectService';
 import { checklistService } from '../services/checklistService';
 import { timeTrackingService } from '../services/timeTrackingService';
-import { dependencyService } from '../services/dependencyService';
 import { watcherService } from '../services/watcherService';
 import RichTextEditor from './RichTextEditor';
 import QuillCommentEditor from './QuillCommentEditor';
@@ -30,10 +29,10 @@ import { downloadAttachment } from '../utils/attachment';
 import { resolveAvatarUrl } from '../utils/avatar';
 import type {
   ProjectMember, Comment, Attachment, ChecklistItem, ChecklistSummary,
-  TimeEntry, TaskDependency, ActivityLog,
+  TimeEntry, ActivityLog,
 } from '../types';
 import { activityService } from '../services/activityService';
-import { TaskPriority, TaskStatus, DependencyType } from '../types';
+import { TaskPriority, TaskStatus } from '../types';
 import StatusSelect, { StatusTag } from './StatusSelect';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -55,10 +54,6 @@ const PRIORITY_LABEL: Record<string, string> = {
   [TaskPriority.HIGH]: 'Cao', [TaskPriority.URGENT]: 'Khẩn cấp',
 };
 
-const DEP_TYPE_LABEL: Record<string, string> = {
-  BLOCKS: 'Chặn',
-  RELATES_TO: 'Liên quan đến',
-};
 
 const ACTION_LABEL: Record<string, string> = {
   CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xóa',
@@ -304,11 +299,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const [editTimeForm] = Form.useForm();
 
   // Dependencies
-  const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
-  const [depsLoading, setDepsLoading] = useState(false);
-  const [addDepModal, setAddDepModal] = useState(false);
-  const [depForm] = Form.useForm();
-  const [depSaving, setDepSaving] = useState(false);
 
   // Watchers
   const [watching, setWatching] = useState(false);
@@ -330,7 +320,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
       setReplyTo(null);
       setChecklist(null);
       setTimeEntries([]);
-      setDependencies([]);
       setTaskActivity([]);
       fetchTaskById(taskId);
       fetchWatchStatus(taskId);
@@ -346,7 +335,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     if (activeTab === 'attachments') fetchAttachments(taskId);
     if (activeTab === 'checklist') fetchChecklist(taskId);
     if (activeTab === 'time') fetchTimeEntries(taskId);
-    if (activeTab === 'dependencies') fetchDependencies(taskId);
     if (activeTab === 'history') fetchTaskActivity(taskId);
   }, [activeTab, taskId]);
 
@@ -388,16 +376,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
       setTimeTotal(total.totalHours ?? 0);
     } catch { /* ignore */ } finally {
       setTimeLoading(false);
-    }
-  }, []);
-
-  const fetchDependencies = useCallback(async (id: string) => {
-    setDepsLoading(true);
-    try {
-      const data = await dependencyService.getDependencies(id);
-      setDependencies(data);
-    } catch { /* ignore */ } finally {
-      setDepsLoading(false);
     }
   }, []);
 
@@ -639,37 +617,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     }
   };
 
-  // ── Dependencies ──────────────────────────────────────────
-  const handleAddDependency = async (values: any) => {
-    if (!taskId) return;
-    setDepSaving(true);
-    try {
-      await dependencyService.addDependency(taskId, {
-        dependsOnTaskId: values.dependsOnTaskId.trim(),
-        type: values.type,
-      });
-      message.success('Đã thêm phụ thuộc');
-      setAddDepModal(false);
-      depForm.resetFields();
-      fetchDependencies(taskId);
-    } catch (e: any) {
-      message.error(e.message || 'Thêm phụ thuộc thất bại');
-    } finally {
-      setDepSaving(false);
-    }
-  };
-
-  const handleDeleteDependency = async (depId: string) => {
-    if (!taskId) return;
-    try {
-      await dependencyService.deleteDependency(taskId, depId);
-      message.success('Đã xóa phụ thuộc');
-      fetchDependencies(taskId);
-    } catch (e: any) {
-      message.error(e.message || 'Xóa thất bại');
-    }
-  };
-
   // ── Watchers ──────────────────────────────────────────────
   const handleToggleWatch = async () => {
     if (!taskId) return;
@@ -760,19 +707,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
         <Space size={4}>
           <ClockCircleOutlined />
           Giờ làm
-        </Space>
-      ),
-      children: null,
-    },
-    {
-      key: 'dependencies',
-      label: (
-        <Space size={4}>
-          <LinkOutlined />
-          Liên kết
-          {dependencies.length > 0 && (
-            <Badge count={dependencies.length} size="small" color="#722ed1" />
-          )}
         </Space>
       ),
       children: null,
@@ -1328,52 +1262,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
               </>
             )}
 
-            {/* ═══════════ LIÊN KẾT / DEPENDENCIES ═══════════ */}
-            {activeTab === 'dependencies' && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <Text type="secondary" style={{ fontSize: 13 }}>
-                    {dependencies.length} liên kết
-                  </Text>
-                  <Button type="primary" icon={<PlusOutlined />} size="small"
-                    onClick={() => { depForm.resetFields(); setAddDepModal(true); }}>
-                    Thêm liên kết
-                  </Button>
-                </div>
-
-                {depsLoading ? (
-                  <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-                ) : dependencies.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '30px 0', color: '#bfbfbf' }}>
-                    <LinkOutlined style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
-                    Chưa có liên kết nào
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {dependencies.map((dep) => (
-                      <div key={dep.id} style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '10px 12px', background: subtleBg,
-                        borderRadius: 6, border: `1px solid ${borderColor}`,
-                      }}>
-                        <Tag color="purple" style={{ margin: 0 }}>{DEP_TYPE_LABEL[dep.type] || dep.type}</Tag>
-                        <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{dep.dependsOnTaskKey}</Tag>
-                        <Text style={{ flex: 1, fontSize: 13 }} ellipsis={{ tooltip: dep.dependsOnTaskTitle }}>
-                          {dep.dependsOnTaskTitle}
-                        </Text>
-                        <Popconfirm
-                          title="Xóa liên kết này?"
-                          onConfirm={() => handleDeleteDependency(dep.id)}
-                          okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}
-                        >
-                          <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                        </Popconfirm>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
 
             {/* ═══════════ LỊCH SỬ HOẠT ĐỘNG ═══════════ */}
             {activeTab === 'history' && (
@@ -1640,30 +1528,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
         </Form>
       </Modal>
 
-      {/* Modal thêm dependency */}
-      <Modal
-        title={<Space><LinkOutlined />Thêm liên kết task</Space>}
-        open={addDepModal}
-        onCancel={() => setAddDepModal(false)}
-        footer={null}
-        destroyOnHidden
-      >
-        <Form form={depForm} layout="vertical" onFinish={handleAddDependency} style={{ marginTop: 8 }}>
-          <Form.Item name="type" label="Loại liên kết"
-            rules={[{ required: true, message: 'Chọn loại liên kết' }]}
-            initialValue={DependencyType.RELATES_TO}>
-            <Select options={Object.entries(DEP_TYPE_LABEL).map(([k, v]) => ({ value: k, label: v }))} />
-          </Form.Item>
-          <Form.Item name="dependsOnTaskId" label="Task ID liên kết"
-            rules={[{ required: true, message: 'Vui lòng nhập Task ID' }]}>
-            <Input placeholder="Nhập UUID của task cần liên kết" />
-          </Form.Item>
-          <Space>
-            <Button type="primary" htmlType="submit" loading={depSaving}>Thêm liên kết</Button>
-            <Button onClick={() => setAddDepModal(false)}>Hủy</Button>
-          </Space>
-        </Form>
-      </Modal>
     </Drawer>
   );
 };
