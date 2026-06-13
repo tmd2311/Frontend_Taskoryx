@@ -140,7 +140,11 @@ const AdminUsersPage: React.FC = () => {
       setCreateModalOpen(false);
       createForm.resetFields();
       reload();
-      message.success('Tạo tài khoản thành công. Mật khẩu đã được gửi về email của người dùng.');
+      Modal.success({
+        title: 'Tạo tài khoản thành công',
+        content: `Mật khẩu tạm thời đã được gửi về email của ${newUser.fullName || newUser.username}. Người dùng sẽ được yêu cầu đổi mật khẩu khi đăng nhập lần đầu.`,
+        okText: 'Đóng',
+      });
     } catch (e: any) {
       message.error(e.message || 'Tạo người dùng thất bại');
     } finally {
@@ -217,7 +221,11 @@ const AdminUsersPage: React.FC = () => {
       onOk: async () => {
         try {
           await resetPassword(user.id);
-          message.success(`Đã đặt lại mật khẩu. Email xác nhận đã được gửi tới ${user.email}`);
+          Modal.success({
+            title: 'Đặt lại mật khẩu thành công',
+            content: `Mật khẩu mới đã được gửi về email ${user.email}. Người dùng sẽ được yêu cầu đổi mật khẩu khi đăng nhập lần đầu.`,
+            okText: 'Đóng',
+          });
         } catch (e: any) {
           message.error(e.message || 'Đặt lại mật khẩu thất bại');
         }
