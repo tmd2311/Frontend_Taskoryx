@@ -173,12 +173,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   // ── Project nav items ──
   const projectNavItems = currentProject ? [
-    ...(isAdmin || hasPermission('REPORT_VIEW') ? [{
+    {
       key: 'stats',
       icon: <BarChartOutlined />,
       label: 'Thống kê',
       onClick: () => navTo(`/projects/${currentProject.id}?tab=stats`),
-    }] : []),
+    },
     {
       key: 'tasks',
       icon: <CheckSquareOutlined />,

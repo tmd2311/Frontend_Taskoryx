@@ -327,84 +327,6 @@ const AdminTemplatesPage: React.FC = () => {
   const isViewMode = modalMode === 'view';
   const isEditable = modalMode === 'create' || modalMode === 'edit';
 
-  // ── Column builder UI ─────────────────────────────────────
-  const renderColumnBuilder = () => (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <Text strong style={{ fontSize: 13 }}>Cột Kanban</Text>
-        {isEditable && (
-          <Button size="small" icon={<PlusOutlined />} onClick={addColumn}>
-            Thêm cột
-          </Button>
-        )}
-      </div>
-      {columns.length === 0 && (
-        <Text type="secondary" style={{ fontSize: 12 }}>Chưa có cột nào</Text>
-      )}
-      {columns.map((col, idx) => (
-        <div
-          key={idx}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
-            padding: '6px 10px', background: '#fafafa', borderRadius: 6,
-            border: '1px solid #f0f0f0',
-          }}
-        >
-          {isEditable && <HolderOutlined style={{ color: '#bbb', cursor: 'grab' }} />}
-          <div
-            style={{
-              width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-              background: col.color, border: '1px solid #ddd',
-            }}
-          />
-          {isEditable ? (
-            <>
-              <Input
-                size="small"
-                placeholder="Tên cột"
-                value={col.name}
-                onChange={(e) => updateColumn(idx, { name: e.target.value })}
-                style={{ flex: 1 }}
-              />
-              <Select
-                size="small"
-                value={col.mappedStatus}
-                onChange={(v) => updateColumn(idx, { mappedStatus: v })}
-                options={STATUS_OPTIONS}
-                style={{ width: 130 }}
-              />
-              <ColorPicker
-                size="small"
-                value={col.color}
-                onChange={(c) => updateColumn(idx, { color: c.toHexString().slice(0, 7) })}
-                disabledAlpha
-              />
-              <Tooltip title="Cột hoàn thành">
-                <Switch
-                  size="small"
-                  checked={col.isCompleted}
-                  onChange={(v) => updateColumn(idx, { isCompleted: v })}
-                />
-              </Tooltip>
-              <Tooltip title="Xóa cột">
-                <Button
-                  type="text" size="small" danger
-                  icon={<MinusCircleOutlined />}
-                  onClick={() => removeColumn(idx)}
-                />
-              </Tooltip>
-            </>
-          ) : (
-            <>
-              <Text style={{ flex: 1, fontSize: 13 }}>{col.name}</Text>
-              <Text type="secondary" style={{ fontSize: 11 }}>{col.mappedStatus}</Text>
-              {col.isCompleted && <Tag color="green" style={{ fontSize: 11 }}>Hoàn thành</Tag>}
-            </>
-          )}
-        </div>
-      ))}
-    </div>
-  );
 
   return (
     <div>
@@ -568,18 +490,6 @@ const AdminTemplatesPage: React.FC = () => {
           />
         </div>
 
-        <Divider style={{ margin: '12px 0' }} />
-
-        {renderColumnBuilder()}
-
-        {isEditable && !columns.some((c) => c.isCompleted) && columns.length > 0 && (
-          <Alert
-            type="warning"
-            showIcon
-            message="Cần ít nhất 1 cột được đánh dấu là cột hoàn thành (toggle xanh)"
-            style={{ marginTop: 8 }}
-          />
-        )}
       </Modal>
     </div>
   );

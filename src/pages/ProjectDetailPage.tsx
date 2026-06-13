@@ -504,7 +504,7 @@ const ProjectDetailPage: React.FC = () => {
       const data = await projectService.getStats(projectId);
       setProjectStats(data);
     } catch (e: any) {
-      if (e?.status === 403) setForbiddenTab('stats');
+      // stats visible to all members — do not hide tab on error
     } finally {
       setStatsLoading(false);
     }
