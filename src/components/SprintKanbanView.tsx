@@ -43,10 +43,11 @@ export interface SprintKanbanViewProps {
   allSprints?: Sprint[];
   onOpenTask: (taskKey: string) => void;
   onRefreshStats?: () => void;
+  onTaskStatusChange?: (fromStatus: TaskStatus, toStatus: TaskStatus) => void;
 }
 
 const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
-  projectId, sprintId, allSprints = [], onOpenTask, onRefreshStats,
+  projectId, sprintId, allSprints = [], onOpenTask, onRefreshStats, onTaskStatusChange,
 }) => {
   const { isDark } = useThemeStore();
   const colBg        = isDark ? '#1c1f2e' : '#f7f8fa';
@@ -116,6 +117,7 @@ const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
     if (srcStatus !== dstStatus) {
       try {
         await taskService.updateStatus(draggableId, { status: dstStatus });
+        onTaskStatusChange?.(srcStatus, dstStatus);
         onRefreshStats?.();
       } catch {
         message.error('Không thể cập nhật trạng thái task');

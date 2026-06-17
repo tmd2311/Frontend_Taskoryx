@@ -1269,12 +1269,12 @@ const TaskDetailPage: React.FC = () => {
                 )}
 
                 {/* Cột Kanban */}
-                {task.columnName && (
+                {/* {task.columnName && (
                   <div style={{ padding: '10px 14px', borderBottom: `1px solid ${borderColor}` }}>
                     <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cột Kanban</Text>
                     <Tag><AppstoreOutlined /> {task.columnName}</Tag>
                   </div>
-                )}
+                )} */}
 
                 {/* Người tạo */}
                 {task.reporterName && (

@@ -1194,6 +1194,20 @@ const ProjectDetailPage: React.FC = () => {
                           allSprints={sprints}
                           onOpenTask={(taskKey) => navigate(`/tasks/${taskKey}`)}
                           onRefreshStats={() => fetchSprints()}
+                          onTaskStatusChange={(fromStatus, toStatus) => {
+                            const DONE_STATUSES: string[] = ['DONE', 'RESOLVED'];
+                            const wasDone = DONE_STATUSES.includes(fromStatus);
+                            const isDone  = DONE_STATUSES.includes(toStatus);
+                            if (wasDone === isDone) return; // completedTaskCount không đổi
+                            setSprints(prev => prev.map(s => {
+                              if (s.id !== sprint.id) return s;
+                              const delta = isDone ? 1 : -1;
+                              return {
+                                ...s,
+                                completedTaskCount: Math.max(0, (s.completedTaskCount ?? 0) + delta),
+                              };
+                            }));
+                          }}
                         />
                       )}
                     </div>

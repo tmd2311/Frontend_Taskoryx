@@ -8,7 +8,7 @@ import {
 import {
   EditOutlined, DeleteOutlined, CloseOutlined, SaveOutlined, UserOutlined,
   CalendarOutlined, ExclamationCircleOutlined, CommentOutlined,
-  PaperClipOutlined, FolderOutlined, AppstoreOutlined, SendOutlined,
+  PaperClipOutlined, FolderOutlined, SendOutlined,
   FileOutlined, FileImageOutlined, FilePdfOutlined, FileExcelOutlined,
   FileWordOutlined, FileZipOutlined, ReloadOutlined, DownloadOutlined,
   MessageOutlined, CheckSquareOutlined, ClockCircleOutlined,
@@ -19,6 +19,7 @@ import { useTaskStore } from '../stores/taskStore';
 import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
 import { projectService } from '../services/projectService';
+import { sprintService } from '../services/sprintService';
 import { checklistService } from '../services/checklistService';
 import { timeTrackingService } from '../services/timeTrackingService';
 import { watcherService } from '../services/watcherService';
@@ -29,7 +30,7 @@ import { downloadAttachment } from '../utils/attachment';
 import { resolveAvatarUrl } from '../utils/avatar';
 import type {
   ProjectMember, Comment, Attachment, ChecklistItem, ChecklistSummary,
-  TimeEntry, ActivityLog, Task as TaskType,
+  TimeEntry, ActivityLog, Task as TaskType, Sprint,
 } from '../types';
 import { taskService } from '../services/taskService';
 import { activityService } from '../services/activityService';
@@ -274,6 +275,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
 
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
 
   // Comments
   const [commentHtml, setCommentHtml] = useState('');
@@ -320,6 +322,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
       setEditMode(false);
       setActiveTab('detail');
       setMembers([]);
+      setSprints([]);
       setCommentHtml('');
       setReplyTo(null);
       setChecklist(null);
@@ -355,13 +358,19 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     return () => { cancelled = true; };
   }, [task?.parentTaskId]);
 
-  // ── Fetch members khi vào edit mode ───────────────────────
+  // ── Fetch members + sprints khi vào edit mode ─────────────
   useEffect(() => {
-    if (editMode && task?.projectId && members.length === 0) {
-      setMembersLoading(true);
-      projectService.getMembers(task.projectId)
-        .then(setMembers).catch(() => { })
-        .finally(() => setMembersLoading(false));
+    if (editMode && task?.projectId) {
+      if (members.length === 0) {
+        setMembersLoading(true);
+        projectService.getMembers(task.projectId)
+          .then(setMembers).catch(() => { })
+          .finally(() => setMembersLoading(false));
+      }
+      if (sprints.length === 0) {
+        sprintService.getSprints(task.projectId)
+          .then(setSprints).catch(() => { });
+      }
     }
   }, [editMode, task?.projectId]);
 
@@ -414,6 +423,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
       description: task.description,
       priority: task.priority,
       assigneeId: task.assigneeId ?? null,
+      sprintId: task.sprintId ?? null,
       dueDate: task.dueDate ? dayjs(task.dueDate) : null,
       startDate: task.startDate ? dayjs(task.startDate) : null,
       estimatedHours: task.estimatedHours,
@@ -430,6 +440,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
         description: values.description || undefined,
         priority: values.priority,
         assigneeId: values.assigneeId ?? undefined,
+        sprintId: values.sprintId ?? undefined,
         dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : undefined,
         startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : undefined,
         estimatedHours: values.estimatedHours,
@@ -460,6 +471,7 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     setEditMode(false);
     form.resetFields();
     setMembers([]);
+    setSprints([]);
     setCommentHtml('');
     setReplyTo(null);
     setCurrentTask(null);
@@ -849,6 +861,16 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                     }
                   />
                 </Form.Item>
+                <Form.Item name="sprintId" label="Sprint">
+                  <Select
+                    placeholder="Chọn sprint"
+                    allowClear
+                    options={[
+                      { label: '— Backlog —', value: null },
+                      ...sprints.map(s => ({ label: s.name, value: s.id })),
+                    ]}
+                  />
+                </Form.Item>
                 <Space style={{ width: '100%' }}>
                   <Form.Item name="startDate" label="Ngày bắt đầu" style={{ flex: 1 }}
                     rules={[{
@@ -920,11 +942,6 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                       );
                     })()}
                   </Descriptions.Item>
-                  {task.columnName && (
-                    <Descriptions.Item label={<Space size={4}><AppstoreOutlined />Cột</Space>}>
-                      <Tag>{task.columnName}</Tag>
-                    </Descriptions.Item>
-                  )}
                   {task.projectName && (
                     <Descriptions.Item label={<Space size={4}><FolderOutlined />Dự án</Space>}>
                       <Space size={4}>
