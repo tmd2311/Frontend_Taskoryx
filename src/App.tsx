@@ -173,7 +173,7 @@ function App() {
           <Route
             path="/time-report"
             element={
-              <ProtectedRoute requiredPermission="REPORT_VIEW">
+              <ProtectedRoute requiredPermission={['REPORT_VIEW', 'TASK_VIEW']}>
                 <MainLayout>
                   <TimeReportPage />
                 </MainLayout>
