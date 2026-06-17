@@ -47,10 +47,19 @@ interface StatusSelectProps {
   loading?: boolean;
   size?: 'small' | 'middle' | 'large';
   style?: React.CSSProperties;
+  disabledValues?: string[];
+  disabledTooltip?: string;
 }
 
 /** Dropdown chọn trạng thái */
-const StatusSelect: React.FC<StatusSelectProps> = ({ value, onChange, loading, size, style }) => {
+const StatusSelect: React.FC<StatusSelectProps> = ({ value, onChange, loading, size, style, disabledValues, disabledTooltip }) => {
+  const options = STATUS_OPTIONS.map(opt => ({
+    ...opt,
+    disabled: disabledValues?.includes(opt.value as string),
+    label: disabledValues?.includes(opt.value as string) ? (
+      <span title={disabledTooltip} style={{ opacity: 0.5 }}>{opt.label}</span>
+    ) : opt.label,
+  }));
   return (
     <Select
       value={value}
@@ -58,7 +67,7 @@ const StatusSelect: React.FC<StatusSelectProps> = ({ value, onChange, loading, s
       loading={loading}
       size={size}
       style={{ minWidth: 150, ...style }}
-      options={STATUS_OPTIONS}
+      options={options}
       labelRender={({ value: v }) => {
         const c = STATUS_CONFIG[v as string];
         if (!c) return <span>{v}</span>;

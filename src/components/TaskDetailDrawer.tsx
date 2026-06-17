@@ -29,8 +29,9 @@ import { downloadAttachment } from '../utils/attachment';
 import { resolveAvatarUrl } from '../utils/avatar';
 import type {
   ProjectMember, Comment, Attachment, ChecklistItem, ChecklistSummary,
-  TimeEntry, ActivityLog,
+  TimeEntry, ActivityLog, Task as TaskType,
 } from '../types';
+import { taskService } from '../services/taskService';
 import { activityService } from '../services/activityService';
 import { TaskPriority, TaskStatus } from '../types';
 import StatusSelect, { StatusTag } from './StatusSelect';
@@ -307,6 +308,9 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const [taskActivity, setTaskActivity] = useState<ActivityLog[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
 
+  // Parent task – để giới hạn date picker
+  const [parentTask, setParentTask] = useState<TaskType | null>(null);
+
   const open = !!taskId;
   const task = currentTask?.id === taskId ? currentTask : null;
 
@@ -337,6 +341,19 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
     if (activeTab === 'time') fetchTimeEntries(taskId);
     if (activeTab === 'history') fetchTaskActivity(taskId);
   }, [activeTab, taskId]);
+
+  // ── Fetch parent task để giới hạn date picker ─────────────
+  useEffect(() => {
+    let cancelled = false;
+    if (task?.parentTaskId) {
+      taskService.getTaskById(task.parentTaskId)
+        .then(p => { if (!cancelled) setParentTask(p); })
+        .catch(() => { if (!cancelled) setParentTask(null); });
+    } else {
+      setParentTask(null);
+    }
+    return () => { cancelled = true; };
+  }, [task?.parentTaskId]);
 
   // ── Fetch members khi vào edit mode ───────────────────────
   useEffect(() => {
@@ -833,11 +850,33 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                   />
                 </Form.Item>
                 <Space style={{ width: '100%' }}>
-                  <Form.Item name="startDate" label="Ngày bắt đầu" style={{ flex: 1 }}>
-                    <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+                  <Form.Item name="startDate" label="Ngày bắt đầu" style={{ flex: 1 }}
+                    rules={[{
+                      validator: async (_, value) => {
+                        const due = form.getFieldValue('dueDate');
+                        if (value && due && value.isAfter(due)) throw new Error('Ngày bắt đầu phải trước hạn chót');
+                      },
+                    }]}>
+                    <DatePicker
+                      style={{ width: '100%' }} format="DD/MM/YYYY"
+                      minDate={parentTask?.startDate ? dayjs(parentTask.startDate) : undefined}
+                      maxDate={parentTask?.dueDate ? dayjs(parentTask.dueDate) : undefined}
+                      onChange={() => form.validateFields(['dueDate'])}
+                    />
                   </Form.Item>
-                  <Form.Item name="dueDate" label="Hạn chót" style={{ flex: 1 }}>
-                    <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+                  <Form.Item name="dueDate" label="Hạn chót" style={{ flex: 1 }}
+                    rules={[{
+                      validator: async (_, value) => {
+                        const start = form.getFieldValue('startDate');
+                        if (value && start && value.isBefore(start)) throw new Error('Hạn chót phải sau ngày bắt đầu');
+                      },
+                    }]}>
+                    <DatePicker
+                      style={{ width: '100%' }} format="DD/MM/YYYY"
+                      minDate={parentTask?.startDate ? dayjs(parentTask.startDate) : undefined}
+                      maxDate={parentTask?.dueDate ? dayjs(parentTask.dueDate) : undefined}
+                      onChange={() => form.validateFields(['startDate'])}
+                    />
                   </Form.Item>
                 </Space>
                 <Form.Item name="estimatedHours" label="Giờ ước tính">
@@ -859,18 +898,27 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                 <Divider style={{ margin: '12px 0' }} />
                 <Descriptions column={1} size="small" labelStyle={{ color: subColor, width: 130 }}>
                   <Descriptions.Item label="Trạng thái">
-                    <StatusSelect
-                      value={task.status}
-                      size="small"
-                      onChange={async (status) => {
-                        try {
-                          await updateTaskStatus(task.id, { status: status as TaskStatus });
-                          message.success('Đã cập nhật trạng thái');
-                        } catch (e: any) {
-                          message.error(e.message || 'Cập nhật thất bại');
-                        }
-                      }}
-                    />
+                    {(() => {
+                      const hasBlockingSubtasks = task.subTasks && task.subTasks.some(
+                        s => !['DONE', 'RESOLVED', 'CANCELLED'].includes(s.status)
+                      );
+                      return (
+                        <StatusSelect
+                          value={task.status}
+                          size="small"
+                          disabledValues={hasBlockingSubtasks ? ['DONE', 'RESOLVED'] : undefined}
+                          disabledTooltip="Còn task con chưa hoàn thành"
+                          onChange={async (status) => {
+                            try {
+                              await updateTaskStatus(task.id, { status: status as TaskStatus });
+                              message.success('Đã cập nhật trạng thái');
+                            } catch (e: any) {
+                              message.error(e?.response?.data?.message || e.message || 'Cập nhật thất bại');
+                            }
+                          }}
+                        />
+                      );
+                    })()}
                   </Descriptions.Item>
                   {task.columnName && (
                     <Descriptions.Item label={<Space size={4}><AppstoreOutlined />Cột</Space>}>
@@ -951,33 +999,41 @@ const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                 )}
 
                 {/* ── Đầu việc con ── */}
-                {task.subTasks && task.subTasks.length > 0 && (
-                  <>
-                    <Divider style={{ margin: '12px 0' }} />
-                    <div>
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        Đầu việc con ({task.subTasks.length})
-                      </Text>
-                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {task.subTasks.map((sub) => (
-                          <div key={sub.id} style={{
-                            padding: '8px 12px', background: subtleBg,
-                            borderRadius: 6, border: `1px solid ${borderColor}`,
-                            display: 'flex', alignItems: 'center', gap: 8,
-                          }}>
-                            <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{sub.taskKey}</Tag>
-                            <Text style={{ flex: 1, fontSize: 13 }} ellipsis={{ tooltip: sub.title }}>
-                              {sub.title}
-                            </Text>
-                            {sub.assigneeName && (
-                              <Text type="secondary" style={{ fontSize: 12 }}>{sub.assigneeName}</Text>
-                            )}
-                          </div>
-                        ))}
+                {task.subTasks && task.subTasks.length > 0 && (() => {
+                  const doneCount = task.subTasks.filter(s =>
+                    ['DONE', 'RESOLVED', 'CANCELLED'].includes(s.status)).length;
+                  const total = task.subTasks.length;
+                  const percent = Math.round((doneCount / total) * 100);
+                  return (
+                    <>
+                      <Divider style={{ margin: '12px 0' }} />
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            Đầu việc con ({doneCount}/{total} hoàn thành)
+                          </Text>
+                          <Text style={{ fontSize: 12, color: '#52c41a' }}>{percent}%</Text>
+                        </div>
+                        <Progress percent={percent} showInfo={false} strokeColor="#52c41a" size="small" style={{ marginBottom: 8 }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {task.subTasks.map((sub) => (
+                            <div key={sub.id} style={{
+                              padding: '8px 12px', background: subtleBg,
+                              borderRadius: 6, border: `1px solid ${borderColor}`,
+                              display: 'flex', alignItems: 'center', gap: 8,
+                            }}>
+                              <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{sub.taskKey}</Tag>
+                              <Text style={{ flex: 1, fontSize: 13 }} ellipsis={{ tooltip: sub.title }}>
+                                {sub.title}
+                              </Text>
+                              <StatusTag status={sub.status} small />
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  </>
-                )}
+                    </>
+                  );
+                })()}
               </>
             ))}
 
