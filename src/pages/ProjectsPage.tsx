@@ -14,7 +14,6 @@ import {
   Tooltip,
   Spin,
   Alert,
-
   Select,
   Avatar,
   message,
@@ -22,7 +21,9 @@ import {
   Divider,
   ColorPicker,
   Dropdown,
+  DatePicker,
 } from 'antd';
+import dayjs from 'dayjs';
 import type { MenuProps } from 'antd';
 import {
   PlusOutlined,
@@ -38,6 +39,7 @@ import {
   ExclamationCircleOutlined,
   EditOutlined,
   EllipsisOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
 import { useProjectStore } from '../stores/projectStore';
 import { usePermissionStore } from '../stores/permissionStore';
@@ -191,7 +193,7 @@ const ProjectCard: React.FC<{
         )}
 
         {/* Stats */}
-        <Space size={16} style={{ marginBottom: 12 }}>
+        <Space size={16} style={{ marginBottom: 8 }}>
           <Space size={4}>
             <TeamOutlined style={{ color: '#888' }} />
             <Text type="secondary" style={{ fontSize: 13 }}>
@@ -205,6 +207,20 @@ const ProjectCard: React.FC<{
             </Text>
           </Space>
         </Space>
+
+        {/* Dates */}
+        {(project.startDate || project.endDate) && (
+          <div style={{ marginBottom: 10 }}>
+            <Space size={4}>
+              <CalendarOutlined style={{ color: '#888', fontSize: 12 }} />
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {project.startDate ? dayjs(project.startDate).format('DD/MM/YYYY') : '?'}
+                {' → '}
+                {project.endDate ? dayjs(project.endDate).format('DD/MM/YYYY') : '?'}
+              </Text>
+            </Space>
+          </div>
+        )}
 
         {/* Footer */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -344,15 +360,22 @@ const ProjectsPage: React.FC = () => {
       color: project.color,
       isPublic: project.isPublic,
       isArchived: project.isArchived,
+      startDate: project.startDate ? (dayjs(project.startDate) as any) : undefined,
+      endDate: project.endDate ? (dayjs(project.endDate) as any) : undefined,
     });
     setEditModalOpen(true);
   };
 
-  const handleEdit = async (values: UpdateProjectRequest) => {
+  const handleEdit = async (values: any) => {
     if (!editTarget) return;
     setEditSubmitting(true);
     try {
-      const updated = await updateProject(editTarget.id, values);
+      const payload: UpdateProjectRequest = {
+        ...values,
+        startDate: values.startDate ? dayjs(values.startDate).format('YYYY-MM-DD') : undefined,
+        endDate: values.endDate ? dayjs(values.endDate).format('YYYY-MM-DD') : undefined,
+      };
+      const updated = await updateProject(editTarget.id, payload);
       if (isAdmin) {
         setAdminProjects((prev) => prev.map((p) => p.id === updated.id ? updated : p));
       }
@@ -590,6 +613,15 @@ const ProjectsPage: React.FC = () => {
               <Select.Option value={true}>Lưu trữ</Select.Option>
             </Select>
           </Form.Item>
+
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Form.Item name="startDate" label="Ngày bắt đầu" style={{ flex: 1 }}>
+              <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Chọn ngày" />
+            </Form.Item>
+            <Form.Item name="endDate" label="Ngày kết thúc" style={{ flex: 1 }}>
+              <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Chọn ngày" />
+            </Form.Item>
+          </div>
         </Form>
       </Modal>
 

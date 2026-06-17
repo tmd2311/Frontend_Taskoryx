@@ -8,7 +8,7 @@ import type { TableColumnsType } from 'antd';
 type ColumnsType<T> = TableColumnsType<T>;
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined,
-  AppstoreAddOutlined, MinusCircleOutlined, HolderOutlined,
+  AppstoreAddOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
@@ -40,14 +40,6 @@ const ENABLED_MODULES = [
   { label: 'Đính kèm file', value: 'ATTACHMENT' },
 ];
 
-const STATUS_OPTIONS = [
-  { label: 'TODO', value: 'TODO' },
-  { label: 'IN_PROGRESS', value: 'IN_PROGRESS' },
-  { label: 'IN_REVIEW', value: 'IN_REVIEW' },
-  { label: 'RESOLVED', value: 'RESOLVED' },
-  { label: 'DONE', value: 'DONE' },
-  { label: 'CANCELLED', value: 'CANCELLED' },
-];
 
 const DEFAULT_COLUMNS: TemplateColumn[] = [
   { name: 'Cần làm', color: '#f59e0b', isCompleted: false, mappedStatus: 'TODO' },
@@ -110,18 +102,6 @@ const AdminTemplatesPage: React.FC = () => {
     return acc;
   }, {} as Record<string, ProjectTemplate[]>);
 
-  // ── Column builder helpers ─────────────────────────────────
-  const addColumn = () =>
-    setColumns((prev) => [
-      ...prev,
-      { name: '', color: '#6b7280', isCompleted: false, mappedStatus: 'TODO' },
-    ]);
-
-  const removeColumn = (idx: number) =>
-    setColumns((prev) => prev.filter((_, i) => i !== idx));
-
-  const updateColumn = (idx: number, patch: Partial<TemplateColumn>) =>
-    setColumns((prev) => prev.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
 
   // ── Build columnsConfig string ─────────────────────────────
   const buildColumnsConfig = (): string => {

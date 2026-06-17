@@ -1696,13 +1696,23 @@ const ProjectDetailPage: React.FC = () => {
       {/* ── Tab thống kê dự án ── */}
       {activeTab === 'stats' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: project && (project.startDate || project.endDate) ? 6 : 16 }}>
             <Text strong style={{ fontSize: 15 }}>
               <RiseOutlined style={{ marginRight: 6, color: '#4361ee' }} />
               Thống kê dự án
             </Text>
             <Button size="small" icon={<ReloadOutlined />} onClick={fetchStats} loading={statsLoading}>Làm mới</Button>
           </div>
+          {project && (project.startDate || project.endDate) && (
+            <div style={{ marginBottom: 16 }}>
+              <CalendarOutlined style={{ marginRight: 6, color: '#8c8c8c', fontSize: 12 }} />
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                {project.startDate ? dayjs(project.startDate).format('DD/MM/YYYY') : '?'}
+                {' → '}
+                {project.endDate ? dayjs(project.endDate).format('DD/MM/YYYY') : '?'}
+              </Text>
+            </div>
+          )}
 
           {statsLoading && !projectStats ? (
             <div style={{ textAlign: 'center', padding: 60 }}><Spin /></div>

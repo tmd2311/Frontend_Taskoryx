@@ -186,6 +186,8 @@ export interface Project {
   taskCount?: number;
   currentUserRole?: ProjectRole;
   projectConfig?: ProjectConfig;
+  startDate?: string;
+  endDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -218,6 +220,8 @@ export interface UpdateProjectRequest {
   icon?: string;
   isPublic?: boolean;
   isArchived?: boolean;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface AddMemberRequest {
@@ -1092,6 +1096,14 @@ export interface AiSubTask {
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   duration_days: number;
   start_offset_days: number;
+  // fields mới
+  start_date?: string;        // ISO date (tuyệt đối, ưu tiên cao hơn offset)
+  due_date?: string;          // ISO date
+  status?: string;
+  estimated_hours?: number;
+  assignee_id?: string;
+  label_ids?: string[];
+  category_id?: string;
   sub_tasks: AiSubTask[];
 }
 
@@ -1101,6 +1113,14 @@ export interface AiTask {
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   duration_days: number;
   start_offset_days: number;
+  // fields mới
+  start_date?: string;
+  due_date?: string;
+  status?: string;
+  estimated_hours?: number;
+  assignee_id?: string;
+  label_ids?: string[];
+  category_id?: string;
   sub_tasks: AiSubTask[];
 }
 
@@ -1110,6 +1130,9 @@ export interface AiSprint {
   sprint_number: number;
   duration_days: number;
   start_offset_days: number;
+  // fields mới
+  start_date?: string;       // ISO date tuyệt đối
+  end_date?: string;         // ISO date tuyệt đối
   tasks: AiTask[];
 }
 

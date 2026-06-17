@@ -15,6 +15,10 @@ import {
   Col,
   Tooltip,
   Progress,
+  DatePicker,
+  InputNumber,
+  Popconfirm,
+  Select,
 } from 'antd';
 import {
   RobotOutlined,
@@ -27,18 +31,23 @@ import {
   LoadingOutlined,
   ExclamationCircleOutlined,
   CloseOutlined,
+  EditOutlined,
+  SaveOutlined,
+  DeleteOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
 import { aiService } from '../services/aiService';
 import { websocketService } from '../services/websocketService';
-import type { AiSprint, AiTask, AiSubTask, AiSessionResponse, AiJobResponse } from '../types';
+import type { AiSprint, AiTask, AiSubTask, AiSessionResponse, AiJobResponse, AiProjectPlan } from '../types';
 import { useThemeStore } from '../stores/themeStore';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
-// step: 'form' | 'waiting' | 'preview' | 'confirming' | 'error'
-type Step = 'form' | 'waiting' | 'preview' | 'confirming' | 'error';
+// step: 'form' | 'waiting' | 'preview' | 'editing' | 'confirming' | 'error'
+type Step = 'form' | 'waiting' | 'preview' | 'editing' | 'confirming' | 'error';
 
 const PRIORITY_COLOR: Record<string, string> = {
   LOW: '#22c55e',
@@ -168,6 +177,295 @@ const SprintPanel: React.FC<{
   );
 };
 
+// ─── EditTaskRow — task hoặc sub-task có expand description + sub_tasks ───────
+interface EditTaskRowProps {
+  task: AiTask | AiSubTask;
+  depth: number;
+  isDark: boolean;
+  onChange: (patch: Partial<AiTask>) => void;
+  onRemove: () => void;
+}
+
+const PRIORITY_OPTIONS = [
+  { label: 'Thấp', value: 'LOW' },
+  { label: 'Trung bình', value: 'MEDIUM' },
+  { label: 'Cao', value: 'HIGH' },
+  { label: 'Khẩn cấp', value: 'URGENT' },
+];
+
+const EditTaskRow: React.FC<EditTaskRowProps> = ({ task, depth, isDark, onChange, onRemove }) => {
+  const [expanded, setExpanded] = useState(false);
+  const rowBg = isDark ? (depth > 0 ? '#1a1d2e' : '#232638') : (depth > 0 ? '#f0f0f5' : '#fafafa');
+  const borderCol = isDark ? '#2e3250' : '#f0f0f0';
+
+  const addSubTask = () => {
+    const subs: AiSubTask[] = [...(task.sub_tasks ?? []), {
+      title: '',
+      priority: 'MEDIUM',
+      duration_days: 1,
+      start_offset_days: 0,
+      sub_tasks: [],
+    }];
+    onChange({ sub_tasks: subs } as any);
+  };
+
+  const updateSubTask = (idx: number, patch: Partial<AiSubTask>) => {
+    const subs = [...(task.sub_tasks ?? [])];
+    subs[idx] = { ...subs[idx], ...patch };
+    onChange({ sub_tasks: subs } as any);
+  };
+
+  const removeSubTask = (idx: number) => {
+    onChange({ sub_tasks: (task.sub_tasks ?? []).filter((_, k) => k !== idx) } as any);
+  };
+
+  return (
+    <div style={{ marginBottom: 4 }}>
+      {/* Main row */}
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+          padding: '5px 8px', paddingLeft: 8 + depth * 18,
+          borderRadius: 6, background: rowBg,
+          border: `1px solid ${borderCol}`,
+        }}
+      >
+        {/* Expand toggle */}
+        <Button
+          type="text"
+          size="small"
+          onClick={() => setExpanded(v => !v)}
+          style={{ padding: '0 2px', color: isDark ? '#5c6080' : '#bfbfbf', flexShrink: 0, fontSize: 11 }}
+          title={expanded ? 'Thu gọn' : 'Mở rộng (mô tả / sub-task)'}
+        >
+          {expanded ? '▼' : '▶'}
+        </Button>
+
+        {/* Title */}
+        <Input
+          value={task.title}
+          onChange={e => onChange({ title: e.target.value } as any)}
+          placeholder="Tên task..."
+          size="small"
+          style={{ flex: '1 1 160px', minWidth: 100 }}
+        />
+
+        {/* Priority */}
+        <Select
+          value={task.priority}
+          onChange={v => onChange({ priority: v } as any)}
+          size="small"
+          style={{ width: 108, flexShrink: 0 }}
+          options={PRIORITY_OPTIONS}
+        />
+
+        {/* Due date */}
+        <DatePicker
+          value={(task as AiTask).due_date ? dayjs((task as AiTask).due_date) : null}
+          onChange={d => onChange({ due_date: d?.format('YYYY-MM-DD') ?? undefined } as any)}
+          size="small"
+          format="DD/MM/YYYY"
+          placeholder="Hạn chót"
+          style={{ width: 126, flexShrink: 0 }}
+        />
+
+        {/* Estimated hours */}
+        <InputNumber
+          value={(task as AiTask).estimated_hours}
+          onChange={v => onChange({ estimated_hours: v ?? undefined } as any)}
+          min={0.5}
+          step={0.5}
+          size="small"
+          placeholder="h"
+          style={{ width: 72, flexShrink: 0 }}
+          addonAfter="h"
+        />
+
+        {/* Delete */}
+        <Popconfirm
+          title="Xóa task này?"
+          onConfirm={onRemove}
+          okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}
+        >
+          <Button danger type="text" size="small" icon={<DeleteOutlined />} style={{ flexShrink: 0 }} />
+        </Popconfirm>
+      </div>
+
+      {/* Expanded: description + sub_tasks */}
+      {expanded && (
+        <div style={{ paddingLeft: 8 + depth * 18 + 4, marginTop: 4 }}>
+          {/* Description */}
+          <Input.TextArea
+            value={task.description ?? ''}
+            onChange={e => onChange({ description: e.target.value } as any)}
+            placeholder="Mô tả task..."
+            autoSize={{ minRows: 2, maxRows: 5 }}
+            size="small"
+            style={{
+              fontSize: 13, color: isDark ? '#9397b0' : '#6b7280',
+              background: isDark ? '#1c1f2e' : '#fff',
+              border: `1px solid ${borderCol}`, borderRadius: 6,
+              marginBottom: 6, resize: 'none',
+            }}
+          />
+
+          {/* Sub-tasks (chỉ cấp 0 mới có) */}
+          {depth === 0 && (
+            <>
+              {(task.sub_tasks ?? []).map((sub, j) => (
+                <EditTaskRow
+                  key={j}
+                  task={sub}
+                  depth={1}
+                  isDark={isDark}
+                  onChange={patch => updateSubTask(j, patch as Partial<AiSubTask>)}
+                  onRemove={() => removeSubTask(j)}
+                />
+              ))}
+              <Button
+                type="dashed"
+                size="small"
+                icon={<PlusOutlined />}
+                onClick={addSubTask}
+                style={{ width: '100%', marginTop: 2, marginBottom: 4, fontSize: 12, color: isDark ? '#9397b0' : '#8c8c8c' }}
+              >
+                + Sub-task
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── EditPlanView ─────────────────────────────────────────────
+const EditPlanView: React.FC<{
+  plan: AiProjectPlan;
+  onChange: (plan: AiProjectPlan) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  isSaving: boolean;
+  isDark: boolean;
+}> = ({ plan, onChange, onSave, onCancel, isSaving, isDark }) => {
+  const cloneAndUpdate = (updater: (p: AiProjectPlan) => void): AiProjectPlan => {
+    const next = JSON.parse(JSON.stringify(plan)) as AiProjectPlan;
+    updater(next);
+    return next;
+  };
+
+  const updateSprint = (si: number, updater: (s: AiSprint) => void) =>
+    onChange(cloneAndUpdate(p => updater(p.sprints[si])));
+
+  const updateTask = (si: number, ti: number, patch: Partial<AiTask>) =>
+    onChange(cloneAndUpdate(p => { p.sprints[si].tasks[ti] = { ...p.sprints[si].tasks[ti], ...patch }; }));
+
+  const deleteSprint = (si: number) =>
+    onChange(cloneAndUpdate(p => { p.sprints.splice(si, 1); }));
+
+  const deleteTask = (si: number, ti: number) =>
+    onChange(cloneAndUpdate(p => { p.sprints[si].tasks.splice(ti, 1); }));
+
+  const addTask = (si: number) =>
+    onChange(cloneAndUpdate(p => {
+      p.sprints[si].tasks.push({ title: '', priority: 'MEDIUM', duration_days: 1, start_offset_days: 0, sub_tasks: [] });
+    }));
+
+  return (
+    <div style={{ maxWidth: 860, margin: '0 auto', padding: '24px 0' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <Title level={3} style={{ margin: 0 }}>Chỉnh sửa kế hoạch</Title>
+        <Space>
+          <Button onClick={onCancel} style={{ borderRadius: 8 }}>Hủy</Button>
+          <Button
+            type="primary"
+            loading={isSaving}
+            icon={<SaveOutlined />}
+            onClick={onSave}
+            style={{ borderRadius: 8 }}
+          >
+            Lưu thay đổi
+          </Button>
+        </Space>
+      </div>
+
+      {/* Sprint list */}
+      {plan.sprints.map((sprint, si) => (
+        <Card
+          key={si}
+          style={{ marginBottom: 16, borderRadius: 12, border: `1px solid ${isDark ? '#2e3250' : '#eef0f6'}` }}
+          bodyStyle={{ padding: '12px 16px' }}
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Input
+                value={sprint.name}
+                onChange={e => updateSprint(si, s => { s.name = e.target.value; })}
+                style={{ width: 200, fontWeight: 600 }}
+                size="small"
+              />
+              <DatePicker.RangePicker
+                size="small"
+                value={[
+                  sprint.start_date ? dayjs(sprint.start_date) : null,
+                  sprint.end_date ? dayjs(sprint.end_date) : null,
+                ]}
+                onChange={dates => updateSprint(si, s => {
+                  s.start_date = dates?.[0]?.format('YYYY-MM-DD') ?? undefined;
+                  s.end_date = dates?.[1]?.format('YYYY-MM-DD') ?? undefined;
+                })}
+                format="DD/MM/YYYY"
+                placeholder={['Bắt đầu', 'Kết thúc']}
+              />
+              <Popconfirm
+                title="Xóa sprint này?"
+                onConfirm={() => deleteSprint(si)}
+                okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}
+              >
+                <Button danger size="small" icon={<DeleteOutlined />} />
+              </Popconfirm>
+            </div>
+          }
+        >
+          {/* Goal */}
+          <Input
+            value={sprint.goal}
+            onChange={e => updateSprint(si, s => { s.goal = e.target.value; })}
+            placeholder="Goal của sprint..."
+            size="small"
+            style={{ marginBottom: 10, fontStyle: 'italic' }}
+            prefix={<span style={{ color: '#4361ee', marginRight: 4 }}>🎯</span>}
+          />
+
+          {/* Tasks */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {sprint.tasks.map((task, ti) => (
+              <EditTaskRow
+                key={ti}
+                task={task}
+                depth={0}
+                isDark={isDark}
+                onChange={patch => updateTask(si, ti, patch as Partial<AiTask>)}
+                onRemove={() => deleteTask(si, ti)}
+              />
+            ))}
+          </div>
+
+          <Button
+            type="dashed"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={() => addTask(si)}
+            style={{ marginTop: 8, width: '100%' }}
+          >
+            Thêm task
+          </Button>
+        </Card>
+      ))}
+    </div>
+  );
+};
+
 const EXAMPLE_PROMPTS = [
   'Xây dựng app thương mại điện tử bán đồ gia dụng có giỏ hàng, thanh toán và quản lý đơn hàng',
   'Tạo hệ thống quản lý nhân sự với chấm công, tính lương và đánh giá hiệu suất',
@@ -184,6 +482,8 @@ const AiProjectPage: React.FC = () => {
   const [sessionData, setSessionData] = useState<AiSessionResponse | null>(null);
   const [jobData, setJobData] = useState<AiJobResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingPlan, setEditingPlan] = useState<AiProjectPlan | null>(null);
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -387,6 +687,21 @@ const AiProjectPage: React.FC = () => {
     setJobData(null);
     setError(null);
     setStep('form');
+  };
+
+  const handleSavePlan = async () => {
+    if (!sessionId || !editingPlan) return;
+    setIsSavingPlan(true);
+    try {
+      const updated = await aiService.updateSessionPlan(sessionId, editingPlan);
+      setSessionData(prev => prev ? { ...prev, plan: updated.plan ?? editingPlan } : prev);
+      setStep('preview');
+      setError(null);
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || 'Lưu thất bại. Vui lòng thử lại.');
+    } finally {
+      setIsSavingPlan(false);
+    }
   };
 
   // ── Step: form ──
@@ -622,14 +937,27 @@ const AiProjectPage: React.FC = () => {
 
         {/* Actions */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={handleRegenerate}
-            size="large"
-            style={{ borderRadius: 8 }}
-          >
-            Sinh lại
-          </Button>
+          <Space>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={handleRegenerate}
+              size="large"
+              style={{ borderRadius: 8 }}
+            >
+              Sinh lại
+            </Button>
+            <Button
+              icon={<EditOutlined />}
+              onClick={() => {
+                setEditingPlan(JSON.parse(JSON.stringify(sessionData!.plan)));
+                setStep('editing');
+              }}
+              size="large"
+              style={{ borderRadius: 8 }}
+            >
+              Chỉnh sửa
+            </Button>
+          </Space>
           <Button
             type="primary"
             size="large"
@@ -647,6 +975,21 @@ const AiProjectPage: React.FC = () => {
           </Button>
         </div>
       </div>
+    );
+  }
+
+  // ── Step: editing ──
+  if (step === 'editing') {
+    if (!editingPlan) { setStep('preview'); return null; }
+    return (
+      <EditPlanView
+        plan={editingPlan}
+        onChange={setEditingPlan}
+        onSave={handleSavePlan}
+        onCancel={() => setStep('preview')}
+        isSaving={isSavingPlan}
+        isDark={isDark}
+      />
     );
   }
 

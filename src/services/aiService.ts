@@ -39,6 +39,12 @@ export const aiService = {
     return data;
   },
 
+  // ④ Cập nhật plan (PATCH)
+  updateSessionPlan: async (sessionId: string, plan: AiProjectPlan): Promise<AiSessionResponse> => {
+    const res: any = await api.patch(`/ai/projects/sessions/${sessionId}/plan`, { plan });
+    return res.data ?? res;
+  },
+
   // ⑥ Poll job confirm
   getJobStatus: async (jobId: string): Promise<AiJobResponse> => {
     const res: any = await api.get(`/ai/projects/jobs/${jobId}`);

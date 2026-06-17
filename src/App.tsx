@@ -8,7 +8,6 @@ import DashboardPage from './pages/DashboardPage';
 import TasksPage from './pages/TasksPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProfilePage from './pages/ProfilePage';
-import BoardsPage from './pages/BoardsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import AdminUsersPage from './pages/AdminUsersPage';
@@ -156,16 +155,6 @@ function App() {
               <ProtectedRoute requiredPermission="PROJECT_VIEW">
                 <MainLayout>
                   <ProjectDetailPage />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/boards"
-            element={
-              <ProtectedRoute requiredPermission="BOARD_VIEW">
-                <MainLayout>
-                  <BoardsPage />
                 </MainLayout>
               </ProtectedRoute>
             }
