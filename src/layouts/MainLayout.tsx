@@ -134,7 +134,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       label: 'Đầu việc của tôi',
       onClick: () => { navTo('/tasks'); setCurrentProject(null); },
     }] : []),
-    ...(isAdmin || hasPermission('REPORT_VIEW') ? [{
+    ...(isAdmin || hasPermission('REPORT_VIEW') || hasPermission('TASK_VIEW') ? [{
       key: '/time-report',
       icon: <ClockCircleOutlined />,
       label: 'Báo cáo giờ',
